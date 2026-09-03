@@ -1,0 +1,50 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "nest build",
+    "test": "node --test tests/refinanciamientos.test.cjs tests/movimientos-caja.test.cjs tests/use-cases-caja.integration.test.cjs tests/auth.test.cjs tests/initial-admin.seed.test.cjs tests/catalog-seeds.test.cjs tests/cierre-financiero.test.cjs tests/cierre-financiero-contract.test.cjs tests/ingresos.test.cjs tests/etapa1-prestamos-roles.test.cjs tests/etapa2-cartera-historica.test.cjs tests/prestamo-estado-historial.test.cjs",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "migration:run": "npm run build && typeorm migration:run -d dist/database/data-source.js",
+    "migration:revert": "npm run build && typeorm migration:revert -d dist/database/data-source.js",
+    "migration:show": "npm run build && typeorm migration:show -d dist/database/data-source.js",
+    "migration:generate": "npm run build && typeorm migration:generate -d dist/database/data-source.js",
+    "seed:initial": "npm run build && node dist/database/seed.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/jwt": "^12.0.1",
+    "@nestjs/passport": "^12.0.0",
+    "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/swagger": "^12.0.1",
+    "@nestjs/typeorm": "^12.0.1",
+    "bcrypt": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "dotenv": "^17.4.2",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "pg": "^8.23.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "typeorm": "^1.1.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/testing": "^12.0.1",
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "^26.4.0",
+    "@types/passport-jwt": "^4.0.1",
+    "typescript": "^6.0.3"
+  }
+}

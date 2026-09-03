@@ -1,0 +1,8 @@
+import { MovimientoCaja } from '../../../domain/entities/movimiento-caja';
+import { MovimientoCajaOrmEntity } from './movimiento-caja.orm-entity';
+const dbDate = (v: string | Date) => v instanceof Date ? new Date(Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate())) : new Date(`${v}T00:00:00.000Z`);
+const date = (v: Date) => v.toISOString().slice(0, 10);
+export class MovimientoCajaMapper {
+  static toDomain(e: MovimientoCajaOrmEntity) { const value = new MovimientoCaja(e.id, e.tipo, e.concepto, e.monto, dbDate(e.fecha), e.observaciones, e.pagoId, e.prestamoId, e.refinanciamientoId, e.movimientoReversadoId, e.usuarioId, e.fechaCreacion); return Object.assign(value, { pago: e.pago ? { id: e.pago.id } : undefined, prestamo: e.prestamo ? { id: e.prestamo.id } : undefined, refinanciamiento: e.refinanciamiento ? { id: e.refinanciamiento.id } : undefined, movimientoReversado: e.movimientoReversado ? { id: e.movimientoReversado.id, concepto: e.movimientoReversado.concepto, monto: e.movimientoReversado.monto } : undefined, reversiones: e.reversiones?.map(reversal => ({ id: reversal.id, tipo: reversal.tipo, monto: reversal.monto, fecha: dbDate(reversal.fecha) })), usuario: e.usuario ? { id: e.usuario.id, nombreCompleto: e.usuario.nombreCompleto, activo: e.usuario.activo } : undefined }); }
+  static toOrm(d: MovimientoCaja) { const e = new MovimientoCajaOrmEntity(); if (d.id !== null) e.id = d.id; e.tipo=d.tipo; e.concepto=d.concepto; e.monto=d.monto; e.fecha=date(d.fecha); e.observaciones=d.observaciones; e.pagoId=d.pagoId; e.prestamoId=d.prestamoId; e.refinanciamientoId=d.refinanciamientoId; e.movimientoReversadoId=d.movimientoReversadoId; e.usuarioId=d.usuarioId; return e; }
+}

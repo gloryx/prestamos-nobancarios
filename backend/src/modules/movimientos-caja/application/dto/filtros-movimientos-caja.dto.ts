@@ -1,0 +1,5 @@
+import { Type } from 'class-transformer';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsPositive, IsString, Min, Max } from 'class-validator';
+import { ConceptoMovimientoCaja } from '../../domain/enums/concepto-movimiento-caja.enum';
+import { TipoMovimientoCaja } from '../../domain/enums/tipo-movimiento-caja.enum';
+export class FiltrosMovimientosCajaDto { @IsOptional() @IsString() buscar?: string; @IsOptional() @Type(() => Number) @IsInt() @Min(1) pagina = 1; @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limite = 10; @IsOptional() @IsEnum(TipoMovimientoCaja) tipo?: TipoMovimientoCaja; @IsOptional() @IsEnum(ConceptoMovimientoCaja) concepto?: ConceptoMovimientoCaja; @IsOptional() @Type(() => Number) @IsInt() @IsPositive() usuarioId?: number; @IsOptional() @Type(() => Number) @IsInt() @IsPositive() pagoId?: number; @IsOptional() @Type(() => Number) @IsInt() @IsPositive() prestamoId?: number; @IsOptional() @Type(() => Number) @IsInt() @IsPositive() refinanciamientoId?: number; @IsOptional() @IsDateString({ strict: true }) fechaDesde?: string; @IsOptional() @IsDateString({ strict: true }) fechaHasta?: string; }

@@ -1,0 +1,2 @@
+import { FuenteIngreso } from '../../../domain/entities/fuente-ingreso'; import { FuenteIngresoOrmEntity } from './fuente-ingreso.orm-entity';
+export class FuenteIngresoMapper { static toDomain(e: FuenteIngresoOrmEntity) { return new FuenteIngreso(e.id, e.nombre, e.activo, e.fechaCreacion); } static toOrm(v: FuenteIngreso) { const e = new FuenteIngresoOrmEntity(); if (v.id !== null) e.id = v.id; e.nombre = v.nombre; e.activo = v.activo; return e; } }

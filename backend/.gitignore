@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+# Archivos locales del padrón TSE
+# Archivos locales del padrón TSE
+backend/data/patron-tse/*
+backend/data/padron-tse/*
+!backend/data/patron-tse/.gitkeep
+!backend/data/padron-tse/.gitkeep

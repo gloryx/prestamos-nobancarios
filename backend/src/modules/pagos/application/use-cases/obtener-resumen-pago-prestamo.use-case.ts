@@ -1,0 +1,5 @@
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { PRESTAMO_REPOSITORY, PrestamoRepository } from '../../../prestamos/domain/repositories/prestamo.repository';
+import { PAGO_REPOSITORY, PagoRepository } from '../../domain/repositories/pago.repository';
+@Injectable()
+export class ObtenerResumenPagoPrestamoUseCase { constructor(@Inject(PAGO_REPOSITORY) private readonly pagos: PagoRepository, @Inject(PRESTAMO_REPOSITORY) private readonly prestamos: PrestamoRepository) {} async execute(id: number) { const prestamo = await this.prestamos.buscarPorId(id); if (!prestamo) throw new NotFoundException('Préstamo no encontrado.'); const t = await this.pagos.obtenerTotalesPorPrestamo(id); return { prestamoId: id, capitalOriginal: prestamo.capital, interesOriginal: prestamo.interes, montoTotal: prestamo.montoTotal, totalPagado: t.total, capitalPagado: t.capital, interesPagado: t.interes, capitalPendiente: Math.max(0, prestamo.capital - t.capital), interesPendiente: Math.max(0, prestamo.interes - t.interes), saldoPendiente: Math.max(0, prestamo.montoTotal - t.total), estado: prestamo.estado }; } }

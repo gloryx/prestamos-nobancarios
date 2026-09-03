@@ -1,0 +1,29 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Pago } from '../../../domain/entities/pago';
+import { FiltrosPagos, PagoConRelaciones, PagoRepository, PagosPaginados, TotalesPago } from '../../../domain/repositories/pago.repository';
+import { PagoMapper } from './pago.mapper';
+import { PagoOrmEntity } from './pago.orm-entity';
+
+@Injectable()
+export class PagoTypeOrmRepository implements PagoRepository {
+  constructor(@InjectRepository(PagoOrmEntity) private readonly repository: Repository<PagoOrmEntity>) {}
+  private withRelations() { return this.repository.createQueryBuilder('pago').leftJoinAndSelect('pago.formaPago', 'formaPago').leftJoinAndSelect('pago.cobrador', 'cobrador').leftJoinAndSelect('pago.prestamo', 'prestamo').leftJoinAndSelect('prestamo.cliente', 'cliente'); }
+  async guardar(pago: Pago): Promise<Pago> { return PagoMapper.toDomain(await this.repository.save(PagoMapper.toOrm(pago))); }
+  async buscarPorId(id: number): Promise<PagoConRelaciones | null> { const entity = await this.withRelations().where('pago.id = :id', { id }).getOne(); return entity ? PagoMapper.toDomain(entity) : null; }
+  async listarPorPrestamo(prestamoId: number): Promise<PagoConRelaciones[]> { const entities = await this.withRelations().where('pago.prestamo_id = :prestamoId', { prestamoId }).orderBy('pago.fecha', 'ASC').addOrderBy('pago.id', 'ASC').getMany(); return entities.map(PagoMapper.toDomain); }
+  async obtenerTotalesPorPrestamo(prestamoId: number): Promise<TotalesPago> {
+    const row = await this.repository.createQueryBuilder('pago').select('COALESCE(SUM(pago.monto), 0)', 'total').addSelect('COALESCE(SUM(pago.capital_aplicado), 0)', 'capital').addSelect('COALESCE(SUM(pago.interes_aplicado), 0)', 'interes').where('pago.prestamo_id = :prestamoId', { prestamoId }).getRawOne<{ total: string; capital: string; interes: string }>();
+    return { total: Number(row?.total ?? 0), capital: Number(row?.capital ?? 0), interes: Number(row?.interes ?? 0) };
+  }
+  async listar(filtros: FiltrosPagos): Promise<PagosPaginados> {
+    const query = this.withRelations();
+    if (filtros.formaPagoId !== undefined) query.andWhere('pago.forma_pago_id = :formaPagoId', { formaPagoId: filtros.formaPagoId });
+    if (filtros.cobradorId !== undefined) query.andWhere('pago.cobrador_id = :cobradorId', { cobradorId: filtros.cobradorId });
+     query.orderBy('pago.fecha', 'DESC').addOrderBy('pago.id', 'DESC').skip((filtros.pagina - 1) * filtros.limite).take(Math.min(filtros.limite, 100));
+    const [entities, total] = await query.getManyAndCount();
+    return { datos: entities.map(PagoMapper.toDomain), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
+  }
+  async existePagoParaPrestamo(prestamoId: number): Promise<boolean> { return (await this.repository.count({ where: { prestamoId } })) > 0; }
+}

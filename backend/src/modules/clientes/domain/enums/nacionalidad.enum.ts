@@ -1,0 +1,6 @@
+export enum Nacionalidad {
+  COSTARRICENSE = 'COSTARRICENSE',
+  NICARAGUENSE = 'NICARAGUENSE',
+  PANAMENO = 'PANAMEÑO',
+  ARABE = 'ARABE',
+}
