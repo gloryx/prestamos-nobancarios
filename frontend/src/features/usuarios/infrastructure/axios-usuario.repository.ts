@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { apiClient } from '@/core/api/client'
 import { UsuarioError } from '../domain/usuario.error'
-import type { ActualizarUsuarioInput, CrearUsuarioInput, Usuario, UsuarioFilters, UsuarioPage, UsuarioRepository } from '../domain/usuario.types'
+import type { ActualizarUsuarioInput, CrearUsuarioInput, Usuario, UsuarioFilters, UsuarioPage, UsuarioRepository, UsuarioSelector } from '../domain/usuario.types'
 
 function rethrow(error: unknown): never {
   if (axios.isAxiosError(error)) throw new UsuarioError(error.response?.status ?? 0, 'usuarios request failed')
@@ -11,6 +11,9 @@ function rethrow(error: unknown): never {
 export class AxiosUsuarioRepository implements UsuarioRepository {
   async list(filters: UsuarioFilters): Promise<UsuarioPage> {
     try { return (await apiClient.get<UsuarioPage>('/usuarios', { params: filters })).data } catch (error) { return rethrow(error) }
+  }
+  async listSelector(): Promise<UsuarioSelector[]> {
+    try { return (await apiClient.get<UsuarioSelector[]>('/usuarios/selector')).data } catch (error) { return rethrow(error) }
   }
   async create(input: CrearUsuarioInput): Promise<Usuario> {
     try { return (await apiClient.post<Usuario>('/usuarios', input)).data } catch (error) { return rethrow(error) }

@@ -14,6 +14,8 @@ export class PrestamoOrmEntity {
   @ManyToOne(() => PeriodicidadPagoOrmEntity, { onDelete: 'RESTRICT' }) @JoinColumn({ name: 'periodicidad_pago_id' }) periodicidadPago!: PeriodicidadPagoOrmEntity;
   @Column({ name: 'forma_pago_id', type: 'integer' }) formaPagoId!: number;
   @ManyToOne(() => FormaPagoOrmEntity, { onDelete: 'RESTRICT' }) @JoinColumn({ name: 'forma_pago_id' }) formaPago!: FormaPagoOrmEntity;
+  @Column({ name: 'forma_desembolso_id', type: 'integer', nullable: true }) formaDesembolsoId!: number | null;
+  @ManyToOne(() => FormaPagoOrmEntity, { nullable: true, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'forma_desembolso_id' }) formaDesembolso!: FormaPagoOrmEntity | null;
   @Column({ name: 'fecha_alta', type: 'date' }) fechaAlta!: string;
   @Column({ type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) capital!: number;
   @Column({ type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) interes!: number;

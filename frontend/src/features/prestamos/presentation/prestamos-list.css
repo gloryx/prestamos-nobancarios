@@ -1,0 +1,65 @@
+.prestamos-list-table-wrap .prestamos-list-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-number { width: 60px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-client { width: 260px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-address { width: auto; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-date { width: 86px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-capital { width: 95px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-status { width: 90px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-actions { width: 110px; }
+
+.prestamos-list-table-wrap .prestamos-list-table th:nth-child(1),
+.prestamos-list-table-wrap .prestamos-list-table td:nth-child(1),
+.prestamos-list-table-wrap .prestamos-list-table th:nth-child(4),
+.prestamos-list-table-wrap .prestamos-list-table td:nth-child(4) {
+  min-width: 0;
+  max-width: none;
+  white-space: nowrap;
+  padding-inline: 4px;
+}
+
+.prestamos-list-table-wrap .prestamos-list-table th:nth-child(5),
+.prestamos-list-table-wrap .prestamos-list-table td:nth-child(5) {
+  min-width: 0;
+  max-width: none;
+  white-space: nowrap;
+  padding-inline: 8px;
+  text-align: right;
+}
+
+.prestamos-list-table-wrap .prestamos-list-table th:nth-child(6),
+.prestamos-list-table-wrap .prestamos-list-table td:nth-child(6) {
+  min-width: 0;
+  max-width: none;
+  white-space: nowrap;
+}
+
+.prestamos-list-page .prestamos-list-table td:nth-child(2) strong,
+.prestamos-list-page .prestamos-list-table td:nth-child(2) small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prestamos-list-address {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prestamos-list-page .prestamos-list-actions {
+  display: flex;
+  gap: 0;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.prestamos-list-page .prestamos-list-actions .table-action {
+  padding: 2px;
+}

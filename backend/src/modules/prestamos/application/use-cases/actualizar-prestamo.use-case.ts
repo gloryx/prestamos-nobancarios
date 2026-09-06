@@ -17,10 +17,11 @@ export class ActualizarPrestamoUseCase {
     const datos: DatosPrestamo = {
       clienteId: dto.clienteId ?? prestamo.clienteId, periodicidadPagoId: dto.periodicidadPagoId ?? prestamo.periodicidadPagoId,
       formaPagoId: dto.formaPagoId ?? prestamo.formaPagoId, fechaAlta: has(dto, 'fechaAlta') ? new Date(`${dto.fechaAlta!.slice(0, 10)}T00:00:00.000Z`) : prestamo.fechaAlta,
+      formaDesembolsoId: has(dto, 'formaDesembolsoId') ? dto.formaDesembolsoId! : prestamo.formaDesembolsoId,
       capital: dto.capital ?? prestamo.capital, interes: dto.interes ?? prestamo.interes, cantidadPagos: dto.cantidadPagos ?? prestamo.cantidadPagos,
       planPersonalizado: dto.planPersonalizado ?? prestamo.planPersonalizado, observaciones: has(dto, 'observaciones') ? dto.observaciones : prestamo.observaciones,
     };
-    await this.references.validar(datos.clienteId, datos.periodicidadPagoId, datos.formaPagoId);
+    await this.references.validar(datos.clienteId, datos.periodicidadPagoId, datos.formaPagoId, has(dto, 'formaDesembolsoId') ? dto.formaDesembolsoId : undefined);
     const totales = this.pagos ? await this.pagos.obtenerTotalesPorPrestamo(id) : { capital: 0, interes: 0, total: 0 };
     if (datos.capital < totales.capital) throw new BadRequestException('El capital del préstamo no puede ser menor al capital ya pagado.');
     if (datos.interes < totales.interes) throw new BadRequestException('El interés del préstamo no puede ser menor al interés ya pagado.');

@@ -8,6 +8,7 @@ export class CrearPrestamoDto {
   @ApiProperty({ example: 1 }) @Type(() => Number) @IsInt() @IsPositive() clienteId: number;
   @ApiProperty({ example: 2 }) @Type(() => Number) @IsInt() @IsPositive() periodicidadPagoId: number;
   @ApiProperty({ example: 1 }) @Type(() => Number) @IsInt() @IsPositive() formaPagoId: number;
+  @ApiProperty({ example: 2 }) @Type(() => Number) @IsInt() @IsPositive() formaDesembolsoId: number;
   @ApiProperty({ example: '2026-08-30', format: 'date' }) @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fechaAlta: string;
   @ApiProperty({ example: 100000 }) @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @IsPositive() capital: number;
   @ApiProperty({ example: 15000 }) @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) interes: number;

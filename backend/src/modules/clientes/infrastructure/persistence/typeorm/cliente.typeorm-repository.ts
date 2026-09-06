@@ -43,6 +43,9 @@ export class ClienteTypeOrmRepository implements ClienteRepository {
         .orWhere('cliente.telefono2 ILIKE :term', { term })
         .orWhere('cliente.correo ILIKE :term', { term })));
     }
+    if (filtros.direccion?.trim()) {
+      query.andWhere('cliente.direccion ILIKE :direccion', { direccion: `%${filtros.direccion.trim()}%` });
+    }
     if (filtros.activo !== undefined) query.andWhere('cliente.activo = :activo', { activo: filtros.activo });
     query.orderBy('cliente.primer_apellido', 'ASC').addOrderBy('cliente.primer_nombre', 'ASC');
     query.skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);

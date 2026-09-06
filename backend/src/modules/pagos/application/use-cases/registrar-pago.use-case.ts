@@ -10,6 +10,7 @@ import { Pago } from '../../domain/entities/pago';
 import { PagoConRelaciones } from '../../domain/repositories/pago.repository';
 import { PagoOrmEntity } from '../../infrastructure/persistence/typeorm/pago.orm-entity';
 import { PagoMapper } from '../../infrastructure/persistence/typeorm/pago.mapper';
+import { PlanPagoOrmEntity } from '../../../planes-pago/infrastructure/persistence/typeorm/plan-pago.orm-entity';
 import { DistribuidorPagoService } from '../../domain/services/distribuidor-pago.service';
 import { MovimientoCajaService } from '../../../movimientos-caja/application/services/movimiento-caja.service';
 import { ConceptoMovimientoCaja } from '../../../movimientos-caja/domain/enums/concepto-movimiento-caja.enum';
@@ -37,16 +38,22 @@ export class RegistrarPagoUseCase {
       const prestamo = await manager.getRepository(PrestamoOrmEntity).createQueryBuilder('prestamo').where('prestamo.id = :id', { id: dto.prestamoId }).setLock('pessimistic_write').getOne();
       if (!prestamo) throw new NotFoundException('Préstamo no encontrado.');
       if (prestamo.estado !== EstadoPrestamo.ACTIVO) throw new BadRequestException('Solo se pueden registrar pagos de préstamos activos.');
+       if (!dto.planPagoId) throw new BadRequestException('Debe seleccionar una cuota para registrar el pago.');
+       const planPago = await manager.getRepository(PlanPagoOrmEntity).createQueryBuilder('plan').where('plan.id = :id', { id: dto.planPagoId }).andWhere('plan.prestamo_id = :prestamoId', { prestamoId: dto.prestamoId }).setLock('pessimistic_write').getOne();
+       if (!planPago) throw new BadRequestException('La cuota seleccionada no pertenece al préstamo.');
+       const applied = await manager.getRepository(PagoOrmEntity).createQueryBuilder('pago').select('COALESCE(SUM(pago.monto), 0)', 'total').where('pago.plan_pago_id = :planPagoId', { planPagoId: dto.planPagoId }).getRawOne<{ total: string }>();
+       const pending = Math.max(0, planPago.montoProgramado - Number(applied?.total ?? 0));
+       if (cents(dto.monto) > cents(pending)) throw new BadRequestException('El monto excede el pendiente de la cuota seleccionada.');
       const totals = await manager.getRepository(PagoOrmEntity).createQueryBuilder('pago').select('COALESCE(SUM(pago.monto), 0)', 'total').addSelect('COALESCE(SUM(pago.capital_aplicado), 0)', 'capital').addSelect('COALESCE(SUM(pago.interes_aplicado), 0)', 'interes').where('pago.prestamo_id = :id', { id: dto.prestamoId }).getRawOne<{ total: string; capital: string; interes: string }>();
       const capitalPendiente = Math.max(0, prestamo.capital - Number(totals?.capital ?? 0));
       const interesPendiente = Math.max(0, prestamo.interes - Number(totals?.interes ?? 0));
       let distribucion;
       try { distribucion = DistribuidorPagoService.distribuir(dto.monto, capitalPendiente, interesPendiente); } catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'El pago no es válido.'); }
-        const pago = Pago.crear({ prestamoId: dto.prestamoId, formaPagoId: dto.formaPagoId, monto: dto.monto, capitalAplicado: distribucion.capital, interesAplicado: distribucion.interes, cobradorId: dto.cobradorId, fecha, observaciones: dto.observaciones });
-       const saved = await manager.getRepository(PagoOrmEntity).save(PagoMapper.toOrm(pago));
+         const pago = Pago.crear({ prestamoId: dto.prestamoId, formaPagoId: dto.formaPagoId, monto: dto.monto, capitalAplicado: distribucion.capital, interesAplicado: distribucion.interes, cobradorId: dto.cobradorId, fecha, observaciones: dto.observaciones, planPagoId: planPago.id });
+        const saved = await manager.getRepository(PagoOrmEntity).save(PagoMapper.toOrm(pago));
          if (cents(Number(totals?.capital ?? 0)) + cents(distribucion.capital) >= cents(prestamo.capital) && cents(Number(totals?.interes ?? 0)) + cents(distribucion.interes) >= cents(prestamo.interes)) { const previousState = prestamo.estado; prestamo.estado = EstadoPrestamo.CANCELADO; await manager.getRepository(PrestamoOrmEntity).save(prestamo); if (this.history) await this.history.registrar(manager, prestamo.id, previousState, EstadoPrestamo.CANCELADO, fecha, actorUsuarioId, dto.observaciones); }
-        if (this.caja && actorUsuarioId) await this.caja.automatico(manager, { tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.PAGO_CLIENTE, monto: dto.monto, fecha, observaciones: dto.observaciones?.trim() || null, pagoId: saved.id, prestamoId: dto.prestamoId, refinanciamientoId: null, movimientoReversadoId: null, usuarioId: actorUsuarioId });
-        const complete = await manager.getRepository(PagoOrmEntity).createQueryBuilder('pago').leftJoinAndSelect('pago.formaPago', 'formaPago').leftJoinAndSelect('pago.cobrador', 'cobrador').leftJoinAndSelect('pago.prestamo', 'prestamo').leftJoinAndSelect('prestamo.cliente', 'cliente').where('pago.id = :id', { id: saved.id }).getOne();
+         if (this.caja && actorUsuarioId) await this.caja.automatico(manager, { tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.PAGO_CLIENTE, monto: dto.monto, fecha, observaciones: dto.observaciones?.trim() || null, pagoId: saved.id, formaPagoId: dto.formaPagoId, prestamoId: dto.prestamoId, refinanciamientoId: null, movimientoReversadoId: null, usuarioId: actorUsuarioId });
+         const complete = await manager.getRepository(PagoOrmEntity).createQueryBuilder('pago').leftJoinAndSelect('pago.formaPago', 'formaPago').leftJoinAndSelect('pago.cobrador', 'cobrador').leftJoinAndSelect('pago.prestamo', 'prestamo').leftJoinAndSelect('prestamo.cliente', 'cliente').leftJoinAndSelect('pago.planPago', 'planPago').where('pago.id = :id', { id: saved.id }).getOne();
        return PagoMapper.toDomain(complete ?? saved);
     });
   }

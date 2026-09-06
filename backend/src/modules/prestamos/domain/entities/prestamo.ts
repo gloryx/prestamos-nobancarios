@@ -4,6 +4,7 @@ export interface DatosPrestamo {
   clienteId: number;
   periodicidadPagoId: number;
   formaPagoId: number;
+  formaDesembolsoId?: number | null;
   fechaAlta: Date;
   capital: number;
   interes: number;
@@ -20,6 +21,7 @@ export class Prestamo {
     public clienteId: number,
     public periodicidadPagoId: number,
     public formaPagoId: number,
+    public formaDesembolsoId: number | null,
     public fechaAlta: Date,
     public capital: number,
     public interes: number,
@@ -35,7 +37,7 @@ export class Prestamo {
 
   static crear(datos: DatosPrestamo): Prestamo {
     const now = new Date();
-    return new Prestamo(null, datos.clienteId, datos.periodicidadPagoId, datos.formaPagoId, datos.fechaAlta,
+    return new Prestamo(null, datos.clienteId, datos.periodicidadPagoId, datos.formaPagoId, datos.formaDesembolsoId ?? null, datos.fechaAlta,
       datos.capital, datos.interes, datos.capital + datos.interes, datos.capital, datos.cantidadPagos,
       datos.planPersonalizado, EstadoPrestamo.ACTIVO, normalizeObservaciones(datos.observaciones), now, now);
   }
@@ -44,6 +46,7 @@ export class Prestamo {
     this.clienteId = datos.clienteId;
     this.periodicidadPagoId = datos.periodicidadPagoId;
     this.formaPagoId = datos.formaPagoId;
+    this.formaDesembolsoId = datos.formaDesembolsoId ?? null;
     this.fechaAlta = datos.fechaAlta;
     this.capital = datos.capital;
     this.interes = datos.interes;

@@ -29,7 +29,7 @@ export class MovimientoCajaService {
     return this.repo.guardarEnTransaccion(manager, MovimientoCaja.crear({ ...data, tipo: direccion(data.concepto), observaciones: data.observaciones?.trim() || null }));
   }
 
-  async automatico(manager: EntityManager, data: { tipo: TipoMovimientoCaja; concepto: ConceptoMovimientoCaja; monto: number; fecha: Date; observaciones?: string | null; pagoId?: number | null; prestamoId?: number | null; refinanciamientoId?: number | null; movimientoReversadoId?: number | null; usuarioId: number }) {
+  async automatico(manager: EntityManager, data: { tipo: TipoMovimientoCaja; concepto: ConceptoMovimientoCaja; monto: number; fecha: Date; observaciones?: string | null; pagoId?: number | null; formaPagoId?: number | null; prestamoId?: number | null; refinanciamientoId?: number | null; movimientoReversadoId?: number | null; usuarioId: number }) {
     if (this.periods) await this.periods.assertOpen(manager, data.fecha);
     await this.validarActor(manager, data.usuarioId);
     if (manuales.has(data.concepto)) throw new BadRequestException('Los conceptos manuales deben registrarse mediante el flujo manual.');

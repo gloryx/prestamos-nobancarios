@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { PagoOrmEntity } from '../../../../pagos/infrastructure/persistence/typeorm/pago.orm-entity';
 import { PrestamoOrmEntity } from '../../../../prestamos/infrastructure/persistence/typeorm/prestamo.orm-entity';
 import { numberTransformer } from '../../../../prestamos/infrastructure/persistence/typeorm/number.transformer';
 
@@ -13,4 +14,5 @@ export class PlanPagoOrmEntity {
   @Column({ name: 'fecha_vencimiento', type: 'date' }) fechaVencimiento!: string;
   @Column({ name: 'monto_programado', type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) montoProgramado!: number;
   @CreateDateColumn({ name: 'fecha_creacion', type: 'timestamp' }) fechaCreacion!: Date;
+  @OneToMany(() => PagoOrmEntity, (pago) => pago.planPago) pagos!: PagoOrmEntity[];
 }

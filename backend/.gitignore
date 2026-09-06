@@ -9,3 +9,5 @@ backend/data/patron-tse/*
 backend/data/padron-tse/*
 !backend/data/patron-tse/.gitkeep
 !backend/data/padron-tse/.gitkeep
+uploads/clientes/identificaciones/*
+!uploads/clientes/identificaciones/.gitkeep

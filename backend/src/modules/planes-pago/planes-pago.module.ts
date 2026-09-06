@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PagoOrmEntity } from '../pagos/infrastructure/persistence/typeorm/pago.orm-entity';
 import { PrestamosModule } from '../prestamos/prestamos.module';
 import { PLAN_PAGO_REPOSITORY } from './domain/repositories/plan-pago.repository';
 import { PlanPagoTypeOrmRepository } from './infrastructure/persistence/typeorm/plan-pago.typeorm-repository';
@@ -13,5 +14,5 @@ import { PlanesPagoController } from './presentation/controllers/planes-pago.con
 import { PagosModule } from '../pagos/pagos.module';
 import { PAGO_REPOSITORY } from '../pagos/domain/repositories/pago.repository';
 
-@Module({ imports: [forwardRef(() => PrestamosModule), forwardRef(() => PagosModule), TypeOrmModule.forFeature([PlanPagoOrmEntity])], controllers: [PlanesPagoController], providers: [ActualizarPlanPagoUseCase, CrearPlanPagoPersonalizadoUseCase, GenerarPlanPagoUseCase, ListarPlanPagoUseCase, ObtenerCuotaPlanPagoUseCase, { provide: PLAN_PAGO_REPOSITORY, useClass: PlanPagoTypeOrmRepository }], exports: [PLAN_PAGO_REPOSITORY] })
+@Module({ imports: [forwardRef(() => PrestamosModule), forwardRef(() => PagosModule), TypeOrmModule.forFeature([PlanPagoOrmEntity, PagoOrmEntity])], controllers: [PlanesPagoController], providers: [ActualizarPlanPagoUseCase, CrearPlanPagoPersonalizadoUseCase, GenerarPlanPagoUseCase, ListarPlanPagoUseCase, ObtenerCuotaPlanPagoUseCase, { provide: PLAN_PAGO_REPOSITORY, useClass: PlanPagoTypeOrmRepository }], exports: [PLAN_PAGO_REPOSITORY] })
 export class PlanesPagoModule {}

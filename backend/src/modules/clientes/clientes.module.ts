@@ -9,11 +9,13 @@ import { CLIENTE_REPOSITORY } from './domain/repositories/cliente.repository';
 import { ClienteTypeOrmRepository } from './infrastructure/persistence/typeorm/cliente.typeorm-repository';
 import { ClienteOrmEntity } from './infrastructure/persistence/typeorm/cliente.orm-entity';
 import { ClientesController } from './presentation/controllers/clientes.controller';
+import { ClienteIdentificacionStorageService } from './infrastructure/storage/cliente-identificacion-storage.service';
+import { ClienteFichaPdfService } from './infrastructure/reports/cliente-ficha-pdf.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ClienteOrmEntity])],
   controllers: [ClientesController],
-  providers: [CrearClienteUseCase, ListarClientesUseCase, ObtenerClienteUseCase, ActualizarClienteUseCase, CambiarEstadoClienteUseCase, { provide: CLIENTE_REPOSITORY, useClass: ClienteTypeOrmRepository }],
+  providers: [CrearClienteUseCase, ListarClientesUseCase, ObtenerClienteUseCase, ActualizarClienteUseCase, CambiarEstadoClienteUseCase, ClienteIdentificacionStorageService, ClienteFichaPdfService, { provide: CLIENTE_REPOSITORY, useClass: ClienteTypeOrmRepository }],
   exports: [CLIENTE_REPOSITORY],
 })
 export class ClientesModule {}

@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { PlanPagoOrmEntity } from '../../../../planes-pago/infrastructure/persistence/typeorm/plan-pago.orm-entity';
 import { FormaPagoOrmEntity } from '../../../../formas-pago/infrastructure/persistence/typeorm/forma-pago.orm-entity';
 import { PrestamoOrmEntity } from '../../../../prestamos/infrastructure/persistence/typeorm/prestamo.orm-entity';
 import { UsuarioOrmEntity } from '../../../../usuarios/infrastructure/persistence/typeorm/usuario.orm-entity';
@@ -6,12 +7,15 @@ import { numberTransformer } from '../../../../prestamos/infrastructure/persiste
 
 @Entity('pago')
 @Index('IDX_pago_prestamo_fecha', ['prestamoId', 'fecha'])
+@Index('IDX_pago_plan_pago', ['planPagoId'])
 export class PagoOrmEntity {
   @PrimaryGeneratedColumn() id!: number;
   @Column({ name: 'prestamo_id', type: 'integer' }) prestamoId!: number;
   @ManyToOne(() => PrestamoOrmEntity, { onDelete: 'RESTRICT' }) @JoinColumn({ name: 'prestamo_id' }) prestamo!: PrestamoOrmEntity;
   @Column({ name: 'forma_pago_id', type: 'integer' }) formaPagoId!: number;
   @ManyToOne(() => FormaPagoOrmEntity, { nullable: false, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'forma_pago_id' }) formaPago!: FormaPagoOrmEntity;
+  @Column({ name: 'plan_pago_id', type: 'integer', nullable: true }) planPagoId!: number | null;
+  @ManyToOne(() => PlanPagoOrmEntity, (plan) => plan.pagos, { nullable: true, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'plan_pago_id' }) planPago!: PlanPagoOrmEntity | null;
   @Column({ type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) monto!: number;
   @Column({ name: 'capital_aplicado', type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) capitalAplicado!: number;
   @Column({ name: 'interes_aplicado', type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) interesAplicado!: number;

@@ -2,7 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, EntityManager, ILike, Repository } from 'typeorm';
 import { normalizeIdentificacion, Usuario } from '../../../domain/entities/usuario';
-import { FiltrosUsuarios, UsuarioRepository, UsuariosPaginados } from '../../../domain/repositories/usuario.repository';
+import { FiltrosUsuarios, UsuarioRepository, UsuariosPaginados, UsuarioSelector } from '../../../domain/repositories/usuario.repository';
 import { UsuarioMapper } from './usuario.mapper';
 import { UsuarioOrmEntity } from './usuario.orm-entity';
 
@@ -32,5 +32,14 @@ export class UsuarioTypeOrmRepository implements UsuarioRepository {
     query.orderBy('usuario.nombre_completo', 'ASC').addOrderBy('usuario.id', 'ASC').skip((filtros.pagina - 1) * filtros.limite).take(Math.min(filtros.limite, 100));
     const [entities, total] = await query.getManyAndCount();
     return { datos: entities.map(UsuarioMapper.toDomain), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
+  }
+  async listarSelector(): Promise<UsuarioSelector[]> {
+    return this.repository.createQueryBuilder('usuario')
+      .select('usuario.id', 'id')
+      .addSelect('usuario.nombre_completo', 'nombreCompleto')
+      .where('usuario.activo = :activo', { activo: true })
+      .orderBy('usuario.nombre_completo', 'ASC')
+      .addOrderBy('usuario.id', 'ASC')
+      .getRawMany<UsuarioSelector>();
   }
 }

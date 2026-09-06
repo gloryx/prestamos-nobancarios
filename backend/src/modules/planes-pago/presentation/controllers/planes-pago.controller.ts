@@ -11,7 +11,8 @@ import { PlanPagoResponseDto } from '../dto/plan-pago-response.dto';
 import { Roles } from '../../../auth/auth.decorators';
 import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
 
-const response = (plan: PlanPago): PlanPagoResponseDto => ({ id: plan.id!, prestamoId: plan.prestamoId, numeroPago: plan.numeroPago, fechaVencimiento: plan.fechaVencimiento.toISOString().slice(0, 10), montoProgramado: plan.montoProgramado, fechaCreacion: plan.fechaCreacion });
+type PlanResponseInput = PlanPago & { montoPagado?: number; montoPendiente?: number; estado?: 'PENDIENTE' | 'PARCIAL' | 'PAGADA'; fechasPago?: string[] };
+const response = (plan: PlanResponseInput): PlanPagoResponseDto => ({ id: plan.id!, prestamoId: plan.prestamoId, numeroPago: plan.numeroPago, fechaVencimiento: plan.fechaVencimiento.toISOString().slice(0, 10), montoProgramado: plan.montoProgramado, fechaCreacion: plan.fechaCreacion, montoPagado: plan.montoPagado ?? 0, montoPendiente: plan.montoPendiente ?? plan.montoProgramado, estado: plan.estado ?? 'PENDIENTE', fechasPago: plan.fechasPago ?? [] });
 const responses = (plans: PlanPago[]) => plans.map(response);
 
 @ApiTags('Planes de pago')
@@ -26,7 +27,11 @@ export class PlanesPagoController {
   @Get('prestamo/:prestamoId') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Listar plan de un préstamo' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiResponse({ status: 200, type: [PlanPagoResponseDto] })
   async listarPlan(@Param('prestamoId', ParseIntPipe) id: number) { return responses(await this.listar.execute(id)); }
   @Get(':id') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Obtener una cuota' }) @ApiParam({ name: 'id', example: 1 }) @ApiResponse({ status: 200, type: PlanPagoResponseDto }) @ApiResponse({ status: 404, description: 'Cuota del plan de pago no encontrada.' })
-  async obtenerCuota(@Param('id', ParseIntPipe) id: number) { return response(await this.obtener.execute(id)); }
+  async obtenerCuota(@Param('id', ParseIntPipe) id: number) {
+    const cuota = await this.obtener.execute(id);
+    const enriched = (await this.listar.execute(cuota.prestamoId)).find((item) => item.id === id);
+    return response(enriched ?? cuota);
+  }
   @Put('prestamo/:prestamoId') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Modificar plan personalizado', description: 'Reemplaza todas las cuotas de forma atómica y marca el préstamo como personalizado.' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiBody({ type: PlanPagoPersonalizadoDto }) @ApiResponse({ status: 200, type: [PlanPagoResponseDto] })
   async modificar(@Param('prestamoId', ParseIntPipe) id: number, @Body() dto: PlanPagoPersonalizadoDto) { return responses(await this.actualizar.execute(id, dto)); }
 }

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, WalletMinimal, X } from "lucide-react";
+import { ChevronDown, ChevronRight, LogOut, WalletMinimal, X } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/app/providers/auth-context";
@@ -16,7 +16,13 @@ export function Sidebar({
   mobileOpen: boolean;
   onClose: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const initials = user?.nombreCompleto
+    .split(" ")
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
   const visibleNavigation = user?.rol === 'VENDEDOR' ? navigation.map((item) => item.label === 'Configuración' && isGroup(item) ? { ...item, items: item.items.filter((child) => child.label === 'Formas de pago' || child.label === 'Periodicidades') } : item) : navigation;
   const [expanded, setExpanded] = useState<string | null>("Clientes");
   const toggle = (key: string) =>
@@ -46,7 +52,7 @@ export function Sidebar({
             <X size={19} />
           </button>
         </div>
-        <nav aria-label="Main navigation">
+        <nav className="sidebar-navigation" aria-label="Main navigation">
           {visibleNavigation.map((item) =>
             isGroup(item) ? (
               <Group
@@ -62,6 +68,19 @@ export function Sidebar({
             ),
           )}
         </nav>
+        <div className="sidebar-account">
+          <div className="sidebar-account-info">
+            <div className="sidebar-avatar" aria-hidden="true">{initials}</div>
+            <div className="sidebar-account-details">
+              <strong title={user?.nombreCompleto}>{user?.nombreCompleto}</strong>
+              <span>{user?.rol}</span>
+            </div>
+          </div>
+          <button className="sidebar-logout" onClick={logout}>
+            <LogOut size={15} />
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
         <div className="sidebar-footer">
           <div className="status-dot" />
           <span>Desarrolado por gloryx</span>

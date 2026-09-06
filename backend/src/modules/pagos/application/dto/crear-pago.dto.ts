@@ -4,6 +4,7 @@ import { IsDateString, IsDefined, IsInt, IsNumber, IsOptional, IsPositive, IsStr
 
 export class CrearPagoDto {
   @ApiProperty({ example: 10 }) @Type(() => Number) @IsInt() @Min(1) prestamoId: number;
+  @ApiProperty({ example: 31, description: 'Cuota contractual a la que se aplica el nuevo pago.' }) @Type(() => Number) @IsInt() @Min(1) planPagoId!: number;
   @ApiProperty({ example: 1 }) @IsDefined() @Type(() => Number) @IsInt() @Min(1) formaPagoId: number;
   @ApiProperty({ example: 24000.00 }) @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @IsPositive() monto: number;
   @ApiProperty({ example: '2026-08-30', format: 'date' }) @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fecha: string;

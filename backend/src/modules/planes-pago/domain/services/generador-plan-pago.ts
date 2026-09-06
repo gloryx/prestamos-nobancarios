@@ -11,6 +11,7 @@ const addMonthsClamped = (date: Date): Date => {
   const targetLastDay = new Date(Date.UTC(source.getUTCFullYear(), month + 1, 0)).getUTCDate();
   return new Date(Date.UTC(source.getUTCFullYear(), month, source.getUTCDate() === sourceLastDay ? targetLastDay : Math.min(source.getUTCDate(), targetLastDay)));
 };
+const moveSundayToMonday = (date: Date): Date => date.getUTCDay() === 0 ? addDays(date, 1) : date;
 
 export class GeneradorPlanPago {
   static generar(prestamo: PrestamoConRelaciones): PlanPago[] {
@@ -24,7 +25,7 @@ export class GeneradorPlanPago {
     const result: PlanPago[] = [];
     let date = atUtcMidnight(prestamo.fechaAlta);
     for (let index = 1; index <= prestamo.cantidadPagos; index += 1) {
-      date = periodicidad === 'DIARIO' ? addDays(date, 1) : periodicidad === 'SEMANAL' ? addDays(date, 7) : periodicidad === 'QUINCENAL' ? addDays(date, 15) : addMonthsClamped(date);
+      date = moveSundayToMonday(periodicidad === 'DIARIO' ? addDays(date, 1) : periodicidad === 'SEMANAL' ? addDays(date, 7) : periodicidad === 'QUINCENAL' ? addDays(date, 15) : addMonthsClamped(date));
       const amount = index === prestamo.cantidadPagos ? cents - base * (prestamo.cantidadPagos - 1) : base;
       result.push(PlanPago.crear({ prestamoId: prestamo.id!, numeroPago: index, fechaVencimiento: date, montoProgramado: amount / 100 }));
     }

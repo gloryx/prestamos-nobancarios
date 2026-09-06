@@ -16,7 +16,7 @@ import { authenticatedUserId, AuthenticatedRequest } from '../../../../common/au
 import { Roles } from '../../../auth/auth.decorators';
 import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
 
-const response = (pago: PagoConRelaciones): PagoResponseDto => ({ id: pago.id!, prestamoId: pago.prestamoId, formaPagoId: pago.formaPagoId, monto: pago.monto, capitalAplicado: pago.capitalAplicado, interesAplicado: pago.interesAplicado, cobradorId: pago.cobradorId, fecha: pago.fecha.toISOString().slice(0, 10), fechaCreacion: pago.fechaCreacion, observaciones: pago.observaciones, formaPago: pago.formaPago, prestamo: pago.prestamo, cliente: pago.cliente, cobrador: pago.cobrador });
+const response = (pago: PagoConRelaciones): PagoResponseDto => ({ id: pago.id!, prestamoId: pago.prestamoId, formaPagoId: pago.formaPagoId, monto: pago.monto, capitalAplicado: pago.capitalAplicado, interesAplicado: pago.interesAplicado, cobradorId: pago.cobradorId, fecha: pago.fecha.toISOString().slice(0, 10), fechaCreacion: pago.fechaCreacion, observaciones: pago.observaciones, planPagoId: pago.planPagoId ?? null, numeroCuota: pago.numeroCuota ?? null, formaPago: pago.formaPago, prestamo: pago.prestamo, cliente: pago.cliente, cobrador: pago.cobrador });
 
 @ApiTags('Pagos')
 @ApiBearerAuth()
@@ -24,7 +24,7 @@ const response = (pago: PagoConRelaciones): PagoResponseDto => ({ id: pago.id!, 
 @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
 export class PagosController {
   constructor(private readonly registrar: RegistrarPagoUseCase, private readonly listarUseCase: ListarPagosUseCase, private readonly obtener: ObtenerPagoPorIdUseCase, private readonly listarPrestamo: ListarPagosPorPrestamoUseCase, private readonly resumen: ObtenerResumenPagoPrestamoUseCase, private readonly estadoPlan: ObtenerEstadoPlanUseCase) {}
-  @Post() @ApiOperation({ summary: 'Registrar un pago' }) @ApiBody({ type: CrearPagoDto, schema: { example: { prestamoId: 10, formaPagoId: 1, cobradorId: 7, monto: 24000, fecha: '2026-08-30', observaciones: 'Pago de cuota 1.' } } }) @ApiResponse({ status: 201, type: PagoResponseDto }) @ApiResponse({ status: 400, description: 'Datos inválidos, forma de pago inactiva o cobrador inactivo.' }) @ApiResponse({ status: 404, description: 'Préstamo, forma de pago o cobrador no encontrado.' })
+  @Post() @ApiOperation({ summary: 'Registrar un pago' }) @ApiBody({ type: CrearPagoDto, schema: { example: { prestamoId: 10, planPagoId: 31, formaPagoId: 1, cobradorId: 7, monto: 24000, fecha: '2026-08-30', observaciones: 'Pago de cuota 1.' } } }) @ApiResponse({ status: 201, type: PagoResponseDto }) @ApiResponse({ status: 400, description: 'Datos inválidos, forma de pago inactiva o cobrador inactivo.' }) @ApiResponse({ status: 404, description: 'Préstamo, forma de pago o cobrador no encontrado.' })
   async crear(@Body() dto: CrearPagoDto, @Req() request: AuthenticatedRequest) { return response(await this.registrar.execute(dto, authenticatedUserId(request))); }
   @Get() @ApiOperation({ summary: 'Listar pagos' }) @ApiQuery({ name: 'pagina', required: false, type: Number, default: 1 }) @ApiQuery({ name: 'limite', required: false, type: Number, default: 10, maximum: 100 }) @ApiQuery({ name: 'formaPagoId', required: false, type: Number }) @ApiQuery({ name: 'cobradorId', required: false, type: Number }) @ApiResponse({ status: 200, type: PagosPaginadosResponseDto })
   async listar(@Query() dto: FiltrosPagosDto) { const result = await this.listarUseCase.execute(dto); return { ...result, datos: result.datos.map(response) }; }

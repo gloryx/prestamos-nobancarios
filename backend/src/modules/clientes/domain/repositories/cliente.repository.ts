@@ -5,6 +5,7 @@ export interface FiltrosClientes {
   pagina: number;
   limite: number;
   buscar?: string;
+  direccion?: string;
   activo?: boolean;
 }
 

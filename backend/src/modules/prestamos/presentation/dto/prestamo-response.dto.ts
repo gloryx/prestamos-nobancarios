@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EstadoPrestamo } from '../../domain/enums/estado-prestamo.enum';
 
-export class PrestamoClienteResumenDto { @ApiProperty({ example: 1 }) id: number; @ApiProperty({ example: '1-2345-6789' }) identificacion: string; @ApiProperty({ example: 'ANA MARÍA PÉREZ MORA' }) nombreCompleto: string; }
+export class PrestamoClienteResumenDto { @ApiProperty({ example: 1 }) id: number; @ApiProperty({ example: '1-2345-6789' }) identificacion: string; @ApiProperty({ example: 'ANA MARÍA PÉREZ MORA' }) nombreCompleto: string; @ApiPropertyOptional({ example: 'SAN JOSÉ, COSTA RICA', nullable: true }) direccion: string | null; }
 export class PrestamoCatalogoResumenDto { @ApiProperty({ example: 1 }) id: number; @ApiProperty({ example: 'MENSUAL' }) nombre: string; }
 export class PrestamoResponseDto {
   @ApiProperty({ example: 1 }) id: number;
@@ -11,6 +11,8 @@ export class PrestamoResponseDto {
   @ApiProperty({ type: PrestamoCatalogoResumenDto }) periodicidadPago: PrestamoCatalogoResumenDto;
   @ApiProperty({ example: 1 }) formaPagoId: number;
   @ApiProperty({ type: PrestamoCatalogoResumenDto }) formaPago: PrestamoCatalogoResumenDto;
+  @ApiPropertyOptional({ example: 2, nullable: true }) formaDesembolsoId: number | null;
+  @ApiPropertyOptional({ type: PrestamoCatalogoResumenDto, nullable: true }) formaDesembolso: PrestamoCatalogoResumenDto | null;
   @ApiProperty({ example: '2026-08-30', format: 'date' }) fechaAlta: string;
   @ApiProperty({ example: 100000 }) capital: number;
   @ApiProperty({ example: 15000 }) interes: number;

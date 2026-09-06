@@ -18,11 +18,14 @@ import { PlanesPagoModule } from '../planes-pago/planes-pago.module';
 import { PagosModule } from '../pagos/pagos.module';
 import { PrestamoEstadoHistorialModule } from './prestamo-estado-historial.module';
 import { PrestamoEstadoHistorialOrmEntity } from './infrastructure/persistence/typeorm/prestamo-estado-historial.orm-entity';
+import { PlanPagoPdfService } from './application/services/plan-pago-pdf.service';
+import { PlanPagoPdfInfrastructureService } from './infrastructure/reports/plan-pago-pdf.infrastructure-service';
+import { PagoOrmEntity } from '../pagos/infrastructure/persistence/typeorm/pago.orm-entity';
 
 @Module({
-  imports: [ClientesModule, PeriodicidadesPagoModule, FormasPagoModule, MovimientosCajaModule, forwardRef(() => PlanesPagoModule), forwardRef(() => PagosModule), PrestamoEstadoHistorialModule, TypeOrmModule.forFeature([PrestamoOrmEntity, PrestamoEstadoHistorialOrmEntity])],
+  imports: [ClientesModule, PeriodicidadesPagoModule, FormasPagoModule, MovimientosCajaModule, forwardRef(() => PlanesPagoModule), forwardRef(() => PagosModule), PrestamoEstadoHistorialModule, TypeOrmModule.forFeature([PrestamoOrmEntity, PrestamoEstadoHistorialOrmEntity, PagoOrmEntity])],
   controllers: [PrestamosController],
-  providers: [CrearPrestamoUseCase, ListarPrestamosUseCase, ObtenerPrestamoPorIdUseCase, ActualizarPrestamoUseCase, CambiarEstadoPrestamoUseCase, PrestamoReferences, { provide: PRESTAMO_REPOSITORY, useClass: PrestamoTypeOrmRepository }],
+  providers: [CrearPrestamoUseCase, ListarPrestamosUseCase, ObtenerPrestamoPorIdUseCase, ActualizarPrestamoUseCase, CambiarEstadoPrestamoUseCase, PlanPagoPdfService, PlanPagoPdfInfrastructureService, PrestamoReferences, { provide: PRESTAMO_REPOSITORY, useClass: PrestamoTypeOrmRepository }],
   exports: [PRESTAMO_REPOSITORY],
 })
 export class PrestamosModule {}

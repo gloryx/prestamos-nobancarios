@@ -8,11 +8,13 @@ import { ActualizarUsuarioUseCase } from '../../application/use-cases/actualizar
 import { CambiarEstadoUsuarioUseCase } from '../../application/use-cases/cambiar-estado-usuario.use-case';
 import { CrearUsuarioUseCase } from '../../application/use-cases/crear-usuario.use-case';
 import { ListarUsuariosUseCase } from '../../application/use-cases/listar-usuarios.use-case';
+import { ListarUsuariosSelectorUseCase } from '../../application/use-cases/listar-usuarios-selector.use-case';
 import { ObtenerUsuarioUseCase } from '../../application/use-cases/obtener-usuario.use-case';
 import { Usuario } from '../../domain/entities/usuario';
 import { RolUsuario } from '../../domain/enums/rol-usuario.enum';
 import { UsuarioResponseDto } from '../dto/usuario-response.dto';
 import { UsuariosPaginadosResponseDto } from '../dto/usuarios-paginados-response.dto';
+import { UsuarioSelectorResponseDto } from '../dto/usuario-selector-response.dto';
 import { CambiarPasswordDto } from '../../application/dto/cambiar-password.dto';
 import { CambiarPasswordUsuarioUseCase } from '../../application/use-cases/cambiar-password-usuario.use-case';
 import { Roles } from '../../../auth/auth.decorators';
@@ -27,7 +29,7 @@ const response = (usuario: Usuario): UsuarioResponseDto => {
 @Controller('usuarios')
 @Roles(RolUsuario.ADMINISTRADOR)
 export class UsuariosController {
-  constructor(private readonly crear: CrearUsuarioUseCase, private readonly listarUseCase: ListarUsuariosUseCase, private readonly obtenerUseCase: ObtenerUsuarioUseCase, private readonly actualizarUseCase: ActualizarUsuarioUseCase, private readonly estadoUseCase: CambiarEstadoUsuarioUseCase, private readonly passwordUseCase: CambiarPasswordUsuarioUseCase) {}
+  constructor(private readonly crear: CrearUsuarioUseCase, private readonly listarUseCase: ListarUsuariosUseCase, private readonly listarSelectorUseCase: ListarUsuariosSelectorUseCase, private readonly obtenerUseCase: ObtenerUsuarioUseCase, private readonly actualizarUseCase: ActualizarUsuarioUseCase, private readonly estadoUseCase: CambiarEstadoUsuarioUseCase, private readonly passwordUseCase: CambiarPasswordUsuarioUseCase) {}
   @Post()
   @ApiOperation({ summary: 'Crear un usuario', description: 'Registra un usuario y almacena la contraseña únicamente como hash.' })
   @ApiBody({ type: CrearUsuarioDto })
@@ -40,6 +42,11 @@ export class UsuariosController {
   @ApiQuery({ name: 'pagina', required: false, type: Number, default: 1 }) @ApiQuery({ name: 'limite', required: false, type: Number, default: 10, maximum: 100 }) @ApiQuery({ name: 'buscar', required: false }) @ApiQuery({ name: 'activo', required: false, type: Boolean }) @ApiQuery({ name: 'rol', required: false, enum: RolUsuario })
   @ApiResponse({ status: 200, type: UsuariosPaginadosResponseDto })
   async listar(@Query() dto: FiltrosUsuariosDto) { const result = await this.listarUseCase.execute(dto); return { ...result, datos: result.datos.map(response) }; }
+  @Get('selector')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Listar usuarios activos para selectores' })
+  @ApiResponse({ status: 200, type: UsuarioSelectorResponseDto, isArray: true })
+  listarSelector() { return this.listarSelectorUseCase.execute(); }
   @Get(':id')
   @Roles(RolUsuario.ADMINISTRADOR)
   @ApiOperation({ summary: 'Obtener un usuario' }) @ApiParam({ name: 'id', example: 1 }) @ApiResponse({ status: 200, type: UsuarioResponseDto }) @ApiResponse({ status: 404, description: 'Usuario no encontrado.' })

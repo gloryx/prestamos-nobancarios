@@ -9,7 +9,7 @@ import { PagoOrmEntity } from './pago.orm-entity';
 @Injectable()
 export class PagoTypeOrmRepository implements PagoRepository {
   constructor(@InjectRepository(PagoOrmEntity) private readonly repository: Repository<PagoOrmEntity>) {}
-  private withRelations() { return this.repository.createQueryBuilder('pago').leftJoinAndSelect('pago.formaPago', 'formaPago').leftJoinAndSelect('pago.cobrador', 'cobrador').leftJoinAndSelect('pago.prestamo', 'prestamo').leftJoinAndSelect('prestamo.cliente', 'cliente'); }
+  private withRelations() { return this.repository.createQueryBuilder('pago').leftJoinAndSelect('pago.formaPago', 'formaPago').leftJoinAndSelect('pago.cobrador', 'cobrador').leftJoinAndSelect('pago.prestamo', 'prestamo').leftJoinAndSelect('prestamo.cliente', 'cliente').leftJoinAndSelect('pago.planPago', 'planPago'); }
   async guardar(pago: Pago): Promise<Pago> { return PagoMapper.toDomain(await this.repository.save(PagoMapper.toOrm(pago))); }
   async buscarPorId(id: number): Promise<PagoConRelaciones | null> { const entity = await this.withRelations().where('pago.id = :id', { id }).getOne(); return entity ? PagoMapper.toDomain(entity) : null; }
   async listarPorPrestamo(prestamoId: number): Promise<PagoConRelaciones[]> { const entities = await this.withRelations().where('pago.prestamo_id = :prestamoId', { prestamoId }).orderBy('pago.fecha', 'ASC').addOrderBy('pago.id', 'ASC').getMany(); return entities.map(PagoMapper.toDomain); }

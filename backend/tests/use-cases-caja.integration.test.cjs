@@ -27,7 +27,7 @@ class TransactionalStore {
   constructor(seed = {}) {
     this.state = {
       prestamos: seed.prestamos || [], pagos: seed.pagos || [], refinanciamientos: [],
-      planes: [], movimientos: [], clientes: [{ id: 1, activo: true, identificacion: 'C-1' }],
+      planes: seed.planes || [], movimientos: [], clientes: [{ id: 1, activo: true, identificacion: 'C-1' }],
       periodicidades: [{ id: 1, activo: true, nombre: 'MENSUAL' }],
       formas: [{ id: 1, activo: true, nombre: 'EFECTIVO' }],
     };
@@ -77,6 +77,7 @@ class FakeQueryBuilder {
   constructor(state, collection, repository) { this.state = state; this.collection = collection; this.repository = repository; this.id = null; this.aggregate = false; }
   leftJoinAndSelect() { return this; }
   where(_sql, params) { this.id = params?.id; return this; }
+  andWhere() { return this; }
   setLock() { return this; }
   select() { this.aggregate = true; return this; }
   addSelect() { this.aggregate = true; return this; }
@@ -122,6 +123,7 @@ function planRepository(store, options = {}) {
 function clone(value) { return structuredClone(value); }
 function dtoLoan(capital = 500000, interes = 100000) { return { clienteId: 1, periodicidadPagoId: 1, formaPagoId: 1, fechaAlta: '2026-08-31', capital, interes, cantidadPagos: 12, planPersonalizado: false }; }
 function dtoRefinance(montoNuevoDesembolsado) { return { prestamoOrigenId: 1, periodicidadPagoId: 1, formaPagoId: 1, fecha: '2026-08-31', montoNuevoDesembolsado, interesNuevo: 0, cantidadPagos: 12, planPersonalizado: false }; }
+function paymentPlan(montoProgramado) { return [{ id: 40, prestamoId: 1, numeroPago: 1, montoProgramado }]; }
 function cajaFor(store, options = {}) {
   const repo = {
     guardarEnTransaccion: async (manager, value) => {
@@ -153,24 +155,35 @@ function fakeCashRepository() {
 }
 
 test('payment records PAGO_CLIENTE in the same manager and rolls back on cash failure', async () => {
-  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 50000, interes: 0, estado: E.ACTIVO }] });
+  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 50000, interes: 0, estado: E.ACTIVO }], planes: paymentPlan(50000) });
   const caja = cajaFor(store);
   const useCase = new RegistrarPagoUseCase(store, new FakeForms(), new FakeUsers(), caja);
-  await useCase.execute({ prestamoId: 1, formaPagoId: 1, monto: 50000, cobradorId: 5, fecha: '2026-08-31' }, 3);
+  await useCase.execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 50000, cobradorId: 5, fecha: '2026-08-31' }, 3);
   assert.deepEqual(store.state.movimientos.map(v => [v.tipo, v.concepto, v.monto]), [[T.ENTRADA, C.PAGO_CLIENTE, 50000]]);
   assert.equal(store.state.pagos[0].cobradorId, 5);
   assert.equal(store.state.movimientos[0].usuarioId, 3);
   assert.equal(store.lastMovementManager, store.managers[0]);
 
-  const failingStore = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 50000, interes: 0, estado: E.ACTIVO }] });
-  await assert.rejects(() => new RegistrarPagoUseCase(failingStore, new FakeForms(), new FakeUsers(), cajaFor(failingStore, { fail: true })).execute({ prestamoId: 1, formaPagoId: 1, monto: 50000, cobradorId: 5, fecha: '2026-08-31' }, 3), /cash failure/);
+  const failingStore = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 50000, interes: 0, estado: E.ACTIVO }], planes: paymentPlan(50000) });
+  await assert.rejects(() => new RegistrarPagoUseCase(failingStore, new FakeForms(), new FakeUsers(), cajaFor(failingStore, { fail: true })).execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 50000, cobradorId: 5, fecha: '2026-08-31' }, 3), /cash failure/);
   assert.equal(failingStore.state.pagos.length, 0);
   assert.equal(failingStore.state.movimientos.length, 0);
 });
 
+test('payment movement preserves SINPE and EFECTIVO formaPagoId', async () => {
+  for (const formaPagoId of [1, 2]) {
+    const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 50000, interes: 0, estado: E.ACTIVO }], planes: paymentPlan(50000) });
+    store.state.formas.push({ id: 2, activo: true, nombre: 'SINPE' });
+    await new RegistrarPagoUseCase(store, new FakeForms(), new FakeUsers(), cajaFor(store)).execute({ prestamoId: 1, planPagoId: 40, formaPagoId, monto: 50000, cobradorId: 5, fecha: '2026-08-31' }, 3);
+    assert.equal(store.state.movimientos.length, 1);
+    assert.equal(store.state.movimientos[0].concepto, C.PAGO_CLIENTE);
+    assert.equal(store.state.movimientos[0].formaPagoId, formaPagoId);
+  }
+});
+
 test('P1/P2/P3/P7 payment evidence is explicit and exact', async () => {
-  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 30000, interes: 20000, estado: E.ACTIVO }] });
-  const payment = await new RegistrarPagoUseCase(store, new FakeForms(), new FakeUsers(), cajaFor(store)).execute({ prestamoId: 1, formaPagoId: 1, monto: 50000, cobradorId: 5, fecha: '2026-08-31' }, 3);
+  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 30000, interes: 20000, estado: E.ACTIVO }], planes: paymentPlan(50000) });
+  const payment = await new RegistrarPagoUseCase(store, new FakeForms(), new FakeUsers(), cajaFor(store)).execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 50000, cobradorId: 5, fecha: '2026-08-31' }, 3);
   const movement = store.state.movimientos;
 
   assert.equal(movement.length, 1, 'P1: one cash entry only');
@@ -181,8 +194,8 @@ test('P1/P2/P3/P7 payment evidence is explicit and exact', async () => {
 });
 
 test('payment cash failure rolls back cancellation after capital and interest are fully covered', async () => {
-  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 50000, interes: 10000, estado: E.ACTIVO }] });
-  await assert.rejects(() => new RegistrarPagoUseCase(store, new FakeForms(), new FakeUsers(), cajaFor(store, { fail: true })).execute({ prestamoId: 1, formaPagoId: 1, monto: 60000, cobradorId: 5, fecha: '2026-08-31' }, 3), /cash failure/);
+  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 50000, interes: 10000, estado: E.ACTIVO }], planes: paymentPlan(60000) });
+  await assert.rejects(() => new RegistrarPagoUseCase(store, new FakeForms(), new FakeUsers(), cajaFor(store, { fail: true })).execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 60000, cobradorId: 5, fecha: '2026-08-31' }, 3), /cash failure/);
   assert.equal(store.state.prestamos[0].estado, E.ACTIVO);
   assert.equal(store.state.pagos.length, 0);
   assert.equal(store.state.movimientos.length, 0);
@@ -201,16 +214,16 @@ test('P6 payment cash idempotency contract rejects the second movement for one p
 });
 
 test('mixed payment applies capital first and records exactly one total movement', async () => {
-  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 100, interes: 50, estado: E.ACTIVO }] });
+  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 100, interes: 50, estado: E.ACTIVO }], planes: paymentPlan(150) });
   const useCase = new RegistrarPagoUseCase(store, new FakeForms(), new FakeUsers(), cajaFor(store));
 
-  const first = await useCase.execute({ prestamoId: 1, formaPagoId: 1, monto: 120, cobradorId: 1, fecha: '2026-08-31' }, 1);
+  const first = await useCase.execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 120, cobradorId: 1, fecha: '2026-08-31' }, 1);
   assert.deepEqual({ monto: first.monto, capitalAplicado: first.capitalAplicado, interesAplicado: first.interesAplicado }, { monto: 120, capitalAplicado: 100, interesAplicado: 20 });
   assert.equal(store.state.movimientos.length, 1);
   assert.equal(store.state.movimientos[0].monto, 120);
   assert.equal(store.state.prestamos[0].estado, E.ACTIVO);
 
-  const second = await useCase.execute({ prestamoId: 1, formaPagoId: 1, monto: 30, cobradorId: 1, fecha: '2026-08-31' }, 1);
+  const second = await useCase.execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 30, cobradorId: 1, fecha: '2026-08-31' }, 1);
   assert.deepEqual({ capitalAplicado: second.capitalAplicado, interesAplicado: second.interesAplicado }, { capitalAplicado: 0, interesAplicado: 30 });
   assert.equal(store.state.movimientos.length, 2);
   assert.equal(store.state.prestamos[0].estado, E.CANCELADO);

@@ -11,6 +11,8 @@ export class PagoResponseDto {
   @ApiProperty({ example: '2026-08-30', format: 'date' }) fecha: string;
   @ApiProperty({ example: '2026-08-30T12:00:00.000Z' }) fechaCreacion: Date;
   @ApiPropertyOptional({ example: 'Pago de cuota 1.', nullable: true }) observaciones: string | null;
+  @ApiPropertyOptional({ example: 31, nullable: true }) planPagoId?: number | null;
+  @ApiPropertyOptional({ example: 2, nullable: true }) numeroCuota?: number | null;
   @ApiProperty({ example: { id: 1, nombre: 'EFECTIVO' } }) formaPago: { id: number; nombre: string };
   @ApiProperty({ example: { id: 10, estado: 'ACTIVO', capital: 100000, interes: 15000, montoTotal: 115000 } }) prestamo: { id: number; estado: string; capital: number; interes: number; montoTotal: number };
   @ApiProperty({ example: { id: 1, identificacion: '1-1111-1111', nombreCompleto: 'JUAN PEREZ' } }) cliente: { id: number; identificacion?: string; nombreCompleto?: string };

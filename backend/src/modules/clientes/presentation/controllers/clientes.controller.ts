@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Put, Query, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ActualizarClienteDto } from '../../application/dto/actualizar-cliente.dto';
 import { CambiarEstadoClienteDto } from '../../application/dto/cambiar-estado-cliente.dto';
 import { CrearClienteDto } from '../../application/dto/crear-cliente.dto';
@@ -16,6 +18,14 @@ import { ClienteResponseDto } from '../dto/cliente-response.dto';
 import { ClientesPaginadosResponseDto } from '../dto/clientes-paginados-response.dto';
 import { Roles } from '../../../auth/auth.decorators';
 import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
+import { ClienteIdentificacionStorageService, extensionForFile, MAX_IDENTIFICATION_FILE_SIZE } from '../../infrastructure/storage/cliente-identificacion-storage.service';
+import { ClienteFichaPdfService } from '../../infrastructure/reports/cliente-ficha-pdf.service';
+
+type IdentificationFile = { originalname: string; mimetype: string; buffer: Buffer };
+const identificationUploadOptions = { storage: memoryStorage(), limits: { fileSize: MAX_IDENTIFICATION_FILE_SIZE }, fileFilter: (_request: unknown, file: unknown, callback: (error: Error | null, acceptFile: boolean) => void) => { try { extensionForFile(file as IdentificationFile); callback(null, true); } catch (error) { callback(error as Error, false); } } };
+const identificationUploadInterceptor = () => FileInterceptor('identificacionFile', identificationUploadOptions);
+const multipartOptionalFields = ['segundoNombre', 'segundoApellido', 'genero', 'fechaNacimiento', 'direccion', 'correo', 'telefono2', 'nacionalidad', 'observaciones'];
+const normalizeMultipartDto = <T extends object>(dto: T): T => { const values = dto as Record<string, unknown>; for (const field of multipartOptionalFields) if (values[field] === '') values[field] = null; return dto; };
 
 const response = (cliente: Cliente): ClienteResponseDto => ({ ...cliente, id: cliente.id!, fechaNacimiento: cliente.fechaNacimiento?.toISOString().slice(0, 10) ?? null });
 
@@ -23,16 +33,18 @@ const response = (cliente: Cliente): ClienteResponseDto => ({ ...cliente, id: cl
 @ApiBearerAuth()
 @Controller('clientes')
 export class ClientesController {
-  constructor(private readonly crear: CrearClienteUseCase, private readonly listarUseCase: ListarClientesUseCase, private readonly obtenerUseCase: ObtenerClienteUseCase, private readonly actualizarUseCase: ActualizarClienteUseCase, private readonly estadoUseCase: CambiarEstadoClienteUseCase) {}
+  constructor(private readonly crear: CrearClienteUseCase, private readonly listarUseCase: ListarClientesUseCase, private readonly obtenerUseCase: ObtenerClienteUseCase, private readonly actualizarUseCase: ActualizarClienteUseCase, private readonly estadoUseCase: CambiarEstadoClienteUseCase, private readonly storage: ClienteIdentificacionStorageService, private readonly fichaPdf: ClienteFichaPdfService) {}
 
   @Post()
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(identificationUploadInterceptor())
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   @ApiOperation({ summary: 'Crear un cliente', description: 'Registra un nuevo cliente en el sistema.' })
   @ApiBody({ type: CrearClienteDto, description: 'Datos completos del cliente.', schema: { type: 'object', example: { identificacion: '1-1111-1111', primerNombre: 'Ana', segundoNombre: 'María', primerApellido: 'Pérez', segundoApellido: 'Mora', genero: Genero.FEMENINO, fechaNacimiento: '1990-05-15', direccion: 'San José, Costa Rica', correo: 'Ana.Perez@example.com', telefono1: '8888-8888', telefono2: '2222-2222', nacionalidad: Nacionalidad.COSTARRICENSE, observaciones: 'Cliente recomendado', urlIdentificacion: '/uploads/clientes/identificaciones/AnaPerez.jpg' } } })
   @ApiResponse({ status: 201, description: 'Cliente creado correctamente.', type: ClienteResponseDto, example: { id: 1, identificacion: '1-1111-1111', primerNombre: 'ANA', segundoNombre: 'MARÍA', primerApellido: 'PÉREZ', segundoApellido: 'MORA', genero: Genero.FEMENINO, fechaNacimiento: '1990-05-15', direccion: 'SAN JOSÉ, COSTA RICA', correo: 'ana.perez@example.com', telefono1: '8888-8888', telefono2: '2222-2222', nacionalidad: Nacionalidad.COSTARRICENSE, observaciones: 'CLIENTE RECOMENDADO', fechaIngreso: '2026-08-30T12:00:00.000Z', urlIdentificacion: '/uploads/clientes/identificaciones/AnaPerez.jpg', activo: true } })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
   @ApiResponse({ status: 409, description: 'La identificación ya está registrada.', example: { statusCode: 409, message: 'Ya existe un cliente con esa identificación.', error: 'Conflict' } })
-  async crearCliente(@Body() dto: CrearClienteDto) { return response(await this.crear.execute(dto)); }
+  async crearCliente(@Body() dto: CrearClienteDto, @UploadedFile() file?: IdentificationFile) { normalizeMultipartDto(dto); const { urlIdentificacion: _ignoredUrl, ...clientDto } = dto; const operation = file ? await this.storage.prepareUpload(dto.identificacion, file) : undefined; try { const result = response(await this.crear.execute({ ...clientDto, urlIdentificacion: operation?.url })); await operation?.commit(); return result; } catch (error) { await operation?.rollback(); throw error; } }
 
   @Get()
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
@@ -42,17 +54,38 @@ export class ClientesController {
   @ApiResponse({ status: 200, description: 'Listado obtenido correctamente.', type: ClientesPaginadosResponseDto })
   async listar(@Query() dto: FiltrosClientesDto) { const result = await this.listarUseCase.execute(dto); return { ...result, datos: result.datos.map(response) }; }
 
+  @Get(':id/ficha-pdf')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Descargar la ficha PDF de un cliente' })
+  @ApiParam({ name: 'id', description: 'Identificador del cliente', example: 1 })
+  @ApiResponse({ status: 200, description: 'Ficha PDF generada correctamente.', content: { 'application/pdf': {} } })
+  async fichaPdfCliente(@Param('id', ParseIntPipe) id: number) {
+    const cliente = await this.obtenerUseCase.execute(id);
+    const pdf = await this.fichaPdf.generate(cliente);
+    const safeIdentification = cliente.identificacion.replace(/[^\p{L}\p{N}_-]/gu, '_') || String(cliente.id);
+    return new StreamableFile(pdf, { type: 'application/pdf', disposition: `attachment; filename="Ficha_Cliente_${safeIdentification}.pdf"` });
+  }
+
   @Get(':id')
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   @ApiOperation({ summary: 'Obtener un cliente', description: 'Obtiene un cliente por su identificador.' }) @ApiParam({ name: 'id', description: 'Identificador del cliente', example: 1 })
   @ApiResponse({ status: 200, description: 'Cliente obtenido correctamente.', type: ClienteResponseDto }) @ApiResponse({ status: 404, description: 'Cliente no encontrado.', example: { statusCode: 404, message: 'Cliente no encontrado.', error: 'Not Found' } })
   async obtener(@Param('id', ParseIntPipe) id: number) { return response(await this.obtenerUseCase.execute(id)); }
 
+  @Get(':id/identificacion-imagen')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Obtener la imagen de identificación de un cliente' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 404, description: 'Imagen de identificación no disponible.' })
+  async obtenerImagen(@Param('id', ParseIntPipe) id: number) { const cliente = await this.obtenerUseCase.execute(id); const image = await this.storage.readImage(cliente.urlIdentificacion); return new StreamableFile(image.buffer, { type: image.mimetype }); }
+
   @Put(':id')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(identificationUploadInterceptor())
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   @ApiOperation({ summary: 'Actualizar un cliente', description: 'Actualiza los datos generales de un cliente existente.' }) @ApiParam({ name: 'id', description: 'Identificador del cliente', example: 1 }) @ApiBody({ type: ActualizarClienteDto, schema: { type: 'object', example: { genero: Genero.MASCULINO } } })
   @ApiResponse({ status: 200, description: 'Cliente actualizado correctamente.', type: ClienteResponseDto }) @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' }) @ApiResponse({ status: 404, description: 'Cliente no encontrado.' }) @ApiResponse({ status: 409, description: 'La identificación ya está registrada.' })
-  async actualizar(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarClienteDto) { return response(await this.actualizarUseCase.execute(id, dto)); }
+  async actualizar(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarClienteDto, @UploadedFile() file?: IdentificationFile) { normalizeMultipartDto(dto); const current = await this.obtenerUseCase.execute(id); const operation = file ? await this.storage.prepareUpload(dto.identificacion ?? current.identificacion, file, { url: current.urlIdentificacion, identification: current.identificacion }) : await this.storage.prepareRename(current.urlIdentificacion, current.identificacion, dto.identificacion ?? current.identificacion); const { urlIdentificacion: _ignoredUrl, ...clientDto } = dto; try { const result = response(await this.actualizarUseCase.execute(id, operation ? { ...clientDto, urlIdentificacion: operation.url } : clientDto)); await operation?.commit(); return result; } catch (error) { await operation?.rollback(); throw error; } }
 
   @Patch(':id/estado')
   @Roles(RolUsuario.ADMINISTRADOR)
