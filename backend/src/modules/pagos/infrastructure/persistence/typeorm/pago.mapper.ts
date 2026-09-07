@@ -22,7 +22,7 @@ export class PagoMapper {
   static toOrm(domain: Pago): PagoOrmEntity {
     const entity = new PagoOrmEntity();
     if (domain.id !== null) entity.id = domain.id;
-      entity.prestamoId = domain.prestamoId; entity.formaPagoId = domain.formaPagoId; entity.planPagoId = domain.planPagoId; entity.monto = domain.monto; entity.capitalAplicado = domain.capitalAplicado; entity.interesAplicado = domain.interesAplicado; entity.cobradorId = domain.cobradorId; entity.fecha = dateToDb(domain.fecha); entity.observaciones = domain.observaciones;
+       entity.prestamoId = domain.prestamoId; entity.formaPagoId = domain.formaPagoId; entity.planPagoId = domain.planPagoId; entity.monto = domain.monto; entity.capitalAplicado = domain.capitalAplicado; entity.interesAplicado = domain.interesAplicado; entity.cobradorId = domain.cobradorId; entity.fecha = dateToDb(domain.fecha); entity.observaciones = domain.observaciones;
     return entity;
   }
 }

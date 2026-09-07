@@ -26,7 +26,7 @@ const entityNames = {
 class TransactionalStore {
   constructor(seed = {}) {
     this.state = {
-      prestamos: seed.prestamos || [], pagos: seed.pagos || [], refinanciamientos: [],
+      prestamos: (seed.prestamos || []).map((loan) => ({ ...loan, montoTotal: loan.montoTotal ?? loan.capital + loan.interes })), pagos: seed.pagos || [], refinanciamientos: [],
       planes: seed.planes || [], movimientos: [], clientes: [{ id: 1, activo: true, identificacion: 'C-1' }],
       periodicidades: [{ id: 1, activo: true, nombre: 'MENSUAL' }],
       formas: [{ id: 1, activo: true, nombre: 'EFECTIVO' }],
@@ -74,10 +74,11 @@ class FakeRepository {
 }
 
 class FakeQueryBuilder {
-  constructor(state, collection, repository) { this.state = state; this.collection = collection; this.repository = repository; this.id = null; this.aggregate = false; }
+  constructor(state, collection, repository) { this.state = state; this.collection = collection; this.repository = repository; this.id = null; this.prestamoId = null; this.aggregate = false; }
   leftJoinAndSelect() { return this; }
-  where(_sql, params) { this.id = params?.id; return this; }
+  where(_sql, params) { this.id = params?.id; this.prestamoId = params?.prestamoId ?? this.prestamoId; return this; }
   andWhere() { return this; }
+  orderBy() { return this; }
   setLock() { return this; }
   select() { this.aggregate = true; return this; }
   addSelect() { this.aggregate = true; return this; }
@@ -85,6 +86,7 @@ class FakeQueryBuilder {
     const rows = this.state.pagos.filter(item => item.prestamoId === this.id);
     return { total: String(rows.reduce((sum, row) => sum + row.monto, 0)), capital: String(rows.reduce((sum, row) => sum + row.capitalAplicado, 0)), interes: String(rows.reduce((sum, row) => sum + row.interesAplicado, 0)) };
   }
+  async getMany() { return this.state[this.collection].filter(item => this.prestamoId == null || item.prestamoId === this.prestamoId); }
   async getOne() {
     const item = this.state[this.collection].find(value => value.id === this.id) || null;
     if (!item) return null;

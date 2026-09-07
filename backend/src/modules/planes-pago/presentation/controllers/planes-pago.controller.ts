@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CrearPlanPagoPersonalizadoUseCase } from '../../application/use-cases/crear-plan-pago-personalizado.use-case';
 import { GenerarPlanPagoUseCase } from '../../application/use-cases/generar-plan-pago.use-case';
@@ -10,6 +10,8 @@ import { PlanPago } from '../../domain/entities/plan-pago';
 import { PlanPagoResponseDto } from '../dto/plan-pago-response.dto';
 import { Roles } from '../../../auth/auth.decorators';
 import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
+import { AjustarCuotaPlanPagoDto } from '../../application/dto/ajustar-cuota-plan-pago.dto';
+import { AjustarCuotaPlanPagoUseCase } from '../../application/use-cases/ajustar-cuota-plan-pago.use-case';
 
 type PlanResponseInput = PlanPago & { montoPagado?: number; montoPendiente?: number; estado?: 'PENDIENTE' | 'PARCIAL' | 'PAGADA'; fechasPago?: string[] };
 const response = (plan: PlanResponseInput): PlanPagoResponseDto => ({ id: plan.id!, prestamoId: plan.prestamoId, numeroPago: plan.numeroPago, fechaVencimiento: plan.fechaVencimiento.toISOString().slice(0, 10), montoProgramado: plan.montoProgramado, fechaCreacion: plan.fechaCreacion, montoPagado: plan.montoPagado ?? 0, montoPendiente: plan.montoPendiente ?? plan.montoProgramado, estado: plan.estado ?? 'PENDIENTE', fechasPago: plan.fechasPago ?? [] });
@@ -19,7 +21,7 @@ const responses = (plans: PlanPago[]) => plans.map(response);
 @ApiBearerAuth()
 @Controller('planes-pago')
 export class PlanesPagoController {
-  constructor(private readonly generar: GenerarPlanPagoUseCase, private readonly personalizado: CrearPlanPagoPersonalizadoUseCase, private readonly listar: ListarPlanPagoUseCase, private readonly obtener: ObtenerCuotaPlanPagoUseCase, private readonly actualizar: ActualizarPlanPagoUseCase) {}
+  constructor(private readonly generar: GenerarPlanPagoUseCase, private readonly personalizado: CrearPlanPagoPersonalizadoUseCase, private readonly listar: ListarPlanPagoUseCase, private readonly obtener: ObtenerCuotaPlanPagoUseCase, private readonly actualizar: ActualizarPlanPagoUseCase, private readonly ajustar: AjustarCuotaPlanPagoUseCase) {}
   @Post('prestamo/:prestamoId/generar') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Generar plan automático', description: 'Genera cuotas con periodicidad semanal, diaria, quincenal o mensual.' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiResponse({ status: 201, type: [PlanPagoResponseDto] })
   async generarPlan(@Param('prestamoId', ParseIntPipe) id: number) { return responses(await this.generar.execute(id)); }
   @Post('prestamo/:prestamoId/personalizado') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Crear plan personalizado', description: 'Ejemplo: cinco cuotas semanales de 24.000 para un total de 120.000.' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiBody({ type: PlanPagoPersonalizadoDto }) @ApiResponse({ status: 201, type: [PlanPagoResponseDto] })
@@ -34,4 +36,6 @@ export class PlanesPagoController {
   }
   @Put('prestamo/:prestamoId') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Modificar plan personalizado', description: 'Reemplaza todas las cuotas de forma atómica y marca el préstamo como personalizado.' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiBody({ type: PlanPagoPersonalizadoDto }) @ApiResponse({ status: 200, type: [PlanPagoResponseDto] })
   async modificar(@Param('prestamoId', ParseIntPipe) id: number, @Body() dto: PlanPagoPersonalizadoDto) { return responses(await this.actualizar.execute(id, dto)); }
+  @Patch(':planPagoId/monto') @Roles(RolUsuario.ADMINISTRADOR) @ApiOperation({ summary: 'Ajustar una cuota pendiente redistribuyendo la diferencia en la siguiente cuota pendiente' }) @ApiParam({ name: 'planPagoId', example: 1 }) @ApiBody({ type: AjustarCuotaPlanPagoDto }) @ApiResponse({ status: 200, type: Object })
+  async ajustarMonto(@Param('planPagoId', ParseIntPipe) id: number, @Body() dto: AjustarCuotaPlanPagoDto) { const result = await this.ajustar.execute(id, dto); return { actualizada: response(result.actualizada), siguiente: response(result.siguiente) }; }
 }

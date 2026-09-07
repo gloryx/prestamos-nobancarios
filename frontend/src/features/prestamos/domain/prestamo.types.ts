@@ -36,10 +36,17 @@ export interface Prestamo {
   estado: EstadoPrestamo
   fechaCreacion: string
   fechaActualizacion: string
+  fechaLimiteContractual: string
+  indicadorCobranza: IndicadorCobranza
 }
 
 export type EstadoPrestamo = 'ACTIVO' | 'CANCELADO' | 'REFINANCIADO' | 'INCOBRABLE'
-export interface PrestamoFilters { pagina: number; limite: number; buscar?: string; direccion?: string; estado?: EstadoPrestamo; clienteId?: number }
+export type IndicadorCobranza = 'AL_DIA' | 'ATRASADO' | 'PLAZO_CUMPLIDO' | 'SALDADO'
+export type PrestamoSortField = 'id' | 'cliente' | 'direccion' | 'fechaAlta' | 'capital' | 'estado'
+export type PrestamoSortDirection = 'ASC' | 'DESC'
+export interface PrestamoFilters { pagina: number; limite: number; buscar?: string; direccion?: string; estados?: EstadoPrestamo[]; fechaInicio?: string; fechaFin?: string; estado?: EstadoPrestamo; clienteId?: number; ordenarPor?: PrestamoSortField; direccionOrden?: PrestamoSortDirection }
+export type PrestamoExportFilters = Pick<PrestamoFilters, 'buscar' | 'direccion' | 'estados' | 'fechaInicio' | 'fechaFin'>
 export interface PrestamoPage { datos: Prestamo[]; pagina: number; limite: number; total: number; totalPaginas: number }
+export interface PrestamosResumen { total: number; prestado: number; ganancia: number; recuperado: number; pendiente: number }
 export type EstadoCuota = 'PENDIENTE' | 'PARCIAL' | 'PAGADA'
 export interface PlanPago { id: number; prestamoId: number; numeroPago: number; fechaVencimiento: string; montoProgramado: number; fechaCreacion: string; montoPagado: number; montoPendiente: number; estado: EstadoCuota; fechasPago: string[] }

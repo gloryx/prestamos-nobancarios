@@ -5,7 +5,7 @@ export interface Pago {
   monto: number
   capitalAplicado: number
   interesAplicado: number
-  cobradorId: number | null
+  cobradorId: number
   fecha: string
   observaciones: string | null
   fechaCreacion: string
@@ -36,7 +36,7 @@ export interface RegistrarPagoInput {
   fecha: string
   cobradorId: number
   planPagoId: number
-  observaciones?: string
+  observaciones?: string | null
 }
 
 export interface PagoRegistrado extends Pago {

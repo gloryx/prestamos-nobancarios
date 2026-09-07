@@ -1,17 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { PrestamoConRelaciones } from '../../../prestamos/domain/repositories/prestamo.repository';
 import { PlanPago } from '../entities/plan-pago';
-
-const atUtcMidnight = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-const addDays = (date: Date, days: number): Date => { const result = atUtcMidnight(date); result.setUTCDate(result.getUTCDate() + days); return result; };
-const addMonthsClamped = (date: Date): Date => {
-  const source = atUtcMidnight(date);
-  const month = source.getUTCMonth() + 1;
-  const sourceLastDay = new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + 1, 0)).getUTCDate();
-  const targetLastDay = new Date(Date.UTC(source.getUTCFullYear(), month + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(source.getUTCFullYear(), month, source.getUTCDate() === sourceLastDay ? targetLastDay : Math.min(source.getUTCDate(), targetLastDay)));
-};
-const moveSundayToMonday = (date: Date): Date => date.getUTCDay() === 0 ? addDays(date, 1) : date;
+import { calcularFechaLimiteContractual, fechaDateOnly } from './calendario-pago';
 
 export class GeneradorPlanPago {
   static generar(prestamo: PrestamoConRelaciones): PlanPago[] {
@@ -23,9 +13,10 @@ export class GeneradorPlanPago {
     const cents = Math.round(prestamo.montoTotal * 100);
     const base = Math.floor(cents / prestamo.cantidadPagos);
     const result: PlanPago[] = [];
-    let date = atUtcMidnight(prestamo.fechaAlta);
+    let date = new Date(`${fechaDateOnly(prestamo.fechaAlta)}T00:00:00.000Z`);
     for (let index = 1; index <= prestamo.cantidadPagos; index += 1) {
-      date = moveSundayToMonday(periodicidad === 'DIARIO' ? addDays(date, 1) : periodicidad === 'SEMANAL' ? addDays(date, 7) : periodicidad === 'QUINCENAL' ? addDays(date, 15) : addMonthsClamped(date));
+      const deadline = calcularFechaLimiteContractual(prestamo.fechaAlta, periodicidad, index);
+      date = new Date(`${deadline}T00:00:00.000Z`);
       const amount = index === prestamo.cantidadPagos ? cents - base * (prestamo.cantidadPagos - 1) : base;
       result.push(PlanPago.crear({ prestamoId: prestamo.id!, numeroPago: index, fechaVencimiento: date, montoProgramado: amount / 100 }));
     }

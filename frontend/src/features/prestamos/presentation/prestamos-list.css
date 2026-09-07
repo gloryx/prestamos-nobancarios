@@ -6,11 +6,12 @@
 
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-number { width: 60px; }
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-client { width: 260px; }
-.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-address { width: auto; }
-.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-date { width: 86px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-address { width: 220px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-date { width: 70px; }
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-capital { width: 95px; }
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-status { width: 90px; }
-.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-actions { width: 110px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-cobranza { width: 112px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-actions { width: 180px; }
 
 .prestamos-list-table-wrap .prestamos-list-table th:nth-child(1),
 .prestamos-list-table-wrap .prestamos-list-table td:nth-child(1),
@@ -62,4 +63,53 @@
 
 .prestamos-list-page .prestamos-list-actions .table-action {
   padding: 2px;
+}
+
+.prestamos-list-sort-button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.prestamos-list-sort-button:focus-visible { outline: 2px solid var(--primary-color, #2563eb); outline-offset: 2px; border-radius: 3px; }
+
+.prestamos-list-header-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.prestamos-list-header-actions .secondary-button { display: inline-flex; align-items: center; gap: 6px; }
+
+.cobranza-badge { display: inline-block; border-radius: 999px; padding: 3px 7px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+.cobranza-al_dia { color: #166534; background: #dcfce7; }
+.cobranza-atrasado { color: #92400e; background: #fef3c7; }
+.cobranza-plazo_cumplido { color: #991b1b; background: #fee2e2; }
+.cobranza-saldado { color: #166534; background: #dcfce7; }
+
+.prestamos-list-filters { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(150px, 0.7fr) minmax(150px, 0.7fr) 220px; }
+
+.prestamos-financial-summary { display: flex; align-items: stretch; gap: 1px; margin: 12px 0; overflow-x: auto; border: 1px solid var(--border-color, #e5e7eb); border-radius: 8px; background: var(--border-color, #e5e7eb); }
+.prestamos-financial-summary > div { min-width: 130px; flex: 1 1 0; padding: 9px 12px; background: var(--surface-color, #fff); }
+.prestamos-financial-summary span, .prestamos-financial-summary strong { display: block; }
+.prestamos-financial-summary span { color: var(--muted-color, #6b7280); font-size: .68rem; font-weight: 700; letter-spacing: .04em; }
+.prestamos-financial-summary strong { margin-top: 3px; font-size: .9rem; white-space: nowrap; }
+.prestamos-financial-summary small { align-self: center; margin: 0 10px; white-space: nowrap; }
+.prestamos-financial-summary-error { color: #b91c1c; }
+.prestamos-financial-summary > div:nth-child(2) span, .prestamos-financial-summary > div:nth-child(2) strong, .prestamos-financial-summary > div:nth-child(5) span, .prestamos-financial-summary > div:nth-child(5) strong { color: #b91c1c; }
+.prestamos-financial-summary > div:nth-child(3) span, .prestamos-financial-summary > div:nth-child(3) strong, .prestamos-financial-summary > div:nth-child(4) span, .prestamos-financial-summary > div:nth-child(4) strong { color: #15803d; }
+
+.prestamos-list-status-filter { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.prestamos-list-filter-label { font-size: 0.82rem; font-weight: 600; }
+.prestamos-list-status-trigger { width: 100%; min-height: 38px; padding: 8px 10px; overflow: hidden; border: 1px solid var(--border-color, #d1d5db); border-radius: 6px; background: var(--surface-color, #fff); color: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.prestamos-list-status-dropdown { position: absolute; z-index: 10; top: 100%; right: 0; left: 0; margin-top: 4px; padding: 8px; border: 1px solid var(--border-color, #d1d5db); border-radius: 6px; background: var(--surface-color, #fff); box-shadow: 0 8px 20px rgb(0 0 0 / 12%); }
+.prestamos-list-status-options { display: grid; gap: 6px; }
+.prestamos-list-status-options label { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 0.85rem; }
+.prestamos-list-status-options input { width: auto; }
+.prestamos-list-status-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color, #e5e7eb); }
+.prestamos-list-status-actions button { padding: 0; border: 0; background: transparent; color: inherit; font-size: 0.78rem; cursor: pointer; }
+.prestamos-list-validation { margin: 10px 0; color: var(--muted-color, #6b7280); font-size: .82rem; }
+.prestamos-list-loading { margin: 8px 0; color: var(--muted-color, #6b7280); font-size: .8rem; }
+.prestamos-list-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: .8rem; }
+.prestamos-list-pagination-controls { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
+.prestamos-list-pagination-controls .secondary-button { min-width: 32px; min-height: 30px; padding: 5px 8px; font-size: .78rem; }
+.prestamos-list-pagination-controls .prestamos-list-pagination-page.is-active { border-color: var(--primary-color, #2563eb); background: var(--primary-color, #2563eb); color: #fff; font-weight: 700; }
+.prestamos-list-pagination-ellipsis { padding: 0 3px; color: var(--muted-color, #6b7280); }
+.prestamos-list-page-size { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.prestamos-list-page-size select { min-height: 30px; padding: 4px 24px 4px 7px; border: 1px solid var(--border-color, #d1d5db); border-radius: 5px; background: var(--surface-color, #fff); color: inherit; }
+
+@media (max-width: 760px) {
+  .prestamos-list-filters { grid-template-columns: 1fr; }
+  .prestamos-list-pagination { align-items: flex-start; }
+  .prestamos-list-pagination-range, .prestamos-list-page-size { flex: 1 1 100%; }
 }

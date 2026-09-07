@@ -13,6 +13,7 @@ import { ObtenerCuotaPlanPagoUseCase } from './application/use-cases/obtener-cuo
 import { PlanesPagoController } from './presentation/controllers/planes-pago.controller';
 import { PagosModule } from '../pagos/pagos.module';
 import { PAGO_REPOSITORY } from '../pagos/domain/repositories/pago.repository';
+import { AjustarCuotaPlanPagoUseCase } from './application/use-cases/ajustar-cuota-plan-pago.use-case';
 
-@Module({ imports: [forwardRef(() => PrestamosModule), forwardRef(() => PagosModule), TypeOrmModule.forFeature([PlanPagoOrmEntity, PagoOrmEntity])], controllers: [PlanesPagoController], providers: [ActualizarPlanPagoUseCase, CrearPlanPagoPersonalizadoUseCase, GenerarPlanPagoUseCase, ListarPlanPagoUseCase, ObtenerCuotaPlanPagoUseCase, { provide: PLAN_PAGO_REPOSITORY, useClass: PlanPagoTypeOrmRepository }], exports: [PLAN_PAGO_REPOSITORY] })
+@Module({ imports: [forwardRef(() => PrestamosModule), forwardRef(() => PagosModule), TypeOrmModule.forFeature([PlanPagoOrmEntity, PagoOrmEntity])], controllers: [PlanesPagoController], providers: [ActualizarPlanPagoUseCase, AjustarCuotaPlanPagoUseCase, CrearPlanPagoPersonalizadoUseCase, GenerarPlanPagoUseCase, ListarPlanPagoUseCase, ObtenerCuotaPlanPagoUseCase, { provide: PLAN_PAGO_REPOSITORY, useClass: PlanPagoTypeOrmRepository }], exports: [PLAN_PAGO_REPOSITORY] })
 export class PlanesPagoModule {}

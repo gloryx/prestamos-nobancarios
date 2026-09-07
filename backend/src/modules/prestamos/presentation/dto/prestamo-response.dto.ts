@@ -19,6 +19,8 @@ export class PrestamoResponseDto {
   @ApiProperty({ example: 115000 }) montoTotal: number;
   @ApiProperty({ example: 100000 }) montoDesembolsado: number;
   @ApiProperty({ example: 12 }) cantidadPagos: number;
+  @ApiProperty({ example: '2027-08-30', format: 'date', required: false }) fechaLimiteContractual?: string;
+  @ApiProperty({ enum: ['AL_DIA', 'ATRASADO', 'PLAZO_CUMPLIDO', 'SALDADO'], example: 'AL_DIA', required: false }) indicadorCobranza?: string;
   @ApiProperty({ example: false }) planPersonalizado: boolean;
   @ApiProperty({ enum: EstadoPrestamo, example: EstadoPrestamo.ACTIVO }) estado: EstadoPrestamo;
   @ApiPropertyOptional({ example: 'Préstamo para capital de trabajo.', nullable: true }) observaciones: string | null;

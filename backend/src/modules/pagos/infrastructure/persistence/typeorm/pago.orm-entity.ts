@@ -19,7 +19,6 @@ export class PagoOrmEntity {
   @Column({ type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) monto!: number;
   @Column({ name: 'capital_aplicado', type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) capitalAplicado!: number;
   @Column({ name: 'interes_aplicado', type: 'numeric', precision: 14, scale: 2, transformer: numberTransformer }) interesAplicado!: number;
-  // Existing databases with NULL cobrador_id require an explicit data migration before synchronization can succeed.
   @Column({ name: 'cobrador_id', type: 'integer', nullable: false }) cobradorId!: number;
   @ManyToOne(() => UsuarioOrmEntity, { nullable: false, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'cobrador_id' }) cobrador!: UsuarioOrmEntity;
   @Column({ name: 'fecha', type: 'date' }) fecha!: string;

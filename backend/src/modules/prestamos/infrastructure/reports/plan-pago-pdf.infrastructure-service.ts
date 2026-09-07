@@ -57,8 +57,8 @@ export class PlanPagoPdfInfrastructureService {
       document.once('end', () => resolvePdf(Buffer.concat(chunks)));
       document.once('error', reject);
 
-       const text = (value: string, x: number, y: number, width: number, size: number, color = '#243447', options: Record<string, unknown> = {}): void => {
-        document.font('Unicode').fontSize(size).fillColor(color).text(value || '-', x, y, { width, lineGap: 0, paragraphGap: 0, ...options });
+       const text = (value: string, x: number, y: number, width: number, size: number, color = '#243447', options: Record<string, unknown> = {}, font = 'Unicode'): void => {
+         document.font(font).fontSize(size).fillColor(color).text(value || '-', x, y, { width, lineGap: 0, paragraphGap: 0, ...options });
       };
        const field = (label: string, value: string, x: number, y: number, width: number, size = 8): void => {
         text(`${label} ${value || '-'}`, x, y, width, size);
@@ -89,7 +89,9 @@ export class PlanPagoPdfInfrastructureService {
            const total = applied?.get(cuota.id!)?.total ?? 0; const pending = Math.max(0, cuota.montoProgramado - total); const status = total <= 0 ? 'Pendiente' : pending <= 0 ? 'Pagada' : 'Parcial';
            text(money(cuota.montoProgramado), MARGIN + 92, y + 2, applied ? 68 : 212, 8, '#243447', { align: 'right' });
            if (applied) { text(money(total), MARGIN + 160, y + 2, 68, 8, '#243447', { align: 'right' }); text(money(pending), MARGIN + 228, y + 2, 76, 8, '#243447', { align: 'right' }); }
-           text(status.toUpperCase(), MARGIN + 304, y + 2, 76, 8, '#243447', { align: 'center', lineBreak: false });
+            const statusColor = status === 'Pagada' ? '#15803D' : status === 'Pendiente' ? '#DC2626' : '#243447';
+            const statusFont = status === 'Pagada' || status === 'Pendiente' ? 'Helvetica-Bold' : 'Unicode';
+            text(status.toUpperCase(), MARGIN + 304, y + 2, 76, 8, statusColor, { align: 'center', lineBreak: false }, statusFont);
          return y + ROW_HEIGHT;
        };
 

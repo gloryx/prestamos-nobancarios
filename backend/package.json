@@ -5,7 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "nest build",
-    "test": "node --test tests/refinanciamientos.test.cjs tests/movimientos-caja.test.cjs tests/use-cases-caja.integration.test.cjs tests/usuarios-selector.test.cjs tests/auth.test.cjs tests/initial-admin.seed.test.cjs tests/catalog-seeds.test.cjs tests/cierre-financiero.test.cjs tests/cierre-financiero-contract.test.cjs tests/ingresos.test.cjs tests/etapa1-prestamos-roles.test.cjs tests/etapa2-cartera-historica.test.cjs tests/prestamo-estado-historial.test.cjs tests/client-identification-storage.test.cjs tests/forma-desembolso.test.cjs tests/planes-pago.test.cjs",
+    "test": "node --test tests/refinanciamientos.test.cjs tests/movimientos-caja.test.cjs tests/use-cases-caja.integration.test.cjs tests/usuarios-selector.test.cjs tests/auth.test.cjs tests/initial-admin.seed.test.cjs tests/catalog-seeds.test.cjs tests/cierre-financiero.test.cjs tests/cierre-financiero-contract.test.cjs tests/ingresos.test.cjs tests/etapa1-prestamos-roles.test.cjs tests/etapa2-cartera-historica.test.cjs tests/prestamo-estado-historial.test.cjs tests/client-identification-storage.test.cjs tests/forma-desembolso.test.cjs tests/planes-pago.test.cjs tests/ajustar-cuota-plan-pago.test.cjs tests/registrar-pago.test.cjs tests/indicador-cobranza.test.cjs tests/prestamos-resumen.test.cjs tests/prestamos-excel.test.cjs tests/prestamos-sorting.test.cjs",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
@@ -32,6 +32,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdfkit": "^0.20.2",
