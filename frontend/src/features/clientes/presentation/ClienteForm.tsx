@@ -81,6 +81,7 @@ const defaults = (cliente?: Cliente): Values => ({
   identificacionFile: undefined,
 });
 const optional = (value: string) => value.trim() || null;
+const optionalEmail = (value: string) => value.trim() || undefined;
 
 export function ClienteForm({
   cliente,
@@ -119,7 +120,7 @@ export function ClienteForm({
       genero: (values.genero || null) as Genero | null,
       fechaNacimiento: optional(values.fechaNacimiento),
       direccion: optional(values.direccion),
-      correo: optional(values.correo)?.toLowerCase() ?? null,
+      correo: optionalEmail(values.correo)?.toLowerCase(),
       telefono1: values.telefono1.trim(),
       telefono2: optional(values.telefono2),
       nacionalidad: (values.nacionalidad || null) as Nacionalidad | null,

@@ -27,7 +27,7 @@ for (const field of Object.keys(expected)) for (const direction of ['ASC', 'DESC
   const { repository, calls } = setup();
   await repository.listar({ pagina: 2, limite: 10, ordenarPor: field, direccionOrden: direction });
   assert.equal(calls[0][0], 'orderBy'); assert.equal(calls[0][1], expected[field][0]); assert.equal(calls[0][2], direction);
-  if (field !== 'id') assert.deepEqual(calls[1], ['addOrderBy', 'prestamo.id', 'DESC']);
+   if (field !== 'id') assert.deepEqual(calls[1], ['addOrderBy', 'prestamo.id', field === 'fechaAlta' ? direction : 'DESC']);
   assert.ok(calls.findIndex(call => call[0] === 'skip') > 0);
 });
 
@@ -39,6 +39,12 @@ test('default order is unchanged', async () => {
 test('address uses NULLS LAST and stable tie-break', async () => {
   const { repository, calls } = setup(); await repository.listar({ pagina: 1, limite: 10, ordenarPor: 'direccion', direccionOrden: 'DESC' });
   assert.deepEqual(calls.slice(0, 2), [['orderBy', 'cliente.direccion', 'DESC', 'NULLS LAST'], ['addOrderBy', 'prestamo.id', 'DESC']]);
+});
+
+for (const direction of ['ASC', 'DESC']) test(`fechaAlta uses the same direction for its id tie-break (${direction})`, async () => {
+  const { repository, calls } = setup();
+  await repository.listar({ pagina: 1, limite: 10, ordenarPor: 'fechaAlta', direccionOrden: direction });
+  assert.deepEqual(calls.slice(0, 2), [['orderBy', 'prestamo.fecha_alta', direction], ['addOrderBy', 'prestamo.id', direction]]);
 });
 
 test('filters remain applied with sorting and pagination', async () => {

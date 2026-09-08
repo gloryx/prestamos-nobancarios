@@ -13,7 +13,18 @@
 @media (max-width: 760px) { .payment-summary-grid, .payment-fields { grid-template-columns: 1fr; }.payment-wide { grid-column: auto; }.loan-selector-filters { grid-template-columns: 1fr; }.payment-modal-backdrop { padding: 10px; }.payment-modal { max-height: calc(100vh - 20px); padding: 14px; }.payment-pagination { justify-content: center; flex-wrap: wrap; }.payment-actions .primary-button { width: 100%; justify-content: center; } }
 .payment-plan-wrap { margin-top: 14px; }.payment-plan-table { min-width: 760px; }.payment-plan-table th, .payment-plan-table td { padding: 9px 8px; }.selected-payment-row { background: var(--color-accent-soft); }.payment-status { display: inline-flex; padding: 4px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; }.payment-status.pendiente { color: #8b5b58; background: #f7e5e3; }.payment-status.parcial { color: #1f5f8b; background: #dceefa; }.payment-status.pagada { color: #16785f; background: #dff5ec; }
 .payment-plan-lock { display: block; color: #b91c1c; font-size: 11px; margin-top: 4px; }
-.adjustment-modal { width: min(560px, 100%); }.adjustment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }.adjustment-amount { display: grid; gap: 6px; font-size: var(--form-label-size); font-weight: var(--form-label-weight); }.adjustment-amount .currency-input input { width: 100%; box-sizing: border-box; min-height: var(--form-control-height); padding-left: 27px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); color: var(--color-text); font: inherit; }.adjustment-preview { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px; border: 1px solid var(--color-primary); border-radius: 7px; background: var(--color-accent-soft); color: var(--color-text-muted); font-size: 11px; }.adjustment-preview strong { color: var(--color-primary); font-size: 13px; }
+.adjustment-modal { width: min(calc(100% - 32px), 520px); max-height: calc(100vh - 36px); box-sizing: border-box; }
+.adjustment-modal .adjustment-title { margin: 0; font-size: 18px; }
+.adjustment-modal .adjustment-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; padding: 9px 10px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-accent-soft); }
+.adjustment-modal .adjustment-summary p { min-width: 0; margin: 0; }
+.adjustment-modal .adjustment-summary span { display: block; color: var(--color-text-muted); font-size: 10px; }
+.adjustment-modal .adjustment-summary strong { display: block; margin-top: 3px; color: var(--color-text); font-size: 13px; }
+.adjustment-modal .adjustment-fields { display: grid; gap: 10px; margin-top: 14px; }
+.adjustment-modal .adjustment-field { display: grid; gap: 6px; min-width: 0; font-size: var(--form-label-size); font-weight: var(--form-label-weight); }
+.adjustment-modal .adjustment-field input, .adjustment-modal .adjustment-field .currency-input input { width: 100%; min-width: 0; min-height: var(--form-control-height); box-sizing: border-box; padding: var(--form-control-padding-block) var(--form-control-padding-inline); border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); color: var(--color-text); font: inherit; }
+.adjustment-modal .adjustment-field .currency-input input { padding-left: 27px; }
+.adjustment-modal .adjustment-actions { gap: 8px; margin-top: 14px; }
+@media (max-width: 760px) { .adjustment-modal { width: calc(100% - 32px); }.adjustment-modal .adjustment-summary { grid-template-columns: 1fr; } }
 .loan-selector-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; }
 .loan-selector-clear { white-space: nowrap; }
 .loan-table-wrap table { min-width: 1000px; }

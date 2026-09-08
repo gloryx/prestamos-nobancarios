@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { apiClient } from '@/core/api/client'
 import { FormaPagoError } from '../domain/forma-pago.error'
-import type { FormaPago, FormaPagoInput, FormaPagoRepository } from '../domain/forma-pago.types'
+import type { FormaPago, FormaPagoInput, FormaPagoRepository, FormasPagoPaginadas } from '../domain/forma-pago.types'
 
 function rethrow(error: unknown): never {
   if (axios.isAxiosError(error)) throw new FormaPagoError(error.response?.status ?? 0, 'formas de pago request failed')
@@ -11,6 +11,10 @@ function rethrow(error: unknown): never {
 export class AxiosFormaPagoRepository implements FormaPagoRepository {
   async list(): Promise<FormaPago[]> {
     try { return (await apiClient.get<FormaPago[]>('/formas-pago')).data } catch (error) { return rethrow(error) }
+  }
+
+  async listAdministration(pagina: number, limite: number): Promise<FormasPagoPaginadas> {
+    try { return (await apiClient.get<FormasPagoPaginadas>('/formas-pago/administracion', { params: { pagina, limite } })).data } catch (error) { return rethrow(error) }
   }
 
   async getById(id: number): Promise<FormaPago> {

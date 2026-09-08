@@ -7,6 +7,7 @@ import { PrestamoOrmEntity } from '../../../prestamos/infrastructure/persistence
 import { PlanPagoMapper } from '../../infrastructure/persistence/typeorm/plan-pago.mapper';
 import { PlanPagoOrmEntity } from '../../infrastructure/persistence/typeorm/plan-pago.orm-entity';
 import { AjustarCuotaPlanPagoDto } from '../dto/ajustar-cuota-plan-pago.dto';
+import { validarFechaVencimientoPlan } from './validar-plan-pago';
 
 const cents = (value: number) => Math.round(value * 100);
 const money = (value: number) => cents(value) / 100;
@@ -16,7 +17,10 @@ export class AjustarCuotaPlanPagoUseCase {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   async execute(planPagoId: number, dto: AjustarCuotaPlanPagoDto) {
-    if (!Number.isFinite(dto.montoProgramado) || dto.montoProgramado <= 0 || cents(dto.montoProgramado) !== dto.montoProgramado * 100) {
+    const hasAmount = dto.montoProgramado !== undefined;
+    const hasDate = dto.fechaVencimiento !== undefined;
+    if (!hasAmount && !hasDate) throw new BadRequestException('Debe indicar un monto o una fecha de vencimiento.');
+    if (hasAmount && (!Number.isFinite(dto.montoProgramado) || dto.montoProgramado <= 0 || cents(dto.montoProgramado) !== dto.montoProgramado * 100)) {
       throw new BadRequestException('montoProgramado debe ser positivo y tener como máximo dos decimales.');
     }
 
@@ -45,6 +49,9 @@ export class AjustarCuotaPlanPagoUseCase {
       const next = candidates.find((plan) => !plansWithPayments.has(plan.id));
       if (!next) throw new BadRequestException('No existe una cuota posterior pendiente para redistribuir la diferencia.');
 
+      const currentIndex = allPlans.findIndex((plan) => plan.id === current.id);
+      if (hasDate) validarFechaVencimientoPlan(dto.fechaVencimiento!, loan.fechaAlta, allPlans[currentIndex - 1]?.fechaVencimiento, allPlans[currentIndex + 1]?.fechaVencimiento);
+
       const locked = await Promise.all([current, next].sort((a, b) => a.id - b.id).map((plan) => plans.findOne({ where: { id: plan.id }, lock: { mode: 'pessimistic_write' } })));
       const lockedCurrent = locked.find((plan) => plan?.id === current.id);
       const lockedNext = locked.find((plan) => plan?.id === next.id);
@@ -56,20 +63,25 @@ export class AjustarCuotaPlanPagoUseCase {
 
       const lockedPlans = await plans.find({ where: { prestamoId: loan.id } });
       if (lockedPlans.reduce((sum, plan) => sum + cents(plan.montoProgramado), 0) !== cents(loan.montoTotal)) throw new BadRequestException('El total del plan de pago no coincide con el monto total del préstamo.');
-      const differenceCents = cents(lockedCurrent.montoProgramado) - cents(dto.montoProgramado);
-       const newNextCents = cents(lockedNext.montoProgramado) + differenceCents;
-       if (newNextCents <= 0) throw new BadRequestException('El monto de la cuota posterior debe ser mayor que cero.');
-       const adjustedTotalCents = lockedPlans.reduce((sum, plan) => {
-         if (plan.id === lockedCurrent.id) return sum + cents(dto.montoProgramado);
-         if (plan.id === lockedNext.id) return sum + newNextCents;
-         return sum + cents(plan.montoProgramado);
-       }, 0);
-       if (adjustedTotalCents !== cents(loan.montoTotal)) throw new BadRequestException('El total del plan de pago no coincide con el monto total del préstamo.');
-
-       lockedCurrent.montoProgramado = money(dto.montoProgramado);
-      lockedNext.montoProgramado = money(newNextCents / 100);
-      await plans.save(lockedCurrent);
-      await plans.save(lockedNext);
+      const amountChanged = hasAmount && cents(lockedCurrent.montoProgramado) !== cents(dto.montoProgramado!);
+      if (hasDate) lockedCurrent.fechaVencimiento = dto.fechaVencimiento!;
+      if (amountChanged) {
+        const differenceCents = cents(lockedCurrent.montoProgramado) - cents(dto.montoProgramado!);
+        const newNextCents = cents(lockedNext.montoProgramado) + differenceCents;
+        if (newNextCents <= 0) throw new BadRequestException('El monto de la cuota posterior debe ser mayor que cero.');
+        const adjustedTotalCents = lockedPlans.reduce((sum, plan) => {
+          if (plan.id === lockedCurrent.id) return sum + cents(dto.montoProgramado!);
+          if (plan.id === lockedNext.id) return sum + newNextCents;
+          return sum + cents(plan.montoProgramado);
+        }, 0);
+        if (adjustedTotalCents !== cents(loan.montoTotal)) throw new BadRequestException('El total del plan de pago no coincide con el monto total del préstamo.');
+        lockedCurrent.montoProgramado = money(dto.montoProgramado!);
+        lockedNext.montoProgramado = money(newNextCents / 100);
+        await plans.save(lockedCurrent);
+        await plans.save(lockedNext);
+      } else if (hasDate) {
+        await plans.save(lockedCurrent);
+      }
       return { actualizada: PlanPagoMapper.toDomain(lockedCurrent), siguiente: PlanPagoMapper.toDomain(lockedNext) };
     });
   }

@@ -15,6 +15,7 @@ export class PrestamoResponseDto {
   @ApiPropertyOptional({ type: PrestamoCatalogoResumenDto, nullable: true }) formaDesembolso: PrestamoCatalogoResumenDto | null;
   @ApiProperty({ example: '2026-08-30', format: 'date' }) fechaAlta: string;
   @ApiProperty({ example: 100000 }) capital: number;
+  @ApiPropertyOptional({ example: 75000 }) capitalPendiente?: number;
   @ApiProperty({ example: 15000 }) interes: number;
   @ApiProperty({ example: 115000 }) montoTotal: number;
   @ApiProperty({ example: 100000 }) montoDesembolsado: number;

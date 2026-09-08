@@ -4,14 +4,10 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { join } from 'node:path';
+import { getCorsOptions } from './config/cors.config';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-
-  app.useStaticAssets(join(process.cwd(), 'uploads'), {
-    prefix: '/uploads/',
-  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -20,7 +16,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-  app.enableCors();
+  app.enableCors(getCorsOptions());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('API Préstamos No Bancarios')

@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,6 +16,7 @@ import {
   ApiParam,
   ApiResponse,
   ApiTags,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { ActualizarFormaPagoDto } from '../../application/dto/actualizar-forma-pago.dto';
 import { CambiarEstadoFormaPagoDto } from '../../application/dto/cambiar-estado-forma-pago.dto';
@@ -27,6 +29,9 @@ import { ObtenerFormaPagoUseCase } from '../../application/use-cases/obtener-for
 import { FormaPagoResponseDto } from '../dto/forma-pago-response.dto';
 import { Roles } from '../../../auth/auth.decorators';
 import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
+import { FiltrosFormasPagoAdministracionDto } from '../../application/dto/filtros-formas-pago-administracion.dto';
+import { ListarFormasPagoAdministracionUseCase } from '../../application/use-cases/listar-formas-pago-administracion.use-case';
+import { FormasPagoPaginadosResponseDto } from '../dto/formas-pago-paginados-response.dto';
 
 @ApiTags('Formas de pago')
 @ApiBearerAuth()
@@ -38,6 +43,7 @@ export class FormasPagoController {
     private readonly obtenerFormaPagoUseCase: ObtenerFormaPagoUseCase,
     private readonly actualizarFormaPagoUseCase: ActualizarFormaPagoUseCase,
     private readonly cambiarEstadoFormaPagoUseCase: CambiarEstadoFormaPagoUseCase,
+    private readonly listarAdministracionUseCase: ListarFormasPagoAdministracionUseCase,
   ) {}
 
   @Post()
@@ -98,6 +104,16 @@ export class FormasPagoController {
   })
   listar() {
     return this.listarFormasPagoUseCase.execute();
+  }
+
+  @Get('administracion')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Listar formas de pago para administración con paginación' })
+  @ApiQuery({ name: 'pagina', required: false, type: Number, default: 1 })
+  @ApiQuery({ name: 'limite', required: false, type: Number, default: 10, maximum: 100 })
+  @ApiResponse({ status: 200, type: FormasPagoPaginadosResponseDto })
+  listarAdministracion(@Query() dto: FiltrosFormasPagoAdministracionDto) {
+    return this.listarAdministracionUseCase.execute(dto);
   }
 
   @Get(':id')

@@ -1,7 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsPositive, IsString, Matches, Max, Min } from 'class-validator';
+import { IsArray, IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsPositive, IsString, Matches, Max, Min } from 'class-validator';
 import { EstadoPrestamo } from '../../domain/enums/estado-prestamo.enum';
+import { INDICADORES_COBRANZA, IndicadorCobranza } from '../services/indicador-cobranza.service';
 
 export enum OrdenarPrestamosPor {
   ID = 'id',
@@ -26,6 +27,7 @@ export class FiltrosPrestamosDto {
   @ApiPropertyOptional({ example: '2026-01-01', format: 'date' }) @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fechaInicio?: string;
   @ApiPropertyOptional({ example: '2026-12-31', format: 'date' }) @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fechaFin?: string;
   @ApiPropertyOptional({ enum: EstadoPrestamo, example: EstadoPrestamo.ACTIVO }) @IsOptional() @IsEnum(EstadoPrestamo) estado?: EstadoPrestamo;
+  @ApiPropertyOptional({ enum: INDICADORES_COBRANZA }) @IsOptional() @IsIn(INDICADORES_COBRANZA) indicadorCobranza?: IndicadorCobranza;
   @ApiPropertyOptional({ example: 1 }) @IsOptional() @Type(() => Number) @IsInt() @IsPositive() clienteId?: number;
   @ApiPropertyOptional({ enum: OrdenarPrestamosPor }) @IsOptional() @IsEnum(OrdenarPrestamosPor) ordenarPor?: OrdenarPrestamosPor;
   @ApiPropertyOptional({ enum: DireccionOrden }) @IsOptional() @IsEnum(DireccionOrden) direccionOrden?: DireccionOrden;

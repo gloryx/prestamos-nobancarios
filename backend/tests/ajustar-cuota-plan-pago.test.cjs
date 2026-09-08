@@ -3,11 +3,11 @@ const test = require('node:test');
 const { BadRequestException } = require('@nestjs/common');
 const { AjustarCuotaPlanPagoUseCase } = require('../dist/modules/planes-pago/application/use-cases/ajustar-cuota-plan-pago.use-case');
 
-const plan = (id, numeroPago, montoProgramado, prestamoId = 1) => ({ id, prestamoId, numeroPago, montoProgramado, fechaVencimiento: '2026-09-05', fechaCreacion: new Date() });
+const plan = (id, numeroPago, montoProgramado, prestamoId = 1, fechaVencimiento = '2026-09-05') => ({ id, prestamoId, numeroPago, montoProgramado, fechaVencimiento, fechaCreacion: new Date() });
 const payment = (id, planPagoId, monto) => ({ id, planPagoId, monto });
 
 class FakeDataSource {
-  constructor(plans, payments = [], loan = { id: 1, estado: 'ACTIVO', montoTotal: 700 }) { this.plans = plans; this.payments = payments; this.loan = loan; this.failOnSecondSave = false; }
+  constructor(plans, payments = [], loan = { id: 1, estado: 'ACTIVO', montoTotal: 700 }) { this.plans = plans; this.payments = payments; this.loan = { fechaAlta: '2026-09-01', ...loan }; this.failOnSecondSave = false; }
   transaction(callback) {
     const snapshot = this.plans.map((item) => ({ ...item }));
     return Promise.resolve().then(() => callback({ getRepository: (entity) => entity.name === 'PlanPagoOrmEntity' ? this.planRepository() : entity.name === 'PrestamoOrmEntity' ? this.loanRepository() : this.paymentRepository() })).catch((error) => { this.plans.splice(0, this.plans.length, ...snapshot); throw error; });
@@ -17,7 +17,7 @@ class FakeDataSource {
   paymentRepository() { return { find: async ({ where }) => { const value = where.planPagoId; const ids = value?._value ?? [value]; return this.payments.filter((item) => ids.includes(item.planPagoId)); } }; }
 }
 
-const execute = (dataSource, id, amount) => new AjustarCuotaPlanPagoUseCase(dataSource).execute(id, { montoProgramado: amount });
+const execute = (dataSource, id, amount, fechaVencimiento) => new AjustarCuotaPlanPagoUseCase(dataSource).execute(id, { ...(amount === undefined ? {} : { montoProgramado: amount }), ...(fechaVencimiento === undefined ? {} : { fechaVencimiento }) });
 const message = (promise, expected) => assert.rejects(promise, (error) => { assert.ok(error instanceof BadRequestException); assert.equal(error.message, expected); return true; });
 
 test('decrease redistributes cents to the next pending installment and preserves the total', async () => {
@@ -34,6 +34,24 @@ test('increase takes cents from the next pending installment', async () => {
 test('supports two-decimal cent amounts', async () => {
   const plans = [plan(1, 1, 24.01), plan(2, 2, 28.01)]; const source = new FakeDataSource(plans, [], { id: 1, estado: 'ACTIVO', montoTotal: 52.02 });
   await execute(source, 1, 20.02); assert.deepEqual(plans.map((item) => item.montoProgramado), [20.02, 32]);
+});
+
+test('updates only the current operational date without redistributing amounts', async () => {
+  const plans = [plan(1, 1, 240, 1, '2026-09-05'), plan(2, 2, 280, 1, '2026-09-12')];
+  const payments = [payment(8, 99, 7)];
+  const source = new FakeDataSource(plans, payments, { id: 1, estado: 'ACTIVO', montoTotal: 520 });
+  await execute(source, 1, undefined, '2026-09-08');
+  assert.deepEqual(plans.map((item) => [item.montoProgramado, item.fechaVencimiento]), [[240, '2026-09-08'], [280, '2026-09-12']]);
+  assert.deepEqual(payments, [payment(8, 99, 7)]);
+});
+
+test('rejects an invalid or non-chronological operational date', async () => {
+  const plans = [plan(1, 1, 240, 1, '2026-09-05'), plan(2, 2, 280, 1, '2026-09-12')];
+  const source = new FakeDataSource(plans, [], { id: 1, estado: 'ACTIVO', montoTotal: 520 });
+  await message(execute(source, 1, undefined, '2026-09-13'), 'Las fechas de vencimiento deben estar en orden cronológico.');
+  await message(execute(source, 1, undefined, '2026-02-30'), 'Las fechas de vencimiento deben estar en orden cronológico.');
+  await message(execute(source, 1, undefined, '2026-09-06'), 'Las cuotas del plan de pagos no pueden programarse en domingo.');
+  assert.deepEqual(plans.map((item) => item.fechaVencimiento), ['2026-09-05', '2026-09-12']);
 });
 
 test('rejects paid and partial current installments without touching them', async () => {

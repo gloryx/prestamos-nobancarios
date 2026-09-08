@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { apiClient } from '@/core/api/client'
 import { PeriodicidadError } from '../domain/periodicidad-pago.error'
-import type { Periodicidad, PeriodicidadInput, PeriodicidadRepository } from '../domain/periodicidad-pago.types'
+import type { Periodicidad, PeriodicidadInput, PeriodicidadRepository, PeriodicidadesPaginadas } from '../domain/periodicidad-pago.types'
 
 function rethrow(error: unknown): never {
   if (axios.isAxiosError(error)) throw new PeriodicidadError(error.response?.status ?? 0, 'periodicidad request failed')
@@ -11,6 +11,10 @@ function rethrow(error: unknown): never {
 export class AxiosPeriodicidadRepository implements PeriodicidadRepository {
   async list(): Promise<Periodicidad[]> {
     try { return (await apiClient.get<Periodicidad[]>('/periodicidades-pago')).data } catch (error) { return rethrow(error) }
+  }
+
+  async listAdministration(pagina: number, limite: number): Promise<PeriodicidadesPaginadas> {
+    try { return (await apiClient.get<PeriodicidadesPaginadas>('/periodicidades-pago/administracion', { params: { pagina, limite } })).data } catch (error) { return rethrow(error) }
   }
 
   async getById(id: number): Promise<Periodicidad> {

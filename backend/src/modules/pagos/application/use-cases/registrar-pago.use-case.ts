@@ -57,7 +57,7 @@ export class RegistrarPagoUseCase {
          const firstPending = lockedPlans.find((plan) => (paidByPlan.get(plan.id) ?? 0) < cents(plan.montoProgramado));
          const planPago = lockedPlans.find((plan) => plan.id === dto.planPagoId);
          if (!planPago) throw new BadRequestException('La cuota seleccionada no pertenece al préstamo.');
-         if (firstPending && planPago.id !== firstPending.id) throw new BadRequestException(`Debe pagar primero la cuota número ${firstPending.numeroPago}`);
+          if (firstPending && planPago.id !== firstPending.id) throw new BadRequestException('Debe registrar el pago sobre la primera cuota pendiente del plan.');
          const previousPaidCents = paidByPlan.get(planPago.id) ?? 0;
         const oldCurrentCents = cents(planPago.montoProgramado);
         if (previousPaidCents >= oldCurrentCents) throw new BadRequestException('La cuota seleccionada ya está PAGADA y no admite nuevos pagos.');

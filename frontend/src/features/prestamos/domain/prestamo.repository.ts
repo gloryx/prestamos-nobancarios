@@ -8,6 +8,6 @@ export interface PrestamoRepository {
   create(input: PrestamoInput): Promise<Prestamo>
   getPaymentPlanPdf(id: number): Promise<Blob>
   getPaymentPlan(id: number): Promise<PlanPago[]>
-  adjustPaymentPlanAmount(id: number, montoProgramado: number): Promise<{ actualizada: PlanPago; siguiente: PlanPago }>
+  adjustPaymentPlanAmount(id: number, montoProgramado?: number, fechaVencimiento?: string): Promise<{ actualizada: PlanPago; siguiente: PlanPago }>
   getAccountStatementPdf(id: number): Promise<Blob>
 }

@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Nacionalidad } from '../../domain/enums/nacionalidad.enum';
 import { Genero } from '../../domain/enums/genero.enum';
@@ -12,7 +13,7 @@ export class CrearClienteDto {
   @ApiPropertyOptional({ description: 'Género del cliente', enum: Genero, example: Genero.FEMENINO }) @IsOptional() @IsEnum(Genero) genero?: Genero;
   @ApiPropertyOptional({ example: '1985-04-23', format: 'date' }) @IsOptional() @IsDateString() fechaNacimiento?: string;
   @ApiPropertyOptional({ example: 'San José, Costa Rica' }) @IsOptional() @IsString() @MaxLength(500) direccion?: string;
-  @ApiPropertyOptional({ example: 'juan.perez@example.com' }) @IsOptional() @IsEmail() @MaxLength(150) correo?: string;
+  @ApiPropertyOptional({ example: 'juan.perez@example.com', nullable: true }) @Transform(({ value }) => typeof value === 'string' && value.trim() === '' ? undefined : value) @IsOptional() @IsEmail() @MaxLength(150) correo?: string;
   @ApiProperty({ example: '8888-8888' }) @IsString() @IsNotEmpty() @MaxLength(30) telefono1: string;
   @ApiPropertyOptional({ example: '2222-2222' }) @IsOptional() @IsString() @MaxLength(30) telefono2?: string;
   @ApiPropertyOptional({ description: 'Nacionalidad del cliente', enum: Nacionalidad, example: Nacionalidad.COSTARRICENSE, nullable: true }) @IsOptional() @IsEnum(Nacionalidad) nacionalidad?: Nacionalidad;

@@ -15,7 +15,7 @@ export async function descargarPrestamosExcel(repository: PrestamoRepository, fi
 }
 export const obtenerPrestamo = (repository: PrestamoRepository, id: number): Promise<Prestamo> => repository.getById(id)
 export const listarPlanPago = (repository: PrestamoRepository, id: number): Promise<PlanPago[]> => repository.getPaymentPlan(id)
-export const ajustarMontoCuota = (repository: PrestamoRepository, id: number, montoProgramado: number) => repository.adjustPaymentPlanAmount(id, montoProgramado)
+export const ajustarMontoCuota = (repository: PrestamoRepository, id: number, montoProgramado?: number, fechaVencimiento?: string) => repository.adjustPaymentPlanAmount(id, montoProgramado, fechaVencimiento)
 
 export async function abrirPlanPagoPdf(repository: PrestamoRepository, id: number): Promise<void> {
   const blob = await repository.getPaymentPlanPdf(id)

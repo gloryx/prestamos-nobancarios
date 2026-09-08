@@ -10,6 +10,7 @@ import { PeriodicidadPagoTypeOrmRepository } from './infrastructure/persistence/
 import { PeriodicidadPagoOrmEntity } from './infrastructure/persistence/typeorm/periodicidad-pago.orm-entity';
 import { PeriodicidadesPagoController } from './presentation/controllers/periodicidades-pago.controller';
 import { InitialPeriodicidadesPagoSeed } from './application/initial-periodicidades-pago.seed';
+import { ListarPeriodicidadesPagoAdministracionUseCase } from './application/use-cases/listar-periodicidades-pago-administracion.use-case';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PeriodicidadPagoOrmEntity])],
@@ -17,6 +18,7 @@ import { InitialPeriodicidadesPagoSeed } from './application/initial-periodicida
   providers: [
     CrearPeriodicidadPagoUseCase,
     ListarPeriodicidadesPagoUseCase,
+    ListarPeriodicidadesPagoAdministracionUseCase,
     ObtenerPeriodicidadPagoUseCase,
     ActualizarPeriodicidadPagoUseCase,
     CambiarEstadoPeriodicidadPagoUseCase,

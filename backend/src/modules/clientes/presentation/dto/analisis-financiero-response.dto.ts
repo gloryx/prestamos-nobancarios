@@ -1,0 +1,8 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+class AnalisisClienteDto { @ApiProperty() id!: number; @ApiProperty() identificacion!: string; @ApiProperty() nombreCompleto!: string; @ApiProperty() telefono1!: string; @ApiPropertyOptional({ nullable: true }) telefono2!: string | null; }
+class AnalisisResumenDto { @ApiProperty() totalPrestado!: number; @ApiProperty() totalPagado!: number; @ApiProperty() pendiente!: number; @ApiProperty() ganancia!: number; @ApiProperty() cantidadPrestamos!: number; }
+class UltimoPagoDto { @ApiProperty({ example: '2026-09-01' }) fecha!: string; @ApiProperty() monto!: number; }
+class AnalisisPrestamoDto { @ApiProperty() id!: number; @ApiProperty() estado!: string; @ApiProperty() fechaAlta!: string; @ApiProperty() capital!: number; @ApiProperty() interes!: number; @ApiProperty() montoTotal!: number; @ApiProperty() totalPagado!: number; @ApiProperty() capitalPagado!: number; @ApiProperty() interesPagado!: number; @ApiProperty() capitalPendiente!: number; @ApiProperty() interesPendiente!: number; @ApiProperty() saldoPendiente!: number; @ApiProperty({ enum: ['AL_DIA', 'ATRASADO', 'PLAZO_CUMPLIDO', 'SALDADO'] }) indicadorCobranza!: string; @ApiProperty() fechaLimiteContractual!: string; @ApiPropertyOptional({ type: UltimoPagoDto, nullable: true }) ultimoPago!: UltimoPagoDto | null; @ApiProperty() duracionDias!: number; @ApiProperty({ enum: ['FINALIZADO', 'TRANSCURRIDOS'] }) tipoDuracion!: string; }
+
+export class AnalisisFinancieroResponseDto { @ApiProperty({ type: AnalisisClienteDto }) cliente!: AnalisisClienteDto; @ApiProperty({ type: AnalisisResumenDto }) resumen!: AnalisisResumenDto; @ApiProperty({ type: [AnalisisPrestamoDto] }) prestamos!: AnalisisPrestamoDto[]; }

@@ -109,6 +109,7 @@ const contextFor = rol => ({ getHandler: () => {}, getClass: () => {}, switchToH
 test('enforces the ETAPA 1 ADMINISTRADOR/VENDEDOR controller matrix', () => {
   const vendorAllowed = [
     [ClientesController, 'crearCliente'], [ClientesController, 'actualizar'],
+    [ClientesController, 'obtenerImagen'],
     [PrestamosController, 'crearPrestamo'], [PrestamosController, 'actualizar'],
     [PagosController, 'crear'], [RefinanciamientosController, 'crearRefinanciamiento'],
     [PeriodicidadesPagoController, 'listar'], [PeriodicidadesPagoController, 'obtener'],

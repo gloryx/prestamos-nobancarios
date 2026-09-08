@@ -6,7 +6,8 @@ import { PagoOrmEntity } from '../../../pagos/infrastructure/persistence/typeorm
 import { PlanPagoOrmEntity } from '../../../planes-pago/infrastructure/persistence/typeorm/plan-pago.orm-entity';
 import { PrestamoConRelaciones } from '../../domain/repositories/prestamo.repository';
 
-export type IndicadorCobranza = 'AL_DIA' | 'ATRASADO' | 'PLAZO_CUMPLIDO' | 'SALDADO';
+export const INDICADORES_COBRANZA = ['AL_DIA', 'ATRASADO', 'PLAZO_CUMPLIDO', 'SALDADO'] as const;
+export type IndicadorCobranza = (typeof INDICADORES_COBRANZA)[number];
 export interface DatosCobranza { fechaLimiteContractual: string; indicadorCobranza: IndicadorCobranza; }
 
 const localToday = (): string => {

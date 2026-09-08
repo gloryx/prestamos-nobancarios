@@ -21,7 +21,7 @@ const applyOrdering = (query: SelectQueryBuilder<PrestamoOrmEntity>, filtros: Fi
       break;
     }
     case 'direccion': query.orderBy('cliente.direccion', direction, 'NULLS LAST').addOrderBy('prestamo.id', 'DESC'); break;
-    case 'fechaAlta': query.orderBy('prestamo.fecha_alta', direction).addOrderBy('prestamo.id', 'DESC'); break;
+    case 'fechaAlta': query.orderBy('prestamo.fecha_alta', direction).addOrderBy('prestamo.id', direction); break;
     case 'capital': query.orderBy('prestamo.capital', direction).addOrderBy('prestamo.id', 'DESC'); break;
     case 'estado': {
       const supportsSelectAlias = typeof query.addSelect === 'function';
@@ -54,13 +54,32 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
     if (filtros.fechaInicio) query.andWhere('prestamo.fecha_alta >= :fechaInicio', { fechaInicio: filtros.fechaInicio });
     if (filtros.fechaFin) query.andWhere('prestamo.fecha_alta <= :fechaFin', { fechaFin: filtros.fechaFin });
     if (filtros.clienteId !== undefined) query.andWhere('prestamo.cliente_id = :clienteId', { clienteId: filtros.clienteId });
+    if (filtros.candidateIds !== undefined) {
+      if (filtros.candidateIds.length) query.andWhere('prestamo.id IN (:...candidateIds)', { candidateIds: filtros.candidateIds });
+      else query.andWhere('1 = 0');
+    }
     return query;
+  }
+  async listarParaIndicador(filtros: FiltrosPrestamos): Promise<PrestamoConRelaciones[]> {
+    const entities = await this.applyFilters(this.withRelations(), filtros).getMany();
+    return entities.map((entity) => PrestamoMapper.toDomain(entity));
   }
   async listar(filtros: FiltrosPrestamos): Promise<PrestamosPaginados> {
     const query = this.applyFilters(this.withRelations(), filtros);
     applyOrdering(query, filtros).skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
     const [entities, total] = await query.getManyAndCount();
-    return { datos: entities.map((entity) => PrestamoMapper.toDomain(entity)), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
+    const loans = entities.map((entity) => PrestamoMapper.toDomain(entity));
+    if (!loans.length) return { datos: [], pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
+    const ids = loans.map((loan) => loan.id!);
+    const totals = await this.repository.manager.createQueryBuilder()
+      .select('pago.prestamo_id', 'prestamo_id')
+      .addSelect('SUM(pago.capital_aplicado)', 'capital_pagado')
+      .from('pago', 'pago')
+      .where('pago.prestamo_id IN (:...ids)', { ids })
+      .groupBy('pago.prestamo_id')
+      .getRawMany<{ prestamo_id: string; capital_pagado: string }>();
+    const paidByLoan = new Map(totals.map((row) => [Number(row.prestamo_id), Number(row.capital_pagado)]));
+    return { datos: loans.map((loan) => Object.assign(loan, { capitalPendiente: Math.max(0, loan.capital - (paidByLoan.get(loan.id!) ?? 0)) })), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
   }
   async resumen(filtros: FiltrosPrestamos): Promise<PrestamosResumen> {
     const pagos = this.repository.manager.createQueryBuilder().subQuery()

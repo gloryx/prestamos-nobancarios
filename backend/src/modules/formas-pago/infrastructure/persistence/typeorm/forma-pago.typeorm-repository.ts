@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, ILike, Repository } from 'typeorm';
 import { FormaPago } from '../../../domain/entities/forma-pago';
-import { FormaPagoRepository } from '../../../domain/repositories/forma-pago.repository';
+import { FiltrosFormasPagoAdministracion, FormaPagoRepository } from '../../../domain/repositories/forma-pago.repository';
 import { FormaPagoOrmEntity } from './forma-pago.orm-entity';
 import { FormaPagoMapper } from './forma-pago.mapper';
 
@@ -39,6 +39,14 @@ export class FormaPagoTypeOrmRepository implements FormaPagoRepository {
   async listar(): Promise<FormaPago[]> {
     const entities = await this.repository.find({ order: { nombre: 'ASC' } });
     return entities.map((entity) => FormaPagoMapper.toDomain(entity));
+  }
+
+  async listarAdministracion(filtros: FiltrosFormasPagoAdministracion) {
+    const query = this.repository.createQueryBuilder('formaPago');
+    query.orderBy('formaPago.nombre', 'ASC').addOrderBy('formaPago.id', 'ASC');
+    query.skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
+    const [entities, total] = await query.getManyAndCount();
+    return { datos: entities.map((entity) => FormaPagoMapper.toDomain(entity)), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
   }
 
   async actualizar(formaPago: FormaPago): Promise<FormaPago> {

@@ -10,6 +10,7 @@ import { ActualizarClienteUseCase } from '../../application/use-cases/actualizar
 import { CambiarEstadoClienteUseCase } from '../../application/use-cases/cambiar-estado-cliente.use-case';
 import { CrearClienteUseCase } from '../../application/use-cases/crear-cliente.use-case';
 import { ListarClientesUseCase } from '../../application/use-cases/listar-clientes.use-case';
+import { ResumirClientesUseCase } from '../../application/use-cases/resumir-clientes.use-case';
 import { ObtenerClienteUseCase } from '../../application/use-cases/obtener-cliente.use-case';
 import { Cliente } from '../../domain/entities/cliente';
 import { Genero } from '../../domain/enums/genero.enum';
@@ -20,6 +21,8 @@ import { Roles } from '../../../auth/auth.decorators';
 import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
 import { ClienteIdentificacionStorageService, extensionForFile, MAX_IDENTIFICATION_FILE_SIZE } from '../../infrastructure/storage/cliente-identificacion-storage.service';
 import { ClienteFichaPdfService } from '../../infrastructure/reports/cliente-ficha-pdf.service';
+import { ObtenerAnalisisFinancieroUseCase } from '../../application/use-cases/obtener-analisis-financiero.use-case';
+import { AnalisisFinancieroResponseDto } from '../dto/analisis-financiero-response.dto';
 
 type IdentificationFile = { originalname: string; mimetype: string; buffer: Buffer };
 const identificationUploadOptions = { storage: memoryStorage(), limits: { fileSize: MAX_IDENTIFICATION_FILE_SIZE }, fileFilter: (_request: unknown, file: unknown, callback: (error: Error | null, acceptFile: boolean) => void) => { try { extensionForFile(file as IdentificationFile); callback(null, true); } catch (error) { callback(error as Error, false); } } };
@@ -33,7 +36,7 @@ const response = (cliente: Cliente): ClienteResponseDto => ({ ...cliente, id: cl
 @ApiBearerAuth()
 @Controller('clientes')
 export class ClientesController {
-  constructor(private readonly crear: CrearClienteUseCase, private readonly listarUseCase: ListarClientesUseCase, private readonly obtenerUseCase: ObtenerClienteUseCase, private readonly actualizarUseCase: ActualizarClienteUseCase, private readonly estadoUseCase: CambiarEstadoClienteUseCase, private readonly storage: ClienteIdentificacionStorageService, private readonly fichaPdf: ClienteFichaPdfService) {}
+  constructor(private readonly crear: CrearClienteUseCase, private readonly listarUseCase: ListarClientesUseCase, private readonly resumirUseCase: ResumirClientesUseCase, private readonly obtenerUseCase: ObtenerClienteUseCase, private readonly analisisUseCase: ObtenerAnalisisFinancieroUseCase, private readonly actualizarUseCase: ActualizarClienteUseCase, private readonly estadoUseCase: CambiarEstadoClienteUseCase, private readonly storage: ClienteIdentificacionStorageService, private readonly fichaPdf: ClienteFichaPdfService) {}
 
   @Post()
   @ApiConsumes('multipart/form-data')
@@ -50,9 +53,22 @@ export class ClientesController {
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   @ApiOperation({ summary: 'Listar clientes', description: 'Obtiene los clientes registrados con búsqueda, filtros y paginación.' })
   @ApiQuery({ name: 'pagina', required: false, type: Number, example: 1, default: 1, minimum: 1, description: 'Número de página.' }) @ApiQuery({ name: 'limite', required: false, type: Number, example: 10, default: 10, minimum: 1, maximum: 100, description: 'Cantidad de registros por página.' })
-  @ApiQuery({ name: 'buscar', required: false, example: 'perez' }) @ApiQuery({ name: 'activo', required: false, example: true, type: Boolean })
+  @ApiQuery({ name: 'buscar', required: false, example: 'perez' }) @ApiQuery({ name: 'direccion', required: false, example: 'San José' }) @ApiQuery({ name: 'activo', required: false, example: true, type: Boolean }) @ApiQuery({ name: 'ordenarPor', required: false, enum: ['identificacion', 'nombre', 'direccion', 'telefono', 'estado'] }) @ApiQuery({ name: 'direccionOrden', required: false, enum: ['ASC', 'DESC'] })
   @ApiResponse({ status: 200, description: 'Listado obtenido correctamente.', type: ClientesPaginadosResponseDto })
   async listar(@Query() dto: FiltrosClientesDto) { const result = await this.listarUseCase.execute(dto); return { ...result, datos: result.datos.map(response) }; }
+
+  @Get('resumen')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Obtener el resumen de clientes' })
+  async resumen() { return this.resumirUseCase.execute(); }
+
+  @Get(':id/analisis-financiero')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Obtener el análisis financiero de un cliente', description: 'Obtiene el resumen y todos los préstamos del cliente con pagos reales y duración calculada.' })
+  @ApiParam({ name: 'id', description: 'Identificador del cliente', example: 1 })
+  @ApiResponse({ status: 200, description: 'Análisis financiero obtenido correctamente.', type: AnalisisFinancieroResponseDto })
+  @ApiResponse({ status: 404, description: 'Cliente no encontrado.', example: { statusCode: 404, message: 'Cliente no encontrado.', error: 'Not Found' } })
+  async analisisFinanciero(@Param('id', ParseIntPipe) id: number) { return this.analisisUseCase.execute(id); }
 
   @Get(':id/ficha-pdf')
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)

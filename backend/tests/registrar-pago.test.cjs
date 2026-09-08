@@ -108,21 +108,21 @@ test('redistribuye sobrepago en cascada y elimina solo cuotas futuras sin pagos'
   assert.deepEqual(source.plans.map((item) => [item.id, item.montoProgramado]), [[1, 160], [2, 30], [4, 30]]);
 });
 
-test('rejects direct attempts to skip the first pending installment with the API message', async () => {
+test('rejects direct attempts to skip the first pending installment with a functional message', async () => {
   const source = new FakeDataSource([plan(1, 1, 100), plan(2, 2, 100)], [payment(1, 1, 100)], { interes: 200 });
-  await assert.rejects(useCase(source).execute(dto(1, 1), 9), (error) => error instanceof BadRequestException && error.message === 'Debe pagar primero la cuota número 2');
+  await assert.rejects(useCase(source).execute(dto(1, 1), 9), (error) => error instanceof BadRequestException && error.message === 'Debe registrar el pago sobre la primera cuota pendiente del plan.');
   await useCase(source).execute(dto(2, 100), 9); assert.equal(source.payments.at(-1).planPagoId, 2);
 });
 
 test('rejects a later pending installment while the first one is still pending', async () => {
   const source = new FakeDataSource([plan(11, 1, 100), plan(12, 2, 100)], [], { interes: 200 });
-  await assert.rejects(useCase(source).execute(dto(12, 100), 9), (error) => error instanceof BadRequestException && error.message === 'Debe pagar primero la cuota número 1');
+  await assert.rejects(useCase(source).execute(dto(12, 100), 9), (error) => error instanceof BadRequestException && error.message === 'Debe registrar el pago sobre la primera cuota pendiente del plan.');
   assert.equal(source.payments.length, 0);
 });
 
 test('keeps a partial installment current and blocks the next installment', async () => {
   const source = new FakeDataSource([plan(1, 1, 100), plan(2, 2, 100)], [payment(1, 1, 40)], { capital: 0, interes: 200 });
-  await assert.rejects(useCase(source).execute(dto(2, 1), 9), (error) => error instanceof BadRequestException && error.message === 'Debe pagar primero la cuota número 1');
+  await assert.rejects(useCase(source).execute(dto(2, 1), 9), (error) => error instanceof BadRequestException && error.message === 'Debe registrar el pago sobre la primera cuota pendiente del plan.');
   assert.equal(source.plans[0].montoProgramado, 100);
   assert.equal(source.payments.length, 1);
 });

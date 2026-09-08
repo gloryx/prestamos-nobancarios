@@ -10,6 +10,7 @@ import { FormaPagoOrmEntity } from './infrastructure/persistence/typeorm/forma-p
 import { FormaPagoTypeOrmRepository } from './infrastructure/persistence/typeorm/forma-pago.typeorm-repository';
 import { FormasPagoController } from './presentation/controllers/formas-pago.controller';
 import { InitialFormasPagoSeed } from './application/initial-formas-pago.seed';
+import { ListarFormasPagoAdministracionUseCase } from './application/use-cases/listar-formas-pago-administracion.use-case';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FormaPagoOrmEntity])],
@@ -17,6 +18,7 @@ import { InitialFormasPagoSeed } from './application/initial-formas-pago.seed';
   providers: [
     CrearFormaPagoUseCase,
     ListarFormasPagoUseCase,
+    ListarFormasPagoAdministracionUseCase,
     ObtenerFormaPagoUseCase,
     ActualizarFormaPagoUseCase,
     CambiarEstadoFormaPagoUseCase,

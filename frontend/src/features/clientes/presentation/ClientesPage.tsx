@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Eye, Pencil, Plus, Power, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Eye, Pencil, Plus, Power, X } from "lucide-react";
 import { useAuth } from "@/app/providers/auth-context";
 import {
   cambiarEstadoCliente,
   actualizarCliente,
   crearCliente,
   listarClientes,
+  resumirClientes,
   obtenerCliente,
 } from "../application/clientes.use-cases";
 import { clienteErrorMessage } from "../domain/cliente.error";
@@ -15,15 +16,16 @@ import type {
   ClienteFilters,
   ClienteInput,
   ClientePage,
+  ClientesResumen,
+  ClienteSortField,
+  ClienteSortDirection,
 } from "../domain/cliente.types";
 import { AxiosClienteRepository } from "../infrastructure/axios-cliente.repository";
 import { ClienteForm } from "./ClienteForm";
 import { confirmAction } from "@/shared/utils/sweet-alert";
+import { Pagination } from "@/shared/components/Pagination";
 
 const repository = new AxiosClienteRepository();
-type SortColumn = "name" | "address";
-type SortDirection = "asc" | "desc";
-
 const clienteNombre = (cliente: Cliente) => [
   cliente.primerNombre,
   cliente.segundoNombre,
@@ -148,28 +150,49 @@ export function ClientesPage() {
   const [direccion, setDireccion] = useState("");
   const [activo, setActivo] = useState("");
   const [pagina, setPagina] = useState(1);
-  const [sort, setSort] = useState<{ column: SortColumn; direction: SortDirection } | null>(null);
+  const [limite, setLimite] = useState(10);
+  const [sort, setSort] = useState<{ column: ClienteSortField; direction: ClienteSortDirection } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const limite = 10;
+  const [summary, setSummary] = useState<ClientesResumen | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState("");
+  const listRequestId = useRef(0);
   const load = useCallback(async () => {
+    const requestId = ++listRequestId.current;
     setLoading(true);
-    const filters: ClienteFilters = { pagina, limite };
+    const filters: ClienteFilters = { pagina, limite, ordenarPor: sort?.column, direccionOrden: sort?.direction };
     if (buscar.trim()) filters.buscar = buscar.trim();
     if (direccion.trim()) filters.direccion = direccion.trim();
     if (activo) filters.activo = activo === "true";
     try {
-      setPage(await listarClientes(repository, filters));
+      const result = await listarClientes(repository, filters);
+      if (requestId !== listRequestId.current) return;
+      const totalPages = Math.max(0, result.totalPaginas);
+      const safePage = totalPages === 0 ? 1 : Math.min(Math.max(1, result.pagina), totalPages);
+      if (safePage !== pagina) setPagina(safePage);
+      setPage({ ...result, pagina: safePage });
       setError("");
     } catch (cause) {
-      setError(clienteErrorMessage(cause));
+      if (requestId === listRequestId.current) setError(clienteErrorMessage(cause));
     } finally {
-      setLoading(false);
+      if (requestId === listRequestId.current) setLoading(false);
     }
-  }, [activo, buscar, direccion, pagina]);
+  }, [activo, buscar, direccion, limite, pagina, sort]);
   useEffect(() => {
     if (!editing) void load();
   }, [editing, load]);
+  useEffect(() => {
+    if (editing) return;
+    let cancelled = false;
+    setSummaryLoading(true);
+    setSummaryError("");
+    void resumirClientes(repository)
+      .then((value) => { if (!cancelled) setSummary(value); })
+      .catch(() => { if (!cancelled) setSummaryError("No se pudo cargar el resumen de clientes."); })
+      .finally(() => { if (!cancelled) setSummaryLoading(false); });
+    return () => { cancelled = true; };
+  }, [editing]);
   useEffect(() => {
     if (!id) {
       setDetail(undefined);
@@ -280,17 +303,12 @@ export function ClientesPage() {
       setError(clienteErrorMessage(cause));
     }
   };
-  const toggleSort = (column: SortColumn) => {
+  const toggleSort = (column: ClienteSortField) => {
     setSort((current) => current?.column === column
-      ? { column, direction: current.direction === "asc" ? "desc" : "asc" }
-      : { column, direction: "asc" });
+      ? { column, direction: current.direction === "ASC" ? "DESC" : "ASC" }
+      : { column, direction: "ASC" });
+    setPagina(1);
   };
-  const sortedClientes = page?.datos && sort ? [...page.datos].sort((left, right) => {
-    const leftValue = sort?.column === "address" ? left.direccion ?? "" : clienteNombre(left);
-    const rightValue = sort?.column === "address" ? right.direccion ?? "" : clienteNombre(right);
-    const comparison = leftValue.localeCompare(rightValue, "es", { sensitivity: "base" });
-    return sort?.direction === "desc" ? -comparison : comparison;
-  }) : page?.datos ?? [];
   if (id || location.pathname.endsWith("/nuevo"))
     return (
       <section>
@@ -336,6 +354,12 @@ export function ClientesPage() {
           <Plus size={16} /> Nuevo cliente
         </Link>
       </div>
+      <div className="cliente-summary" aria-live="polite">
+        {([['Total de clientes', summary?.total], ['Masculino', summary?.masculino], ['Femenino', summary?.femenino], ['Con préstamo activo', summary?.conPrestamoActivo]] as const).map(([label, value]) => (
+          <div key={label}><span>{label}</span><strong>{summaryLoading ? "—" : value ?? "—"}</strong></div>
+        ))}
+      </div>
+      {summaryError && <p className="form-note cliente-summary-error" role="alert">{summaryError}</p>}
       <div className="panel cliente-filters">
         <input
           value={buscar}
@@ -376,26 +400,28 @@ export function ClientesPage() {
           {error}
         </p>
       )}
-      {loading ? (
+      {loading && page && <p className="form-note" role="status">Cargando clientes...</p>}
+      {loading && !page && (
         <div className="panel state-box">Cargando clientes...</div>
-      ) : !page?.datos.length ? (
+      )}
+      {!loading && !page?.datos.length ? (
         <div className="panel state-box">No hay clientes para mostrar.</div>
-      ) : (
+      ) : page?.datos.length ? (
         <>
           <div className="panel table-wrap cliente-panel">
             <table className="clientes-list-table">
               <thead>
                 <tr>
-                  <th>Identificación</th>
-                  <th className="clientes-list-name-column"><button type="button" className="clientes-list-sort-button" onClick={() => toggleSort("name")}>Nombre {sort?.column === "name" && (sort.direction === "asc" ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" />)}</button></th>
-                  <th>Teléfono</th>
-                  <th className="clientes-list-address-column"><button type="button" className="clientes-list-sort-button" onClick={() => toggleSort("address")}>Dirección {sort?.column === "address" && (sort.direction === "asc" ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" />)}</button></th>
-                  <th>Estado</th>
+                  <th><button type="button" className="clientes-list-sort-button" onClick={() => toggleSort("identificacion")}>Identificación {sort?.column === "identificacion" && (sort.direction === "ASC" ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" />)}</button></th>
+                  <th className="clientes-list-name-column"><button type="button" className="clientes-list-sort-button" onClick={() => toggleSort("nombre")}>Nombre {sort?.column === "nombre" && (sort.direction === "ASC" ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" />)}</button></th>
+                  <th><button type="button" className="clientes-list-sort-button" onClick={() => toggleSort("telefono")}>Teléfono {sort?.column === "telefono" && (sort.direction === "ASC" ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" />)}</button></th>
+                  <th className="clientes-list-address-column"><button type="button" className="clientes-list-sort-button" onClick={() => toggleSort("direccion")}>Dirección {sort?.column === "direccion" && (sort.direction === "ASC" ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" />)}</button></th>
+                  <th><button type="button" className="clientes-list-sort-button" onClick={() => toggleSort("estado")}>Estado {sort?.column === "estado" && (sort.direction === "ASC" ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" />)}</button></th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedClientes.map((cliente) => (
+                {page.datos.map((cliente) => (
                   <tr key={cliente.id}>
                     <td>{cliente.identificacion}</td>
                     <td className="clientes-list-name-column">
@@ -457,30 +483,9 @@ export function ClientesPage() {
               </tbody>
             </table>
           </div>
-          <div className="cliente-pagination">
-            <span>
-              Mostrando página {page.pagina} de {page.totalPaginas} (
-              {page.total} clientes)
-            </span>
-            <button
-              className="table-action"
-              disabled={pagina <= 1}
-              onClick={() => setPagina((value) => value - 1)}
-              aria-label="Página anterior"
-            >
-              <ChevronLeft size={17} />
-            </button>
-            <button
-              className="table-action"
-              disabled={pagina >= page.totalPaginas}
-              onClick={() => setPagina((value) => value + 1)}
-              aria-label="Página siguiente"
-            >
-              <ChevronRight size={17} />
-            </button>
-          </div>
+          <Pagination pagina={pagina} totalPaginas={page.totalPaginas} total={page.total} limite={limite} opcionesLimite={[10, 25, 50, 100]} onPageChange={setPagina} onLimitChange={(value) => { setLimite(value); setPagina(1); }} label="clientes" disabled={loading} />
         </>
-      )}
+      ) : null}
       {selectedClient && (
         <ClienteDetailModal
           cliente={selectedClient}

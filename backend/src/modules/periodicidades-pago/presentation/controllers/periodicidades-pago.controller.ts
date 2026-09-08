@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Put } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ActualizarPeriodicidadPagoDto } from '../../application/dto/actualizar-periodicidad-pago.dto';
 import { CambiarEstadoPeriodicidadPagoDto } from '../../application/dto/cambiar-estado-periodicidad-pago.dto';
 import { CrearPeriodicidadPagoDto } from '../../application/dto/crear-periodicidad-pago.dto';
@@ -11,6 +11,9 @@ import { ObtenerPeriodicidadPagoUseCase } from '../../application/use-cases/obte
 import { PeriodicidadPagoResponseDto } from '../dto/periodicidad-pago-response.dto';
 import { Roles } from '../../../auth/auth.decorators';
 import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
+import { FiltrosPeriodicidadesPagoAdministracionDto } from '../../application/dto/filtros-periodicidades-pago-administracion.dto';
+import { ListarPeriodicidadesPagoAdministracionUseCase } from '../../application/use-cases/listar-periodicidades-pago-administracion.use-case';
+import { PeriodicidadesPagoPaginadosResponseDto } from '../dto/periodicidades-pago-paginados-response.dto';
 
 @ApiTags('Periodicidades de pago')
 @ApiBearerAuth()
@@ -22,6 +25,7 @@ export class PeriodicidadesPagoController {
     private readonly obtenerUseCase: ObtenerPeriodicidadPagoUseCase,
     private readonly actualizarUseCase: ActualizarPeriodicidadPagoUseCase,
     private readonly cambiarEstadoUseCase: CambiarEstadoPeriodicidadPagoUseCase,
+    private readonly listarAdministracionUseCase: ListarPeriodicidadesPagoAdministracionUseCase,
   ) {}
 
   @Post()
@@ -41,6 +45,16 @@ export class PeriodicidadesPagoController {
   @ApiResponse({ status: 200, description: 'Listado de periodicidades de pago obtenido correctamente.', type: PeriodicidadPagoResponseDto, isArray: true, example: [{ id: 1, nombre: 'Diario', activo: true }, { id: 2, nombre: 'Semanal', activo: true }, { id: 3, nombre: 'Quincenal', activo: true }, { id: 4, nombre: 'Mensual', activo: true }] })
   listar() {
     return this.listarUseCase.execute();
+  }
+
+  @Get('administracion')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Listar periodicidades de pago para administración con paginación' })
+  @ApiQuery({ name: 'pagina', required: false, type: Number, default: 1 })
+  @ApiQuery({ name: 'limite', required: false, type: Number, default: 10, maximum: 100 })
+  @ApiResponse({ status: 200, type: PeriodicidadesPagoPaginadosResponseDto })
+  listarAdministracion(@Query() dto: FiltrosPeriodicidadesPagoAdministracionDto) {
+    return this.listarAdministracionUseCase.execute(dto);
   }
 
   @Get(':id')

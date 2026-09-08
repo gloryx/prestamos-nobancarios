@@ -74,8 +74,8 @@ export class AxiosPrestamoRepository implements PrestamoRepository {
   async getPaymentPlan(id: number): Promise<PlanPago[]> {
     try { return (await apiClient.get<PlanPago[]>(`/planes-pago/prestamo/${id}`)).data } catch (error) { return rethrow(error) }
   }
-  async adjustPaymentPlanAmount(id: number, montoProgramado: number): Promise<{ actualizada: PlanPago; siguiente: PlanPago }> {
-    try { return (await apiClient.patch<{ actualizada: PlanPago; siguiente: PlanPago }>(`/planes-pago/${id}/monto`, { montoProgramado })).data } catch (error) { return rethrow(error) }
+  async adjustPaymentPlanAmount(id: number, montoProgramado?: number, fechaVencimiento?: string): Promise<{ actualizada: PlanPago; siguiente: PlanPago }> {
+    try { return (await apiClient.patch<{ actualizada: PlanPago; siguiente: PlanPago }>(`/planes-pago/${id}/monto`, { ...(montoProgramado === undefined ? {} : { montoProgramado }), ...(fechaVencimiento === undefined ? {} : { fechaVencimiento }) })).data } catch (error) { return rethrow(error) }
   }
   async getAccountStatementPdf(id: number): Promise<Blob> {
     try { return (await apiClient.get<Blob>(`/prestamos/${id}/estado-cuenta/pdf`, { responseType: 'blob' })).data } catch (error) { return rethrow(error) }

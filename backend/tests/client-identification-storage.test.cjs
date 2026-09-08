@@ -3,8 +3,10 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs/promises')
 const path = require('node:path')
 const { ClienteIdentificacionStorageService, extensionForFile, normalizeClientIdentification, MAX_IDENTIFICATION_FILE_SIZE } = require('../dist/modules/clientes/infrastructure/storage/cliente-identificacion-storage.service')
+const { getCorsOptions } = require('../dist/config/cors.config')
 
 const directory = path.resolve(process.cwd(), 'uploads/clientes/identificaciones')
+const mainSource = require('node:fs').readFileSync(path.resolve(__dirname, '../src/main.ts'), 'utf8')
 const images = {
   'image/png': Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
   'image/jpeg': Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/AP/EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8Af//Z', 'base64'),
@@ -17,6 +19,25 @@ test('normalizes identification and rejects path traversal', () => {
   assert.equal(normalizeClientIdentification(' 5-0456-0789 '), '504560789')
   assert.throws(() => normalizeClientIdentification('../etc'), /caracteres no permitidos/)
   assert.throws(() => normalizeClientIdentification('5/0456'), /caracteres no permitidos/)
+})
+
+test('does not expose uploads through a public static handler', () => {
+  assert.doesNotMatch(mainSource, /useStaticAssets/)
+})
+
+test('uses an explicit production CORS whitelist and fails closed when absent', () => {
+  assert.deepEqual(getCorsOptions({ NODE_ENV: 'production', CORS_ORIGINS: 'https://app.example.com, https://admin.example.com' }), {
+    origin: ['https://app.example.com', 'https://admin.example.com'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: false,
+  })
+  assert.throws(() => getCorsOptions({ NODE_ENV: 'production' }), /CORS_ORIGINS/)
+  assert.throws(() => getCorsOptions({ NODE_ENV: 'production', CORS_ORIGINS: '*' }), /no puede usar/)
+})
+
+test('keeps local development working with a localhost fallback', () => {
+  assert.deepEqual(getCorsOptions({ NODE_ENV: 'development' }).origin, ['http://localhost:5173', 'http://127.0.0.1:5173'])
 })
 
 test('accepts allowed extensions without decoding in the synchronous filter', () => {
