@@ -21,7 +21,7 @@ class FakeDataSource {
     return { createQueryBuilder: () => { const builder = { where: () => builder, andWhere: () => builder, orderBy: () => builder, setLock: () => builder, getMany: async () => this.plans.filter((item) => item.prestamoId === 1).sort((a, b) => a.numeroPago - b.numeroPago), getOne: async () => null }; return builder; }, save: async (items) => { for (const item of (Array.isArray(items) ? items : [items])) { const index = this.plans.findIndex((current) => current.id === item.id); if (index >= 0) this.plans[index] = item; } return items; }, remove: async (items) => { for (const item of items) this.plans.splice(this.plans.findIndex((current) => current.id === item.id), 1); return items; } };
   }
   paymentRepository() {
-    return { createQueryBuilder: () => { const builder = { where: () => builder, select: () => builder, addSelect: () => builder, leftJoinAndSelect: () => builder, getMany: async () => this.payments.filter((item) => item.prestamoId === 1), getRawOne: async () => ({ total: String(this.payments.reduce((sum, item) => sum + item.monto, 0)), capital: String(this.payments.reduce((sum, item) => sum + item.capitalAplicado, 0)), interes: String(this.payments.reduce((sum, item) => sum + item.interesAplicado, 0)) }), getOne: async () => this.payments.at(-1) ?? null }; return builder; }, save: async (item) => { const saved = { ...item, id: this.nextPaymentId++ }; this.payments.push(saved); return saved; } };
+     return { createQueryBuilder: () => { const builder = { where: () => builder, andWhere: () => builder, select: () => builder, addSelect: () => builder, leftJoinAndSelect: () => builder, getMany: async () => this.payments.filter((item) => item.prestamoId === 1), getRawOne: async () => ({ total: String(this.payments.reduce((sum, item) => sum + item.monto, 0)), capital: String(this.payments.reduce((sum, item) => sum + item.capitalAplicado, 0)), interes: String(this.payments.reduce((sum, item) => sum + item.interesAplicado, 0)) }), getOne: async () => this.payments.at(-1) ?? null }; return builder; }, save: async (item) => { const saved = { ...item, id: this.nextPaymentId++ }; this.payments.push(saved); return saved; } };
   }
   loanRepository() { return { createQueryBuilder: () => { const builder = { where: () => builder, setLock: () => builder, getOne: async () => this.loan }; return builder; }, save: async (loan) => { this.loan = loan; return loan; } }; }
 }
@@ -45,6 +45,7 @@ test('valida siempre el cobrador activo y conserva separado al actor autenticado
   await useCase(source, { buscarPorIdEnTransaccion: async (_manager, id) => { receivedId = id; return { activo: true }; } }).execute({ ...dto(1, 100), cobradorId: 23, observaciones: '   ' }, 77);
   assert.equal(receivedId, 23);
   assert.equal(source.payments.at(-1).observaciones, null);
+  assert.equal(source.payments.at(-1).redistribuyoPlan, false);
 });
 
 test('rechaza un cobrador inactivo sin crear pago', async () => {
@@ -60,6 +61,7 @@ test('permite parcial exacta y conserva el programado', async () => {
   const source = new FakeDataSource([plan(1, 1, 100), plan(2, 2, 100)], [payment(1, 1, 40)], { interes: 200 });
   const result = await useCase(source).execute(dto(1, 60, '2026-09-07'), 9);
   assert.equal(source.plans[0].montoProgramado, 100); assert.equal(source.payments.at(-1).monto, 60);
+  assert.equal(source.payments.at(-1).redistribuyoPlan, false);
   assert.equal(source.plans[0].fechaVencimiento, '2026-09-07');
   assert.equal(source.plans[1].fechaVencimiento, '2026-09-05');
   assert.equal(result.fecha.toISOString(), '2026-09-07T00:00:00.000Z');
@@ -70,6 +72,7 @@ test('keeps the first installment partial and leaves future installments unchang
   await useCase(source).execute(dto(1, 8000), 9);
   assert.deepEqual(planAmounts(source), [10000, 12000]);
   assert.equal(source.payments.at(-1).planPagoId, 1);
+  assert.equal(source.payments.at(-1).redistribuyoPlan, false);
   assert.equal(source.plans.reduce((sum, item) => sum + item.montoProgramado, 0), 22000);
 });
 
@@ -78,15 +81,18 @@ test('keeps the selected amount when a last installment receives a partial payme
   await useCase(source).execute(dto(1, 8000), 9);
   assert.deepEqual(planAmounts(source), [10000]);
   assert.equal(source.payments.at(-1).monto, 8000);
+  assert.equal(source.payments.at(-1).redistribuyoPlan, false);
 });
 
 test('redistributes overpayment only after completing the current installment', async () => {
   const one = new FakeDataSource([plan(1, 1, 10000), plan(2, 2, 20000), plan(3, 3, 10000)], [], { capital: 40000, interes: 0 });
   await useCase(one).execute(dto(1, 25000), 9);
   assert.deepEqual(planAmounts(one), [25000, 5000, 10000]);
+  assert.equal(one.payments.at(-1).redistribuyoPlan, true);
   const several = new FakeDataSource([plan(1, 1, 10000), plan(2, 2, 10000), plan(3, 3, 15000), plan(4, 4, 20000)], [], { capital: 55000, interes: 0 });
   await useCase(several).execute(dto(1, 35000), 9);
   assert.deepEqual(planAmounts(several), [35000, 20000]);
+  assert.equal(several.payments.at(-1).redistribuyoPlan, true);
   assert.equal(several.plans.reduce((sum, item) => sum + item.montoProgramado, 0), 55000);
 });
 
@@ -159,9 +165,10 @@ test('preserves exact cent arithmetic and rejects insufficient redistribution at
   await useCase(source).execute(dto(1, 10.00), 9);
   assert.deepEqual(planAmounts(source), [10.01, 10.02]);
   const failing = new FakeDataSource([plan(1, 1, 10), plan(2, 2, 1), plan(3, 3, 9)], [payment(3, 3, 1)], { capital: 20, interes: 0 });
-  await assert.rejects(useCase(failing).execute(dto(1, 15), 9), /suficiente/);
-  assert.deepEqual(planAmounts(failing), [10, 1, 9]);
-  assert.equal(failing.payments.length, 1);
+   await assert.rejects(useCase(failing).execute(dto(1, 15), 9), /suficiente/);
+   assert.deepEqual(planAmounts(failing), [10, 1, 9]);
+   assert.equal(failing.payments.length, 1);
+   assert.equal(failing.payments[0].redistribuyoPlan, undefined);
 });
 
 test('uses deterministic lock ordering without Promise.all in the use case', async () => {

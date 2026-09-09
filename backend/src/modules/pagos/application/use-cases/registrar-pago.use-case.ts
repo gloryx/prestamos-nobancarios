@@ -50,7 +50,7 @@ export class RegistrarPagoUseCase {
         const planTotalCents = lockedPlans.reduce((sum, plan) => sum + cents(plan.montoProgramado), 0);
         if (planTotalCents !== cents(prestamo.montoTotal)) throw new BadRequestException('El total del plan de pago no coincide con el monto total del préstamo.');
          const payments = await manager.getRepository(PagoOrmEntity).createQueryBuilder('pago')
-           .where('pago.prestamo_id = :prestamoId', { prestamoId: dto.prestamoId }).getMany();
+            .where('pago.prestamo_id = :prestamoId AND pago.estado = :estado', { prestamoId: dto.prestamoId, estado: 'REGISTRADO' }).getMany();
          const paidByPlan = new Map<number, number>();
          for (const payment of payments) if (payment.planPagoId != null) paidByPlan.set(payment.planPagoId, (paidByPlan.get(payment.planPagoId) ?? 0) + cents(payment.monto));
          const hasPaymentsByPlan = new Set<number>(payments.flatMap((payment) => payment.planPagoId == null ? [] : [payment.planPagoId]));
@@ -61,7 +61,7 @@ export class RegistrarPagoUseCase {
          const previousPaidCents = paidByPlan.get(planPago.id) ?? 0;
         const oldCurrentCents = cents(planPago.montoProgramado);
         if (previousPaidCents >= oldCurrentCents) throw new BadRequestException('La cuota seleccionada ya está PAGADA y no admite nuevos pagos.');
-       const totals = await manager.getRepository(PagoOrmEntity).createQueryBuilder('pago').select('COALESCE(SUM(pago.monto), 0)', 'total').addSelect('COALESCE(SUM(pago.capital_aplicado), 0)', 'capital').addSelect('COALESCE(SUM(pago.interes_aplicado), 0)', 'interes').where('pago.prestamo_id = :id', { id: dto.prestamoId }).getRawOne<{ total: string; capital: string; interes: string }>();
+        const totals = await manager.getRepository(PagoOrmEntity).createQueryBuilder('pago').select('COALESCE(SUM(pago.monto), 0)', 'total').addSelect('COALESCE(SUM(pago.capital_aplicado), 0)', 'capital').addSelect('COALESCE(SUM(pago.interes_aplicado), 0)', 'interes').where('pago.prestamo_id = :id', { id: dto.prestamoId }).andWhere('pago.estado = :state', { state: 'REGISTRADO' }).getRawOne<{ total: string; capital: string; interes: string }>();
        const capitalPendiente = Math.max(0, prestamo.capital - Number(totals?.capital ?? 0));
        const interesPendiente = Math.max(0, prestamo.interes - Number(totals?.interes ?? 0));
        let distribucion;
@@ -75,9 +75,10 @@ export class RegistrarPagoUseCase {
          .filter((plan) => plan.numeroPago > planPago.numeroPago && !hasPaymentsByPlan.has(plan.id))
          .sort((a, b) => a.numeroPago - b.numeroPago);
         const hasFutureEligible = futurePlans.length > 0;
-        const plansToDelete: PlanPagoOrmEntity[] = [];
+         const redistribuyoPlan = hasFutureEligible && overpaymentCents > 0;
+         const plansToDelete: PlanPagoOrmEntity[] = [];
         const affectedFuturePlans = new Set<PlanPagoOrmEntity>();
-        if (hasFutureEligible && overpaymentCents > 0) {
+         if (redistribuyoPlan) {
           // Preserve the existing overpayment behavior only after the installment
           // is complete: the extra paid amount becomes part of its operational
           // amount while the same amount is removed from future installments.
@@ -127,7 +128,7 @@ export class RegistrarPagoUseCase {
             await planRepository.save(survivingFuturePlans[index]);
           }
         }
-        const pago = Pago.crear({ prestamoId: dto.prestamoId, formaPagoId: dto.formaPagoId, monto: dto.monto, capitalAplicado: distribucion.capital, interesAplicado: distribucion.interes, cobradorId: dto.cobradorId, fecha, observaciones: dto.observaciones, planPagoId: planPago.id });
+         const pago = Pago.crear({ prestamoId: dto.prestamoId, formaPagoId: dto.formaPagoId, monto: dto.monto, capitalAplicado: distribucion.capital, interesAplicado: distribucion.interes, cobradorId: dto.cobradorId, fecha, observaciones: dto.observaciones, planPagoId: planPago.id, redistribuyoPlan });
         const saved = await manager.getRepository(PagoOrmEntity).save(PagoMapper.toOrm(pago));
          if (cents(Number(totals?.capital ?? 0)) + cents(distribucion.capital) >= cents(prestamo.capital) && cents(Number(totals?.interes ?? 0)) + cents(distribucion.interes) >= cents(prestamo.interes)) { const previousState = prestamo.estado; prestamo.estado = EstadoPrestamo.CANCELADO; await manager.getRepository(PrestamoOrmEntity).save(prestamo); if (this.history) await this.history.registrar(manager, prestamo.id, previousState, EstadoPrestamo.CANCELADO, fecha, actorUsuarioId, dto.observaciones); }
          if (this.caja && actorUsuarioId) await this.caja.automatico(manager, { tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.PAGO_CLIENTE, monto: dto.monto, fecha, observaciones: dto.observaciones?.trim() || null, pagoId: saved.id, formaPagoId: dto.formaPagoId, prestamoId: dto.prestamoId, refinanciamientoId: null, movimientoReversadoId: null, usuarioId: actorUsuarioId });

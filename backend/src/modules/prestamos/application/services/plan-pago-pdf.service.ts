@@ -39,7 +39,7 @@ export class PlanPagoPdfService {
   }
 
   private async applied(id: number): Promise<Map<number, { total: number; fechas: string[] }>> {
-    const rows = await this.pagos.createQueryBuilder('pago').innerJoin('pago.planPago', 'plan').select('pago.plan_pago_id', 'planPagoId').addSelect('COALESCE(SUM(pago.monto), 0)', 'total').addSelect('ARRAY_AGG(DISTINCT pago.fecha ORDER BY pago.fecha)', 'fechas').where('plan.prestamo_id = :id', { id }).andWhere('pago.plan_pago_id IS NOT NULL').groupBy('pago.plan_pago_id').getRawMany<{ planPagoId: string; total: string; fechas: string[] }>();
+    const rows = await this.pagos.createQueryBuilder('pago').innerJoin('pago.planPago', 'plan').select('pago.plan_pago_id', 'planPagoId').addSelect('COALESCE(SUM(pago.monto), 0)', 'total').addSelect('ARRAY_AGG(DISTINCT pago.fecha ORDER BY pago.fecha)', 'fechas').where('plan.prestamo_id = :id', { id }).andWhere('pago.plan_pago_id IS NOT NULL').andWhere('pago.estado = :estado', { estado: 'REGISTRADO' }).groupBy('pago.plan_pago_id').getRawMany<{ planPagoId: string; total: string; fechas: string[] }>();
     const applied = new Map(rows.map(row => [Number(row.planPagoId), { total: Number(row.total), fechas: row.fechas ?? [] }]));
     return applied;
   }

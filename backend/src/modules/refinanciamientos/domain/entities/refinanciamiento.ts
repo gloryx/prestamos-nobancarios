@@ -7,6 +7,7 @@ export interface DatosRefinanciamiento {
   montoRefinanciado: number;
   interesNuevo: number;
   observaciones?: string | null;
+  fechaLimiteContractualOrigen: Date | null;
 }
 
 export class Refinanciamiento {
@@ -21,11 +22,12 @@ export class Refinanciamiento {
     public interesNuevo: number,
     public observaciones: string | null,
     public fechaCreacion: Date,
+    public fechaLimiteContractualOrigen: Date | null = null,
   ) {}
 
   static crear(data: DatosRefinanciamiento): Refinanciamiento {
     return new Refinanciamiento(null, data.prestamoOrigenId, data.prestamoNuevoId, data.fecha,
       data.capitalPendiente, data.interesPendiente, data.montoRefinanciado, data.interesNuevo,
-      data.observaciones?.trim() || null, new Date());
+      data.observaciones?.trim() || null, new Date(), data.fechaLimiteContractualOrigen);
   }
 }

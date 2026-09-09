@@ -10,7 +10,9 @@ export enum OrdenarPrestamosPor {
   DIRECCION = 'direccion',
   FECHA_ALTA = 'fechaAlta',
   CAPITAL = 'capital',
+  SALDO_PENDIENTE = 'saldoPendiente',
   ESTADO = 'estado',
+  INDICADOR_COBRANZA = 'indicadorCobranza',
 }
 
 export enum DireccionOrden {

@@ -27,6 +27,7 @@ export interface Prestamo {
   fechaAlta: string
   capital: number
   capitalPendiente?: number
+  saldoPendiente: number
   interes: number
   montoTotal: number
   montoDesembolsado: number
@@ -43,7 +44,7 @@ export interface Prestamo {
 
 export type EstadoPrestamo = 'ACTIVO' | 'CANCELADO' | 'REFINANCIADO' | 'INCOBRABLE'
 export type IndicadorCobranza = 'AL_DIA' | 'ATRASADO' | 'PLAZO_CUMPLIDO' | 'SALDADO'
-export type PrestamoSortField = 'id' | 'cliente' | 'direccion' | 'fechaAlta' | 'capital' | 'estado'
+export type PrestamoSortField = 'id' | 'cliente' | 'direccion' | 'fechaAlta' | 'capital' | 'saldoPendiente' | 'estado' | 'indicadorCobranza'
 export type PrestamoSortDirection = 'ASC' | 'DESC'
 export interface PrestamoFilters { pagina: number; limite: number; buscar?: string; direccion?: string; estados?: EstadoPrestamo[]; indicadorCobranza?: IndicadorCobranza; fechaInicio?: string; fechaFin?: string; estado?: EstadoPrestamo; clienteId?: number; ordenarPor?: PrestamoSortField; direccionOrden?: PrestamoSortDirection }
 export type PrestamoExportFilters = Pick<PrestamoFilters, 'buscar' | 'direccion' | 'estados' | 'fechaInicio' | 'fechaFin'>

@@ -60,4 +60,20 @@ export class MovimientoCajaService {
     if (reversals > 0) throw new ConflictException('El movimiento ya fue reversado.');
     try { return await this.repo.guardarEnTransaccion(manager, MovimientoCaja.crear({ tipo: original.tipo === TipoMovimientoCaja.ENTRADA ? TipoMovimientoCaja.SALIDA : TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.REVERSO, monto: original.monto, fecha, observaciones: observaciones.trim(), pagoId: null, prestamoId: null, refinanciamientoId: null, movimientoReversadoId: id, usuarioId })); } catch (error) { if (typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505') throw new ConflictException('El movimiento ya fue reversado.'); throw error; }
   }
+
+  async reversarPagoCliente(manager: EntityManager, pagoId: number, fecha: Date, observaciones: string, usuarioId: number) {
+    if (this.periods) await this.periods.assertOpen(manager, fecha);
+    await this.validarActor(manager, usuarioId);
+    const original = await this.repo.buscarPorPagoYConceptoEnTransaccion(manager, pagoId, ConceptoMovimientoCaja.PAGO_CLIENTE);
+    if (!original) throw new NotFoundException('Movimiento original de pago no encontrado.');
+    const locked = await this.repo.buscarPorIdEnTransaccion(manager, original.id!, true);
+    if (!locked || locked.concepto !== ConceptoMovimientoCaja.PAGO_CLIENTE) throw new BadRequestException('El movimiento original del pago no es válido.');
+    if (await this.repo.contarReversionesEnTransaccion(manager, original.id!)) throw new ConflictException('El movimiento del pago ya fue reversado.');
+    try {
+      return await this.repo.guardarEnTransaccion(manager, MovimientoCaja.crear({ tipo: TipoMovimientoCaja.SALIDA, concepto: ConceptoMovimientoCaja.REVERSO, monto: original.monto, fecha, observaciones: observaciones.trim(), pagoId, prestamoId: original.prestamoId, refinanciamientoId: null, movimientoReversadoId: original.id, formaPagoId: original.formaPagoId, usuarioId }));
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505') throw new ConflictException('El movimiento del pago ya fue reversado.');
+      throw error;
+    }
+  }
 }

@@ -75,7 +75,7 @@ export class FinancialPeriodService {
     const loans = await manager.getRepository(PrestamoOrmEntity).createQueryBuilder('p').where('p.fecha_alta <= :at', { at }).getMany();
     const refinanciamientos = await manager.getRepository(RefinanciamientoOrmEntity).createQueryBuilder('r').where('r.fecha <= :at', { at }).getMany();
     const ids = loans.map(p => p.id);
-    const payments = ids.length ? await manager.getRepository(PagoOrmEntity).createQueryBuilder('p').where('p.prestamo_id IN (:...ids)', { ids }).andWhere('p.fecha <= :at', { at }).getMany() : [];
+    const payments = ids.length ? await manager.getRepository(PagoOrmEntity).createQueryBuilder('p').where('p.prestamo_id IN (:...ids)', { ids }).andWhere('p.estado = :state', { state: 'REGISTRADO' }).andWhere('p.fecha <= :at', { at }).getMany() : [];
     const paid = new Map<number, number>(); for (const p of payments) paid.set(p.prestamoId, (paid.get(p.prestamoId) ?? 0) + p.capitalAplicado);
     const states = new Map<number, string>();
     if (this.history) for (const loan of loans) states.set(loan.id, await this.history.estadoDelPrestamoEnFecha(manager, loan.id, new Date(`${at}T00:00:00.000Z`)));
@@ -88,7 +88,7 @@ export class FinancialPeriodService {
   }
 
   private async flows(manager: EntityManager, from: string, to: string, disponibleInicial: number) {
-    const payments = await manager.getRepository(PagoOrmEntity).createQueryBuilder('p').where('p.fecha BETWEEN :from AND :to', { from, to }).getMany();
+    const payments = await manager.getRepository(PagoOrmEntity).createQueryBuilder('p').where('p.estado = :state', { state: 'REGISTRADO' }).andWhere('p.fecha BETWEEN :from AND :to', { from, to }).getMany();
     const capital = money(payments.reduce((s, p) => s + p.capitalAplicado, 0)); const interest = money(payments.reduce((s, p) => s + p.interesAplicado, 0));
     const paymentMismatch = payments.some(p => money(p.monto) !== money(p.capitalAplicado + p.interesAplicado));
     const movements = await manager.getRepository(MovimientoCajaOrmEntity).createQueryBuilder('m').leftJoinAndSelect('m.movimientoReversado', 'original').where('m.fecha BETWEEN :from AND :to', { from, to }).getMany();

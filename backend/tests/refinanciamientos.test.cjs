@@ -3,13 +3,25 @@ const test = require('node:test');
 
 const { ConflictException } = require('@nestjs/common');
 const { RefinanciamientoQueries } = require('../dist/modules/refinanciamientos/application/use-cases/refinanciamiento-queries.use-cases');
+const { ObtenerCadenasClienteUseCase } = require('../dist/modules/refinanciamientos/application/use-cases/obtener-cadenas-cliente.use-case');
 const { CrearRefinanciamientoUseCase } = require('../dist/modules/refinanciamientos/application/use-cases/crear-refinanciamiento.use-case');
+const { RefinanciamientosController } = require('../dist/modules/refinanciamientos/presentation/controllers/refinanciamientos.controller');
+const { RefinanciamientoTypeOrmRepository } = require('../dist/modules/refinanciamientos/infrastructure/persistence/typeorm/refinanciamiento.typeorm-repository');
 const { EstadoPrestamo } = require('../dist/modules/prestamos/domain/enums/estado-prestamo.enum');
+const { calcularDiasGanados } = require('../dist/modules/refinanciamientos/application/services/calcular-dias-ganados');
 
 const relation = (id, prestamoOrigenId, prestamoNuevoId) => ({
   id,
   prestamoOrigenId,
   prestamoNuevoId,
+});
+
+test('diasGanados uses calendar dates, returns null without a snapshot, and is never negative', () => {
+  const day = value => new Date(`${value}T00:00:00.000Z`);
+  assert.equal(calcularDiasGanados(day('2026-09-10'), day('2026-09-01')), 9);
+  assert.equal(calcularDiasGanados(day('2026-09-01'), day('2026-09-01')), 0);
+  assert.equal(calcularDiasGanados(day('2026-08-31'), day('2026-09-01')), 0);
+  assert.equal(calcularDiasGanados(null, day('2026-09-01')), null);
 });
 
 class FakeRefinanciamientoRepository {
@@ -45,6 +57,100 @@ class FakeRefinanciamientoRepository {
     return value;
   }
 }
+
+const listedRefinancing = (id, cliente) => ({
+  id,
+  prestamoOrigenId: id * 10,
+  prestamoNuevoId: id * 10 + 1,
+  fecha: new Date('2026-09-01T00:00:00.000Z'),
+  capitalPendiente: 100,
+  interesPendiente: 0,
+  montoRefinanciado: 100,
+  interesNuevo: 20,
+  observaciones: null,
+  fechaCreacion: new Date('2026-09-01T00:00:00.000Z'),
+  fechaLimiteContractualOrigen: null,
+  cliente,
+  prestamoNuevo: { montoDesembolsado: 50 },
+});
+
+test('GET /refinanciamientos preserves the paginated envelope and adds the origin client summary', async () => {
+  let receivedFilters;
+  const queries = { listar: async filters => { receivedFilters = filters; return { datos: [listedRefinancing(1, { id: 7, identificacion: '1-111-111', nombreCompleto: 'ANA MARIA LOPEZ' })], pagina: 2, limite: 1, total: 3, totalPaginas: 3 }; } };
+  const controller = new RefinanciamientosController(null, queries, null);
+
+  const result = await controller.listar({ pagina: 2, limite: 1, buscar: 'ana', clienteId: 7, fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
+
+  assert.deepEqual(receivedFilters, { pagina: 2, limite: 1, buscar: 'ana', clienteId: 7, fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
+  assert.deepEqual(Object.keys(result), ['datos', 'pagina', 'limite', 'total', 'totalPaginas']);
+  assert.equal(result.datos.length, 1);
+  assert.deepEqual(result.datos[0].cliente, { id: 7, identificacion: '1-111-111', nombreCompleto: 'ANA MARIA LOPEZ' });
+  assert.equal(result.pagina, 2);
+  assert.equal(result.limite, 1);
+  assert.equal(result.total, 3);
+  assert.equal(result.totalPaginas, 3);
+  assert.equal(result.datos[0].montoRefinanciado, 100);
+});
+
+test('GET /refinanciamientos supports empty and multiple listed rows without changing totals', async () => {
+  const rows = [listedRefinancing(1, { id: 7, identificacion: '1-111-111', nombreCompleto: 'ANA LOPEZ' }), listedRefinancing(2, { id: 8, identificacion: '2-222-222', nombreCompleto: 'JUAN PEREZ' })];
+  const controller = new RefinanciamientosController(null, { listar: async () => ({ datos: rows, pagina: 1, limite: 10, total: 2, totalPaginas: 1 }) }, null);
+  const result = await controller.listar({ pagina: 1, limite: 10 });
+  assert.equal(result.datos.length, 2);
+  assert.deepEqual(result.datos.map(value => value.cliente.id), [7, 8]);
+  assert.equal(result.total, 2);
+
+  const emptyController = new RefinanciamientosController(null, { listar: async () => ({ datos: [], pagina: 1, limite: 10, total: 0, totalPaginas: 0 }) }, null);
+  const empty = await emptyController.listar({ pagina: 1, limite: 10 });
+  assert.deepEqual(empty.datos, []);
+  assert.equal(empty.total, 0);
+  assert.equal(empty.totalPaginas, 0);
+});
+
+test('refinanciamiento listing uses the joined origin client and does not perform N+1 queries', async () => {
+  let queryBuilderCalls = 0;
+  let getManyAndCountCalls = 0;
+  const entity = {
+    id: 1,
+    prestamoOrigenId: 10,
+    prestamoNuevoId: 11,
+    fecha: '2026-09-01',
+    capitalPendiente: 100,
+    interesPendiente: 0,
+    montoRefinanciado: 100,
+    interesNuevo: 20,
+    observaciones: null,
+    fechaCreacion: new Date('2026-09-01T00:00:00.000Z'),
+    prestamoOrigen: {
+      id: 10,
+      clienteId: 7,
+      cliente: { id: 7, identificacion: '1-111-111', primerNombre: 'ANA', segundoNombre: null, primerApellido: 'MARIA', segundoApellido: 'LOPEZ' },
+    },
+    prestamoNuevo: { id: 11, clienteId: 7 },
+  };
+  const builder = {
+    leftJoinAndSelect() { return this; },
+    andWhere() { return this; },
+    orderBy() { return this; },
+    addOrderBy() { return this; },
+    skip(value) { this.skipValue = value; return this; },
+    take(value) { this.takeValue = value; return this; },
+    async getManyAndCount() { getManyAndCountCalls += 1; return [[entity], 4]; },
+  };
+  const repository = new RefinanciamientoTypeOrmRepository({
+    createQueryBuilder() { queryBuilderCalls += 1; return builder; },
+  });
+
+  const result = await repository.listar({ pagina: 2, limite: 2, buscar: 'ANA', clienteId: 7, fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
+
+  assert.equal(queryBuilderCalls, 1);
+  assert.equal(getManyAndCountCalls, 1);
+  assert.equal(builder.skipValue, 2);
+  assert.equal(builder.takeValue, 2);
+  assert.deepEqual(result.datos[0].cliente, { id: 7, identificacion: '1-111-111', nombreCompleto: 'ANA MARIA LOPEZ' });
+  assert.equal(result.total, 4);
+  assert.equal(result.totalPaginas, 2);
+});
 
 const chainCases = [
   ['A: 100 -> 101', [relation(1, 100, 101)], 100, [1]],
@@ -82,6 +188,11 @@ test('stops safely when the relations contain a cycle', async () => {
 test('create blocks only an already-refinanced origin and preserves HTTP 409', async () => {
   let countWhere;
   const origin = { id: 100, estado: EstadoPrestamo.ACTIVO };
+  const planQueryBuilder = {
+    select() { return this; },
+    where() { return this; },
+    async getRawOne() { return { fechaLimiteContractualOrigen: '2026-12-31' }; },
+  };
   const queryBuilder = {
     leftJoinAndSelect() { return this; },
     where() { return this; },
@@ -92,8 +203,9 @@ test('create blocks only an already-refinanced origin and preserves HTTP 409', a
     async transaction(callback) {
       return callback({
         getRepository(entity) {
-          if (entity.name === 'PrestamoOrmEntity') return { createQueryBuilder: () => queryBuilder };
-          if (entity.name === 'RefinanciamientoOrmEntity') {
+           if (entity.name === 'PrestamoOrmEntity') return { createQueryBuilder: () => queryBuilder };
+           if (entity.name === 'PlanPagoOrmEntity') return { createQueryBuilder: () => planQueryBuilder };
+           if (entity.name === 'RefinanciamientoOrmEntity') {
             return { count: async ({ where }) => { countWhere = where; return 1; } };
           }
           throw new Error(`Unexpected repository: ${entity.name}`);
@@ -116,21 +228,25 @@ test('create blocks only an already-refinanced origin and preserves HTTP 409', a
 
 test('create locks the origin loan before checking refinancing integrity', async () => {
   let lockMode;
+  let lockTables;
+  let transactionalManager;
+  const manager = {
+    getRepository(entity) {
+      if (entity.name === 'PrestamoOrmEntity') return { createQueryBuilder: () => queryBuilder };
+      if (entity.name === 'RefinanciamientoOrmEntity') return { count: async () => 0 };
+      throw new Error(`Unexpected repository: ${entity.name}`);
+    },
+  };
   const queryBuilder = {
     leftJoinAndSelect() { return this; },
     where() { return this; },
-    setLock(mode) { lockMode = mode; return this; },
+    setLock(mode, _version, tables) { lockMode = mode; lockTables = tables; return this; },
     async getOne() { return { id: 100, estado: EstadoPrestamo.ACTIVO }; },
   };
   const dataSource = {
     async transaction(callback) {
-      return callback({
-        getRepository(entity) {
-          if (entity.name === 'PrestamoOrmEntity') return { createQueryBuilder: () => queryBuilder };
-          if (entity.name === 'RefinanciamientoOrmEntity') return { count: async () => 0 };
-          throw new Error(`Unexpected repository: ${entity.name}`);
-        },
-      });
+      transactionalManager = manager;
+      return callback(manager);
     },
   };
 
@@ -139,4 +255,128 @@ test('create locks the origin loan before checking refinancing integrity', async
     /Unexpected repository/,
   );
   assert.equal(lockMode, 'pessimistic_write');
+  assert.deepEqual(lockTables, ['p']);
+  assert.equal(transactionalManager, manager);
+});
+
+const chainClient = (id = 7) => ({
+  id,
+  identificacion: '1-111-111',
+  primerNombre: 'ANA',
+  segundoNombre: 'MARIA',
+  primerApellido: 'LOPEZ',
+  segundoApellido: null,
+  genero: null,
+  fechaNacimiento: null,
+  direccion: 'San Jose',
+  correo: 'ana@example.test',
+  telefono1: '8888-8888',
+  telefono2: null,
+  nacionalidad: null,
+  observaciones: null,
+  fechaIngreso: new Date('2026-01-01T00:00:00.000Z'),
+  urlIdentificacion: null,
+  activo: true,
+});
+
+const chainLoan = (id, fechaAlta, capital, clienteId = 7) => ({
+  id, clienteId, estado: 'ACTIVO', fechaAlta: new Date(`${fechaAlta}T00:00:00.000Z`),
+  capital, interes: 20, montoTotal: capital + 20, montoDesembolsado: capital,
+});
+
+const chainRelation = (id, origen, nuevo, fecha, capitalPendiente, dineroNuevo, interesNuevo, clienteId = 7) => ({
+  id, prestamoOrigenId: origen, prestamoNuevoId: nuevo, fecha: new Date(`${fecha}T00:00:00.000Z`),
+  capitalPendiente, interesPendiente: 0, montoRefinanciado: capitalPendiente, interesNuevo,
+  observaciones: null, fechaCreacion: new Date(`${fecha}T00:00:00.000Z`),
+  fechaLimiteContractualOrigen: null,
+  prestamoNuevo: { montoDesembolsado: dineroNuevo, clienteId },
+});
+
+const chainData = (prestamos, refinanciamientos, cliente = chainClient()) => ({ cliente, prestamos, refinanciamientos });
+
+test('bulk endpoint groups independent chains and orders them deterministically', async () => {
+  const data = chainData(
+    [chainLoan(30, '2026-01-10', 300), chainLoan(10, '2026-01-01', 100), chainLoan(11, '2026-02-01', 110), chainLoan(31, '2026-01-11', 310)],
+    [chainRelation(2, 10, 11, '2026-02-05', 80, 25, 12), chainRelation(1, 30, 31, '2026-01-12', 250, 0, 8)],
+  );
+  const result = await new ObtenerCadenasClienteUseCase({ buscarDatosCadenasPorClienteId: async () => data }).execute(7);
+
+  assert.deepEqual(result.cadenas.map(value => [value.prestamoRaizId, value.prestamoTerminalId]), [[10, 11], [30, 31]]);
+  assert.deepEqual(result.cadenas[0].transiciones.map(value => value.refinanciamientoId), [2]);
+  assert.deepEqual(result.cadenas[1].transiciones.map(value => value.refinanciamientoId), [1]);
+});
+
+test('bulk endpoint returns the complete monetary, date, summary, and response contract', async () => {
+  const data = chainData(
+    [chainLoan(100, '2026-03-01', 1000), chainLoan(101, '2026-04-01', 1200), chainLoan(102, '2026-05-01', 1400)],
+    [chainRelation(7, 100, 101, '2026-04-15', 900.125, 100.456, 20.239), chainRelation(8, 101, 102, '2026-05-15', 800.335, 200.555, 30.555)],
+  );
+  const useCase = new ObtenerCadenasClienteUseCase({ buscarDatosCadenasPorClienteId: async () => data });
+  const controller = new RefinanciamientosController(null, null, null, useCase);
+  const result = await controller.cadenasPorCliente(7);
+
+  assert.deepEqual(Object.keys(result), ['cliente', 'convencionOrdenFechaInicio', 'resumen', 'cadenas']);
+  assert.equal(result.cliente.id, 7);
+  assert.equal(result.cliente.fechaNacimiento, null);
+  assert.equal(result.cadenas[0].fechaInicio, '2026-03-01');
+  assert.equal(result.cadenas[0].resumen.fechaUltimoRefinanciamiento, '2026-05-15');
+  assert.deepEqual(result.cadenas[0].transiciones[0], {
+    refinanciamientoId: 7, fecha: '2026-04-15', prestamoOrigenId: 100, prestamoNuevoId: 101,
+     capitalTrasladado: 900.13, dineroNuevoDesembolsado: 100.46, interesNuevo: 20.24, fechaLimiteContractualOrigen: null, diasGanados: null,
+  });
+  assert.deepEqual(result.resumen, {
+    cantidadCadenas: 1, cantidadRefinanciamientos: 2,
+     totalCapitalTrasladado: 1700.47, totalDineroNuevoDesembolsado: 301.02, totalInteresNuevoPactado: 50.8, diasGanadosAcumulados: 0, diasGanadosCompletos: false,
+  });
+  assert.deepEqual(Object.keys(result.cadenas[0]), ['prestamoRaizId', 'prestamoTerminalId', 'fechaInicio', 'resumen', 'prestamos', 'transiciones']);
+});
+
+test('bulk endpoint returns HTTP 404 semantics when the client does not exist', async () => {
+  const useCase = new ObtenerCadenasClienteUseCase({ buscarDatosCadenasPorClienteId: async () => null });
+  const controller = new RefinanciamientosController(null, null, null, useCase);
+
+  await assert.rejects(() => controller.cadenasPorCliente(404), error => error.getStatus() === 404 && error.message === 'Cliente no encontrado.');
+});
+
+test('bulk endpoint rejects structural cycles and unreachable relation components', async () => {
+  const data = chainData(
+    [chainLoan(100, '2026-01-01', 100), chainLoan(101, '2026-01-02', 110)],
+    [chainRelation(1, 100, 101, '2026-01-03', 90, 0, 5), chainRelation(2, 101, 100, '2026-01-04', 80, 0, 6)],
+  );
+  const useCase = new ObtenerCadenasClienteUseCase({ buscarDatosCadenasPorClienteId: async () => data });
+
+  await assert.rejects(() => useCase.execute(7), error => error.getStatus() === 409 && /Corrupción estructural/.test(error.message));
+});
+
+test('bulk endpoint rejects a relation crossing client boundaries', async () => {
+  const data = chainData(
+    [chainLoan(100, '2026-01-01', 100, 7), chainLoan(101, '2026-01-02', 110, 8)],
+    [chainRelation(1, 100, 101, '2026-01-03', 90, 0, 5, 8)],
+  );
+  const useCase = new ObtenerCadenasClienteUseCase({ buscarDatosCadenasPorClienteId: async () => data });
+
+  await assert.rejects(() => useCase.execute(7), error => error.getStatus() === 409 && error.message === 'Relación de refinanciamiento cruzada entre clientes.');
+});
+
+test('bulk repository uses a constant three-query shape: client, loans, and relations', async () => {
+  const calls = { repositories: 0, client: 0, loans: 0, relations: 0 };
+  const clientEntity = { id: 7, identificacion: '1-111-111', primerNombre: 'ANA', primerApellido: 'LOPEZ', fechaIngreso: new Date(), activo: true };
+  const loanEntities = [{ id: 100, clienteId: 7, estado: 'ACTIVO', fechaAlta: '2026-01-01', capital: 100, interes: 20, montoTotal: 120, montoDesembolsado: 100 }];
+  const relationEntities = [{ id: 1, prestamoOrigenId: 100, prestamoNuevoId: 101, fecha: '2026-02-01', capitalPendiente: 90, interesPendiente: 0, montoRefinanciado: 90, interesNuevo: 10, fechaCreacion: new Date(), prestamoOrigen: {}, prestamoNuevo: { montoDesembolsado: 0 } }];
+  const relationQuery = {
+    innerJoinAndSelect() { return this; }, where() { return this; }, orderBy() { return this; }, addOrderBy() { return this; },
+    async getMany() { calls.relations += 1; return relationEntities; },
+  };
+  const manager = {
+    getRepository(entity) {
+      calls.repositories += 1;
+      if (entity.name === 'ClienteOrmEntity') return { findOne: async () => { calls.client += 1; return clientEntity; } };
+      if (entity.name === 'PrestamoOrmEntity') return { find: async () => { calls.loans += 1; return loanEntities; } };
+      throw new Error(`Unexpected repository: ${entity.name}`);
+    },
+  };
+  const repository = new RefinanciamientoTypeOrmRepository({ manager, createQueryBuilder: () => relationQuery });
+
+  await repository.buscarDatosCadenasPorClienteId(7);
+  assert.deepEqual(calls, { repositories: 2, client: 1, loans: 1, relations: 1 });
 });

@@ -33,12 +33,12 @@ export class IndicadorCobranzaService {
 
     const totals = await this.dataSource.getRepository(PagoOrmEntity).createQueryBuilder('pago')
       .select('pago.prestamoId', 'prestamoId').addSelect('COALESCE(SUM(pago.monto), 0)', 'total')
-      .where('pago.prestamoId IN (:...ids)', { ids }).groupBy('pago.prestamoId').getRawMany<{ prestamoId: string; total: string }>();
+      .where('pago.prestamoId IN (:...ids)', { ids }).andWhere('pago.estado = :state', { state: 'REGISTRADO' }).groupBy('pago.prestamoId').getRawMany<{ prestamoId: string; total: string }>();
     const paidByLoan = new Map(totals.map((row) => [Number(row.prestamoId), Number(row.total)]));
 
     // Only payments linked through plan_pago count for operational delinquency.
     const overdue = await this.dataSource.getRepository(PlanPagoOrmEntity).createQueryBuilder('plan')
-      .leftJoin(PagoOrmEntity, 'pago', 'pago.plan_pago_id = plan.id')
+      .leftJoin(PagoOrmEntity, 'pago', "pago.plan_pago_id = plan.id AND pago.estado = 'REGISTRADO'")
       .select('plan.prestamoId', 'prestamoId').where('plan.prestamoId IN (:...ids)', { ids })
       .andWhere('plan.fechaVencimiento < :hoy', { hoy })
       .groupBy('plan.id').addGroupBy('plan.prestamoId').addGroupBy('plan.montoProgramado')

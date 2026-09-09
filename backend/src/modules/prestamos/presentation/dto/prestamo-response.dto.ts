@@ -16,6 +16,7 @@ export class PrestamoResponseDto {
   @ApiProperty({ example: '2026-08-30', format: 'date' }) fechaAlta: string;
   @ApiProperty({ example: 100000 }) capital: number;
   @ApiPropertyOptional({ example: 75000 }) capitalPendiente?: number;
+  @ApiPropertyOptional({ example: 90000 }) saldoPendiente?: number;
   @ApiProperty({ example: 15000 }) interes: number;
   @ApiProperty({ example: 115000 }) montoTotal: number;
   @ApiProperty({ example: 100000 }) montoDesembolsado: number;

@@ -55,6 +55,15 @@ test('no indicator preserves the existing single repository path', async () => {
   assert.equal(setupValue.bulkCalls, 0);
 });
 
+for (const direction of ['ASC', 'DESC']) test(`indicator sorting is calculated for all candidates before pagination (${direction})`, async () => {
+  const setupValue = setup({ 1: 'SALDADO', 2: 'AL_DIA', 3: 'SALDADO', 4: 'ATRASADO' });
+  await setupValue.useCase.execute({ ...filters, ordenarPor: 'indicadorCobranza', direccionOrden: direction });
+  const ids = setupValue.calls[1][1].candidateIds;
+  assert.deepEqual(ids, direction === 'ASC' ? [2, 4, 1, 3] : [3, 1, 4, 2]);
+  assert.equal(setupValue.calls[1][1].pagina, filters.pagina);
+  assert.equal(setupValue.calls[1][1].limite, filters.limite);
+});
+
 test('invalid indicator values are rejected by the DTO whitelist', async () => {
   const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true });
   await assert.rejects(() => pipe.transform({ indicadorCobranza: 'UNKNOWN' }, { type: 'query', metatype: FiltrosPrestamosDto }));

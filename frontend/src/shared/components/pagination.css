@@ -1,10 +1,61 @@
-.shared-pagination { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; color: var(--color-text-muted); font-size: 11px; }
-.shared-pagination .table-action { margin: 0; min-width: 26px; min-height: 26px; padding: 3px; }
-.shared-pagination-controls { display: flex; align-items: center; justify-content: center; gap: 2px; flex-wrap: wrap; }
-.shared-pagination-page { font-size: 11px; font-weight: 600; }
-.shared-pagination-page.is-active { border-radius: 4px; background: var(--color-primary); color: #fff; }
-.shared-pagination-ellipsis { padding: 0 2px; color: var(--color-text-muted); }
-.shared-pagination-page-size { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.shared-pagination-page-size select { min-height: 26px; padding: 3px 20px 3px 6px; border: 1px solid var(--color-border); border-radius: 5px; background: var(--color-surface); color: inherit; font: inherit; }
-.shared-pagination button:disabled, .shared-pagination select:disabled { opacity: .35; cursor: not-allowed; }
-@media (max-width: 760px) { .shared-pagination { justify-content: center; } }
+.shared-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+.shared-pagination .table-action {
+  margin: 0;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 3px;
+}
+.shared-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.shared-pagination-page {
+  font-size: 11px;
+  font-weight: 600;
+}
+.shared-pagination-page.is-active {
+  border-radius: 4px;
+  background: var(--color-primary);
+  color: #fff;
+}
+.shared-pagination-ellipsis {
+  padding: 0 2px;
+  color: var(--color-text-muted);
+}
+.shared-pagination-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.shared-pagination-page-size select {
+  min-height: 26px;
+  padding: 3px 20px 3px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+}
+.shared-pagination button:disabled,
+.shared-pagination select:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+@media (max-width: 760px) {
+  .shared-pagination {
+    justify-content: center;
+  }
+}

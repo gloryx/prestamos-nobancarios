@@ -5,6 +5,7 @@ const { plainToInstance } = require('class-transformer');
 const { validate } = require('class-validator');
 const { getMetadataArgsStorage } = require('typeorm');
 const { CrearPrestamoDto } = require('../dist/modules/prestamos/application/dto/crear-prestamo.dto');
+const { CrearRefinanciamientoDto } = require('../dist/modules/refinanciamientos/application/dto/crear-refinanciamiento.dto');
 const { Prestamo } = require('../dist/modules/prestamos/domain/entities/prestamo');
 const { PrestamoOrmEntity } = require('../dist/modules/prestamos/infrastructure/persistence/typeorm/prestamo.orm-entity');
 const { PrestamoReferences } = require('../dist/modules/prestamos/application/use-cases/prestamo-references');
@@ -23,6 +24,13 @@ const dto = (extra = {}) => plainToInstance(CrearPrestamoDto, {
 test('creation DTO requires a positive disbursement payment method', async () => {
   assert.ok((await validate(dto({ formaDesembolsoId: undefined }))).some(error => error.property === 'formaDesembolsoId'));
   assert.ok((await validate(dto({ formaDesembolsoId: 0 }))).some(error => error.property === 'formaDesembolsoId'));
+});
+
+test('refinancing DTO conditionally requires a positive disbursement method', async () => {
+  const base = { prestamoOrigenId: 1, periodicidadPagoId: 1, formaPagoId: 1, fecha: '2026-09-04', montoNuevoDesembolsado: 100, interesNuevo: 10, cantidadPagos: 1, planPersonalizado: false };
+  assert.ok((await validate(plainToInstance(CrearRefinanciamientoDto, base))).some(error => error.property === 'formaDesembolsoId'));
+  assert.equal((await validate(plainToInstance(CrearRefinanciamientoDto, { ...base, formaDesembolsoId: 2 }))).length, 0);
+  assert.equal((await validate(plainToInstance(CrearRefinanciamientoDto, { ...base, montoNuevoDesembolsado: 0 }))).length, 0);
 });
 
 test('loan keeps payment and disbursement methods distinct', () => {

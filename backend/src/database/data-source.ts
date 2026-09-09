@@ -9,6 +9,7 @@ import { PrestamoOrmEntity } from '../modules/prestamos/infrastructure/persisten
 import { PrestamoEstadoHistorialOrmEntity } from '../modules/prestamos/infrastructure/persistence/typeorm/prestamo-estado-historial.orm-entity';
 import { PlanPagoOrmEntity } from '../modules/planes-pago/infrastructure/persistence/typeorm/plan-pago.orm-entity';
 import { PagoOrmEntity } from '../modules/pagos/infrastructure/persistence/typeorm/pago.orm-entity';
+import { PagoAnulacionOrmEntity } from '../modules/pagos/infrastructure/persistence/typeorm/pago-anulacion.orm-entity';
 import { RefinanciamientoOrmEntity } from '../modules/refinanciamientos/infrastructure/persistence/typeorm/refinanciamiento.orm-entity';
 import { MovimientoCajaOrmEntity } from '../modules/movimientos-caja/infrastructure/persistence/typeorm/movimiento-caja.orm-entity';
 import { ConfiguracionFinancieraOrmEntity, CierreMensualOrmEntity, DetalleCorteMensualOrmEntity } from '../modules/cierre-financiero/domain/financial.orm-entities';
@@ -32,7 +33,7 @@ export default new DataSource({
   database: required('DB_DATABASE'),
   entities: [
     UsuarioOrmEntity, ClienteOrmEntity, FormaPagoOrmEntity, PeriodicidadPagoOrmEntity,
-    PrestamoOrmEntity, PrestamoEstadoHistorialOrmEntity, PlanPagoOrmEntity, PagoOrmEntity,
+    PrestamoOrmEntity, PrestamoEstadoHistorialOrmEntity, PlanPagoOrmEntity, PagoOrmEntity, PagoAnulacionOrmEntity,
     RefinanciamientoOrmEntity, MovimientoCajaOrmEntity, ConfiguracionFinancieraOrmEntity,
     CierreMensualOrmEntity, DetalleCorteMensualOrmEntity, FuenteIngresoOrmEntity, IngresoOrmEntity,
   ],

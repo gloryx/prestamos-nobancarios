@@ -8,6 +8,8 @@ function repositoryWith(raw) {
     select(...args) { calls.push(['subselect', ...args]); return this; },
     addSelect(...args) { calls.push(['subaddSelect', ...args]); return this; },
     from(...args) { calls.push(['from', ...args]); return this; },
+    where(...args) { calls.push(['subwhere', ...args]); return this; },
+    andWhere(...args) { calls.push(['subandWhere', ...args]); return this; },
     groupBy(...args) { calls.push(['groupBy', ...args]); return this; },
     getQuery() { return 'SELECT pago.prestamo_id, SUM(pago.monto) AS recuperado FROM pago pago GROUP BY pago.prestamo_id'; },
   };

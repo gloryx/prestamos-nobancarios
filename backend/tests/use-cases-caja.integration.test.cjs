@@ -10,6 +10,7 @@ const { ConceptoMovimientoCaja: C } = require('../dist/modules/movimientos-caja/
 const { TipoMovimientoCaja: T } = require('../dist/modules/movimientos-caja/domain/enums/tipo-movimiento-caja.enum');
 const { EstadoPrestamo: E } = require('../dist/modules/prestamos/domain/enums/estado-prestamo.enum');
 const { authenticatedUserId } = require('../dist/common/authenticated-user');
+const { calcularDiasGanados } = require('../dist/modules/refinanciamientos/application/services/calcular-dias-ganados');
 const { MovimientoCajaOrmEntity } = require('../dist/modules/movimientos-caja/infrastructure/persistence/typeorm/movimiento-caja.orm-entity');
 const { getMetadataArgsStorage } = require('typeorm');
 
@@ -31,6 +32,7 @@ class TransactionalStore {
       periodicidades: [{ id: 1, activo: true, nombre: 'MENSUAL' }],
       formas: [{ id: 1, activo: true, nombre: 'EFECTIVO' }],
     };
+    this.snapshotAsDate = seed.snapshotAsDate === true;
     this.next = { prestamos: 10, pagos: 20, refinanciamientos: 30, planes: 40, movimientos: 50 };
     this.managers = [];
   }
@@ -83,8 +85,13 @@ class FakeQueryBuilder {
   select() { this.aggregate = true; return this; }
   addSelect() { this.aggregate = true; return this; }
   async getRawOne() {
+    if (this.collection === 'planes') {
+      const rows = this.state.planes.filter(item => item.prestamoId === this.prestamoId);
+      const snapshot = rows.length ? rows.map(item => item.fechaVencimiento).sort().at(-1) : null;
+      return { fechaLimiteContractualOrigen: this.repository.store.snapshotAsDate && snapshot ? new Date(`${snapshot}T00:00:00.000Z`) : snapshot };
+    }
     const rows = this.state.pagos.filter(item => item.prestamoId === this.id);
-    return { total: String(rows.reduce((sum, row) => sum + row.monto, 0)), capital: String(rows.reduce((sum, row) => sum + row.capitalAplicado, 0)), interes: String(rows.reduce((sum, row) => sum + row.interesAplicado, 0)) };
+    return { total: String(rows.reduce((sum, row) => sum + row.monto, 0)), totalPagado: String(rows.reduce((sum, row) => sum + row.monto, 0)), capital: String(rows.reduce((sum, row) => sum + row.capitalAplicado, 0)), interes: String(rows.reduce((sum, row) => sum + row.interesAplicado, 0)) };
   }
   async getMany() { return this.state[this.collection].filter(item => this.prestamoId == null || item.prestamoId === this.prestamoId); }
   async getOne() {
@@ -124,8 +131,8 @@ function planRepository(store, options = {}) {
 
 function clone(value) { return structuredClone(value); }
 function dtoLoan(capital = 500000, interes = 100000) { return { clienteId: 1, periodicidadPagoId: 1, formaPagoId: 1, fechaAlta: '2026-08-31', capital, interes, cantidadPagos: 12, planPersonalizado: false }; }
-function dtoRefinance(montoNuevoDesembolsado) { return { prestamoOrigenId: 1, periodicidadPagoId: 1, formaPagoId: 1, fecha: '2026-08-31', montoNuevoDesembolsado, interesNuevo: 0, cantidadPagos: 12, planPersonalizado: false }; }
-function paymentPlan(montoProgramado) { return [{ id: 40, prestamoId: 1, numeroPago: 1, montoProgramado }]; }
+function dtoRefinance(montoNuevoDesembolsado) { return { prestamoOrigenId: 1, periodicidadPagoId: 1, formaPagoId: 1, formaDesembolsoId: montoNuevoDesembolsado > 0 ? 1 : undefined, fecha: '2026-08-31', montoNuevoDesembolsado, interesNuevo: 0, cantidadPagos: 12, planPersonalizado: false }; }
+function paymentPlan(montoProgramado) { return [{ id: 40, prestamoId: 1, numeroPago: 1, fechaVencimiento: '2026-12-31', montoProgramado }]; }
 function cajaFor(store, options = {}) {
   const repo = {
     guardarEnTransaccion: async (manager, value) => {
@@ -170,6 +177,27 @@ test('payment records PAGO_CLIENTE in the same manager and rolls back on cash fa
   await assert.rejects(() => new RegistrarPagoUseCase(failingStore, new FakeForms(), new FakeUsers(), cajaFor(failingStore, { fail: true })).execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 50000, cobradorId: 5, fecha: '2026-08-31' }, 3), /cash failure/);
   assert.equal(failingStore.state.pagos.length, 0);
   assert.equal(failingStore.state.movimientos.length, 0);
+});
+
+test('refinancing normalizes contractual snapshots returned as strings and Dates without shifting the economic date', async () => {
+  for (const snapshotAsDate of [false, true]) {
+    const store = new TransactionalStore({
+      snapshotAsDate,
+      prestamos: [{ id: 1, clienteId: 1, capital: 700000, interes: 100000, estado: E.ACTIVO }],
+      pagos: [{ id: 20, prestamoId: 1, monto: 100000, capitalAplicado: 0, interesAplicado: 100000 }],
+      planes: paymentPlan(800000),
+    });
+
+    let result;
+    await assert.doesNotReject(async () => {
+      result = await new CrearRefinanciamientoUseCase(store, cajaFor(store)).execute(dtoRefinance(300000), 3);
+    });
+    assert.equal(store.state.refinanciamientos.length, 1);
+    assert.equal(store.state.refinanciamientos[0].fechaLimiteContractualOrigen, '2026-12-31');
+    assert.equal(result.fechaLimiteContractualOrigen.toISOString(), '2026-12-31T00:00:00.000Z');
+    assert.equal(calcularDiasGanados(result.fechaLimiteContractualOrigen, result.fecha), 122);
+    assert.deepEqual(store.state.movimientos.map(value => [value.tipo, value.concepto, value.monto]), [[T.SALIDA, C.DESEMBOLSO_REFINANCIAMIENTO, 300000]]);
+  }
 });
 
 test('payment movement preserves SINPE and EFECTIVO formaPagoId', async () => {
@@ -270,7 +298,7 @@ test('personalized loan accepts validated installments and persists them before 
 
 test('refinancing without new money does not call cash, while 300000 creates only refinancing disbursement', async () => {
   for (const amount of [0, 300000]) {
-    const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 700000, interes: 100000, estado: E.ACTIVO }] });
+    const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 700000, interes: 100000, estado: E.ACTIVO }], pagos: [{ id: 20, prestamoId: 1, monto: 100000, capitalAplicado: 0, interesAplicado: 100000 }], planes: paymentPlan(800000) });
     let calls = 0;
     const realCaja = cajaFor(store);
     const caja = { validarActor: (...args) => realCaja.validarActor(...args), automatico: (...args) => { calls++; return realCaja.automatico(...args); } };
@@ -283,14 +311,78 @@ test('refinancing without new money does not call cash, while 300000 creates onl
   }
 });
 
+test('refinancing preserves distinct payment and disbursement methods in loan and cash', async () => {
+  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 700000, interes: 100000, estado: E.ACTIVO }], pagos: [{ id: 20, prestamoId: 1, monto: 100000, capitalAplicado: 0, interesAplicado: 100000 }], planes: paymentPlan(800000) });
+  store.state.formas.push({ id: 2, activo: true, nombre: 'SINPE' });
+  const dto = { ...dtoRefinance(300000), formaPagoId: 1, formaDesembolsoId: 2 };
+  await new CrearRefinanciamientoUseCase(store, cajaFor(store)).execute(dto, 3);
+  const nuevo = store.state.prestamos.find(value => value.id !== 1);
+  assert.equal(nuevo.formaPagoId, 1);
+  assert.equal(nuevo.formaDesembolsoId, 2);
+  assert.equal(store.state.movimientos[0].formaPagoId, 2);
+});
+
+test('refinancing requires and validates the disbursement method atomically', async () => {
+  for (const formaDesembolsoId of [undefined, 9, 2]) {
+    const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 700000, interes: 100000, estado: E.ACTIVO }], pagos: [{ id: 20, prestamoId: 1, monto: 100000, capitalAplicado: 0, interesAplicado: 100000 }], planes: paymentPlan(800000) });
+    if (formaDesembolsoId === 2) store.state.formas.push({ id: 2, activo: false, nombre: 'INACTIVA' });
+    const execute = () => new CrearRefinanciamientoUseCase(store, cajaFor(store)).execute({ ...dtoRefinance(300000), formaDesembolsoId }, 3);
+    await assert.rejects(execute);
+    assert.equal(store.state.prestamos.length, 1);
+    assert.equal(store.state.refinanciamientos.length, 0);
+    assert.equal(store.state.movimientos.length, 0);
+  }
+});
+
 test('refinancing cash failure rolls back new loan, plan, origin status, and relation', async () => {
-  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 700000, interes: 100000, estado: E.ACTIVO }] });
+  const store = new TransactionalStore({ prestamos: [{ id: 1, clienteId: 1, capital: 700000, interes: 100000, estado: E.ACTIVO }], pagos: [{ id: 20, prestamoId: 1, monto: 100000, capitalAplicado: 0, interesAplicado: 100000 }], planes: paymentPlan(800000) });
   await assert.rejects(() => new CrearRefinanciamientoUseCase(store, cajaFor(store, { fail: true })).execute(dtoRefinance(300000), 3), /cash failure/);
   assert.equal(store.state.prestamos.length, 1);
   assert.equal(store.state.prestamos[0].estado, E.ACTIVO);
   assert.equal(store.state.refinanciamientos.length, 0);
-  assert.equal(store.state.planes.length, 0);
+  assert.deepEqual(store.state.planes, paymentPlan(800000));
   assert.equal(store.state.movimientos.length, 0);
+});
+
+test('refinancing eligibility uses total paid and transfers only remaining capital', async () => {
+  for (const totalPagado of [0, 19999, 20000, 30000]) {
+    const store = new TransactionalStore({
+      prestamos: [{ id: 1, clienteId: 1, capital: 100000, interes: 20000, estado: E.ACTIVO }],
+      pagos: totalPagado ? [{ id: 20, prestamoId: 1, monto: totalPagado, capitalAplicado: totalPagado, interesAplicado: 0, planPagoId: 40 }] : [],
+      planes: paymentPlan(120000),
+    });
+    const execute = () => new CrearRefinanciamientoUseCase(store, cajaFor(store)).execute({ ...dtoRefinance(40000), interesNuevo: 25000 }, 3);
+    if (totalPagado < 20000) {
+      await assert.rejects(execute, /No se puede refinanciar el préstamo porque el interés pactado aún no ha sido cubierto completamente/);
+      assert.equal(store.state.prestamos.length, 1);
+      continue;
+    }
+    await execute();
+    const nuevo = store.state.prestamos.find(value => value.id !== 1);
+    assert.equal(nuevo.capital, totalPagado === 20000 ? 140000 : 130000);
+    assert.equal(nuevo.interes, 25000);
+    assert.equal(nuevo.montoTotal, totalPagado === 20000 ? 165000 : 155000);
+    assert.equal(nuevo.montoDesembolsado, 40000);
+    assert.equal(store.state.movimientos.length, 1);
+    assert.deepEqual(store.state.movimientos.map(value => [value.tipo, value.concepto, value.monto]), [[T.SALIDA, C.DESEMBOLSO_REFINANCIAMIENTO, 40000]]);
+    assert.equal(store.state.pagos[0]?.monto, totalPagado);
+    assert.equal(store.state.pagos[0]?.capitalAplicado, totalPagado);
+    assert.equal(store.state.pagos[0]?.interesAplicado, 0);
+    assert.equal(store.state.planes.reduce((sum, plan) => sum + plan.montoProgramado, 0), nuevo.montoTotal);
+  }
+});
+
+test('refinancing without new money creates no cash movement', async () => {
+  const store = new TransactionalStore({
+    prestamos: [{ id: 1, clienteId: 1, capital: 100000, interes: 20000, estado: E.ACTIVO }],
+    pagos: [{ id: 20, prestamoId: 1, monto: 30000, capitalAplicado: 10000, interesAplicado: 20000, planPagoId: 40 }],
+    planes: paymentPlan(120000),
+  });
+  await new CrearRefinanciamientoUseCase(store, cajaFor(store)).execute({ ...dtoRefinance(0), interesNuevo: 25000 }, 3);
+  assert.equal(store.state.movimientos.length, 0);
+  assert.equal(store.state.prestamos.find(value => value.id !== 1).formaDesembolsoId ?? null, null);
+  assert.equal(store.state.pagos[0].capitalAplicado, 10000);
+  assert.equal(store.state.pagos[0].interesAplicado, 20000);
 });
 
 test('authenticated user comes from request.user; headers do not participate', () => {

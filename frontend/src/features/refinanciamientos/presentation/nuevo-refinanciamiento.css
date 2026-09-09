@@ -1,0 +1,63 @@
+.new-refinancing-page { padding: 1.5rem; max-width: 1180px; margin: 0 auto; color: var(--color-text, #1f2937); }
+.new-refinancing-page .page-heading { margin-bottom: 1rem; }
+.eyebrow { margin: 0 0 .25rem; color: var(--color-primary, #2563eb); font-size: .75rem; font-weight: 700; letter-spacing: .08em; }
+.steps { display: flex; gap: .5rem; margin: 0 0 1rem; border-bottom: 1px solid #dbe2ea; padding-bottom: .75rem; }
+.steps span { padding: .45rem .75rem; color: #64748b; font-size: .9rem; }
+.steps .current { color: var(--color-primary, #2563eb); border-bottom: 2px solid currentColor; font-weight: 700; }
+.refinancing-card { background: #fff; border: 1px solid #dbe2ea; border-radius: 10px; padding: 1.15rem; box-shadow: 0 2px 8px #0f172a0d; }
+.card-heading, .refinancing-card > header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.refinancing-card h2 { margin: 0 0 1rem; font-size: 1.05rem; }
+.card-heading h2 { margin-bottom: 0; }
+.preview-summary { display: grid; gap: .6rem; border-top: 1px solid #edf1f5; padding-top: 1rem; }
+.preview-summary p { margin: 0; display: flex; flex-wrap: wrap; gap: .3rem; }
+.preview-summary b { margin-left: .6rem; }
+.capital-highlight { display: block; padding: .85rem; border: 2px solid #d97706; background: #fff7ed; color: #92400e; border-radius: 7px; font-size: 1.05rem; }
+.success-text { color: #166534; font-weight: 700; }
+.refinancing-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(270px, .75fr); align-items: start; gap: 1rem; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+.fields label, .refinancing-modal > label { display: grid; gap: .3rem; font-size: .85rem; font-weight: 600; }
+input, select, textarea { min-height: 2.35rem; border: 1px solid #cbd5e1; border-radius: 6px; padding: .45rem .6rem; background: #fff; font: inherit; font-weight: 400; }
+.new-refinancing-page .currency-input input { padding-left: 27px; }
+textarea { min-height: 4.5rem; resize: vertical; }
+input:focus, select:focus, textarea:focus, button:focus { outline: 3px solid #93c5fd; outline-offset: 1px; }
+.full-field { grid-column: 1 / -1; }
+.checkbox-field { display: flex !important; align-items: center; grid-column: 1 / -1; }
+.checkbox-field input { min-height: auto; }
+small { color: #64748b; font-weight: 400; }
+.visual-preview { background: #f8fafc; }
+.visual-preview p { display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding: .55rem 0; margin: 0; }
+.custom-plan { margin-top: 1rem; border-top: 1px solid #e2e8f0; padding-top: .8rem; }
+.custom-plan h3 { font-size: .95rem; margin: 0 0 .6rem; }
+.installment-row { display: grid; grid-template-columns: 35px 1fr 1fr; gap: .5rem; align-items: center; margin-bottom: .45rem; }
+.form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; }
+button { cursor: pointer; border: 0; font: inherit; }
+.primary-button, .secondary-button, .text-button, .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border-radius: 6px; padding: .55rem .8rem; }
+.primary-button { color: #fff; background: #2563eb; }
+.secondary-button { color: #1e3a8a; background: #dbeafe; }
+.text-button { color: #1d4ed8; background: transparent; padding-inline: .25rem; }
+.icon-button { background: transparent; color: #475569; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+.form-error, .field-error { color: #b91c1c; font-weight: 600; }
+.field-error { font-size: .8rem; }
+.confirmation-message { border-left: 4px solid #2563eb; background: #eff6ff; padding: .8rem; font-weight: 700; }
+.confirm-grid, .result-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.confirm-grid > div, .result-grid strong { border: 1px solid #e2e8f0; border-radius: 7px; padding: .8rem; }
+.confirm-grid h3 { margin: 0 0 .5rem; font-size: .9rem; }
+.confirm-grid dl { display: grid; gap: .45rem; margin: 0; }
+.confirm-grid dl > div { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: .35rem; }
+.confirm-grid dt { color: #64748b; font-size: .85rem; }
+.confirm-grid dd { margin: 0; text-align: right; font-weight: 600; }
+.result-grid { margin-top: 1rem; }
+.result-grid strong { display: flex; justify-content: space-between; gap: .5rem; font-size: .85rem; }
+.result-grid b { color: #1d4ed8; }
+.success-panel { border: 1px solid #86efac; border-radius: 10px; background: #f0fdf4; padding: 1.3rem; }
+.success-panel h2 { color: #166534; margin-top: 0; }
+.refinancing-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: #0f172a99; }
+.refinancing-modal { width: min(920px, 100%); max-height: min(720px, 92vh); overflow: auto; background: #fff; border-radius: 10px; padding: 1.2rem; box-shadow: 0 20px 50px #0f172a55; }
+.refinancing-modal > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.refinancing-modal h2 { margin: 0; }
+.refinancing-modal .table-wrap { margin-top: 1rem; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+th, td { padding: .6rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+th { color: #475569; font-size: .75rem; text-transform: uppercase; }
+@media (max-width: 760px) { .new-refinancing-page { padding: 1rem; } .steps { overflow-x: auto; } .refinancing-layout, .confirm-grid, .result-grid, .fields { grid-template-columns: 1fr; } .full-field { grid-column: auto; } }

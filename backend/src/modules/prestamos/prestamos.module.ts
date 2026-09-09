@@ -31,6 +31,6 @@ import { PrestamosExcelGenerator } from './infrastructure/reports/prestamos-exce
   imports: [ClientesModule, PeriodicidadesPagoModule, FormasPagoModule, MovimientosCajaModule, forwardRef(() => PlanesPagoModule), forwardRef(() => PagosModule), PrestamoEstadoHistorialModule, TypeOrmModule.forFeature([PrestamoOrmEntity, PrestamoEstadoHistorialOrmEntity, PagoOrmEntity, PlanPagoOrmEntity])],
   controllers: [PrestamosController],
   providers: [CrearPrestamoUseCase, ListarPrestamosUseCase, ResumirPrestamosUseCase, ExportarPrestamosExcelUseCase, PrestamosExcelGenerator, ObtenerPrestamoPorIdUseCase, ActualizarPrestamoUseCase, CambiarEstadoPrestamoUseCase, PlanPagoPdfService, PlanPagoPdfInfrastructureService, PrestamoReferences, IndicadorCobranzaService, { provide: PRESTAMO_REPOSITORY, useClass: PrestamoTypeOrmRepository }],
-  exports: [PRESTAMO_REPOSITORY],
+  exports: [PRESTAMO_REPOSITORY, PrestamoReferences],
 })
 export class PrestamosModule {}

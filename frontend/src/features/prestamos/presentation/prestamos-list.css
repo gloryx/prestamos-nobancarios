@@ -9,6 +9,7 @@
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-address { width: 300px; }
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-date { width: 70px; }
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-capital { width: 95px; }
+.prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-balance { width: 110px; }
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-status { width: 90px; }
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-cobranza { width: 112px; }
 .prestamos-list-table-wrap .prestamos-list-table col.prestamos-list-col-actions { width: 180px; }
@@ -47,6 +48,7 @@
   min-width: 0;
   max-width: none;
   white-space: nowrap;
+  text-align: right;
 }
 
 .prestamos-list-page .prestamos-list-table td:nth-child(2) strong,

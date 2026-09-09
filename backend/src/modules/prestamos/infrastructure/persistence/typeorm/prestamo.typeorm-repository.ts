@@ -10,6 +10,22 @@ const clientNameExpression = "UPPER(TRIM(CONCAT_WS(' ', cliente.primer_nombre, c
 const statePriorityExpression = "CASE prestamo.estado WHEN 'ACTIVO' THEN 1 WHEN 'INCOBRABLE' THEN 2 WHEN 'REFINANCIADO' THEN 3 WHEN 'CANCELADO' THEN 4 ELSE 5 END";
 const statePriorityFallbackExpression = "CASE prestamo.estado WHEN 'ACTIVO' THEN 1 WHEN 'INCOBRABLE' THEN 2 WHEN 'REFINANCIADO' THEN 3 WHEN 'CANCELADO' THEN 4 END";
 
+const paymentTotalsQuery = (repository: Repository<PrestamoOrmEntity>) => repository.manager.createQueryBuilder()
+  .select('pago.prestamo_id', 'prestamo_id')
+   .addSelect('SUM(pago.monto)', 'total_pagado')
+  .from('pago', 'pago')
+    .where("pago.estado = 'REGISTRADO'")
+   .groupBy('pago.prestamo_id');
+
+const applyCandidateOrdering = (query: SelectQueryBuilder<PrestamoOrmEntity>, filtros: FiltrosPrestamos) => {
+  const ids = filtros.candidateIds ?? [];
+  const direction = filtros.direccionOrden ?? 'ASC';
+  const expression = `CASE ${ids.map((id, index) => `WHEN prestamo.id = :candidateOrder${index} THEN ${direction === 'DESC' ? ids.length - index : index}`).join(' ')} ELSE ${ids.length} END`;
+  ids.forEach((id, index) => query.setParameter(`candidateOrder${index}`, id));
+  query.addSelect(expression, 'cobranza_sort');
+  return query.orderBy('cobranza_sort', direction).addOrderBy('prestamo.id', direction);
+};
+
 const applyOrdering = (query: SelectQueryBuilder<PrestamoOrmEntity>, filtros: FiltrosPrestamos) => {
   const direction = filtros.direccionOrden ?? 'ASC';
   switch (filtros.ordenarPor) {
@@ -23,6 +39,11 @@ const applyOrdering = (query: SelectQueryBuilder<PrestamoOrmEntity>, filtros: Fi
     case 'direccion': query.orderBy('cliente.direccion', direction, 'NULLS LAST').addOrderBy('prestamo.id', 'DESC'); break;
     case 'fechaAlta': query.orderBy('prestamo.fecha_alta', direction).addOrderBy('prestamo.id', direction); break;
     case 'capital': query.orderBy('prestamo.capital', direction).addOrderBy('prestamo.id', 'DESC'); break;
+    case 'saldoPendiente': {
+      query.orderBy('saldo_pendiente_orden', direction).addOrderBy('prestamo.id', direction);
+      break;
+    }
+    case 'indicadorCobranza': applyCandidateOrdering(query, filtros); break;
     case 'estado': {
       const supportsSelectAlias = typeof query.addSelect === 'function';
       if (supportsSelectAlias) query.addSelect(statePriorityExpression, 'estado_orden');
@@ -66,6 +87,12 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
   }
   async listar(filtros: FiltrosPrestamos): Promise<PrestamosPaginados> {
     const query = this.applyFilters(this.withRelations(), filtros);
+    if (filtros.ordenarPor === 'saldoPendiente') {
+      const paymentTotals = paymentTotalsQuery(this.repository);
+      query.leftJoin(`(${paymentTotals.getQuery()})`, 'pagos_orden', 'pagos_orden.prestamo_id = prestamo.id')
+        .setParameters(paymentTotals.getParameters())
+        .addSelect('GREATEST(prestamo.monto_total - COALESCE(pagos_orden.total_pagado, 0), 0)', 'saldo_pendiente_orden');
+    }
     applyOrdering(query, filtros).skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
     const [entities, total] = await query.getManyAndCount();
     const loans = entities.map((entity) => PrestamoMapper.toDomain(entity));
@@ -73,20 +100,23 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
     const ids = loans.map((loan) => loan.id!);
     const totals = await this.repository.manager.createQueryBuilder()
       .select('pago.prestamo_id', 'prestamo_id')
-      .addSelect('SUM(pago.capital_aplicado)', 'capital_pagado')
-      .from('pago', 'pago')
-      .where('pago.prestamo_id IN (:...ids)', { ids })
+       .addSelect('SUM(pago.capital_aplicado)', 'capital_pagado')
+       .addSelect('SUM(pago.monto)', 'total_pagado')
+       .from('pago', 'pago')
+         .where('pago.prestamo_id IN (:...ids)', { ids })
+       .andWhere("pago.estado = 'REGISTRADO'")
       .groupBy('pago.prestamo_id')
-      .getRawMany<{ prestamo_id: string; capital_pagado: string }>();
-    const paidByLoan = new Map(totals.map((row) => [Number(row.prestamo_id), Number(row.capital_pagado)]));
-    return { datos: loans.map((loan) => Object.assign(loan, { capitalPendiente: Math.max(0, loan.capital - (paidByLoan.get(loan.id!) ?? 0)) })), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
+      .getRawMany<{ prestamo_id: string; capital_pagado: string; total_pagado: string }>();
+    const paidByLoan = new Map(totals.map((row) => [Number(row.prestamo_id), { capital: Number(row.capital_pagado ?? 0), total: Number(row.total_pagado ?? 0) }]));
+    return { datos: loans.map((loan) => { const paid = paidByLoan.get(loan.id!) ?? { capital: 0, total: 0 }; return Object.assign(loan, { capitalPendiente: Math.max(0, loan.capital - paid.capital), saldoPendiente: Math.max(loan.montoTotal - paid.total, 0) }); }), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
   }
   async resumen(filtros: FiltrosPrestamos): Promise<PrestamosResumen> {
     const pagos = this.repository.manager.createQueryBuilder().subQuery()
       .select('pago.prestamo_id', 'prestamo_id')
-      .addSelect('SUM(pago.monto)', 'recuperado')
-      .from('pago', 'pago')
-      .groupBy('pago.prestamo_id');
+        .addSelect('SUM(pago.monto)', 'recuperado')
+       .from('pago', 'pago')
+         .where("pago.estado = 'REGISTRADO'")
+         .groupBy('pago.prestamo_id');
     const query = this.applyFilters(this.repository.createQueryBuilder('prestamo').leftJoin('prestamo.cliente', 'cliente'), filtros)
       .leftJoin(`(${pagos.getQuery()})`, 'pagos', 'pagos.prestamo_id = prestamo.id')
       .select('COUNT(prestamo.id)', 'total')
@@ -101,7 +131,7 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
     const entities = await this.applyFilters(this.withRelations(), filtros).orderBy('prestamo.fecha_alta', 'DESC').addOrderBy('prestamo.id', 'DESC').getMany();
     if (!entities.length) return [];
     const ids = entities.map((entity) => entity.id);
-    const totals = await this.repository.manager.createQueryBuilder().select('pago.prestamo_id', 'prestamo_id').addSelect('SUM(pago.monto)', 'recuperado').from('pago', 'pago').where('pago.prestamo_id IN (:...ids)', { ids }).groupBy('pago.prestamo_id').getRawMany<{ prestamo_id: string; recuperado: string }>();
+     const totals = await this.repository.manager.createQueryBuilder().select('pago.prestamo_id', 'prestamo_id').addSelect('SUM(pago.monto)', 'recuperado').from('pago', 'pago').where('pago.prestamo_id IN (:...ids)', { ids }).andWhere("pago.estado = 'REGISTRADO'").groupBy('pago.prestamo_id').getRawMany<{ prestamo_id: string; recuperado: string }>();
     const recovered = new Map(totals.map((row) => [Number(row.prestamo_id), Number(row.recuperado)]));
     return entities.map((entity) => Object.assign(PrestamoMapper.toDomain(entity), { recuperado: recovered.get(entity.id) ?? 0 }));
   }

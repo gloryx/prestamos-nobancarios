@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, Download, Eye, Pencil, Plus, Power, X } from "lucide-react";
+import { ArrowDown, ArrowUp, CreditCard, Download, Eye, Pencil, Plus, Power, X } from "lucide-react";
 import { useAuth } from "@/app/providers/auth-context";
 import {
   cambiarEstadoCliente,
@@ -451,6 +451,15 @@ export function ClientesPage() {
                       >
                         <Pencil size={15} />
                       </Link>
+                      <button
+                        className="table-action"
+                        type="button"
+                        onClick={() => navigate("/prestamos/nuevo", { state: { selectedClient: cliente } })}
+                        title="Nuevo préstamo"
+                        aria-label="Nuevo préstamo para este cliente"
+                      >
+                        <CreditCard size={15} />
+                      </button>
                       <button
                         className="table-action"
                         type="button"

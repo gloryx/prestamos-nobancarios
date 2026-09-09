@@ -1,4 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EstadoPago } from '../../domain/enums/estado-pago.enum';
+import { MotivoAnulacionPago } from '../../domain/enums/motivo-anulacion-pago.enum';
 
 export class PagoResponseDto {
   @ApiProperty({ example: 1 }) id: number;
@@ -13,6 +15,11 @@ export class PagoResponseDto {
   @ApiPropertyOptional({ example: 'Pago de cuota 1.', nullable: true }) observaciones: string | null;
   @ApiPropertyOptional({ example: 31, nullable: true }) planPagoId?: number | null;
   @ApiPropertyOptional({ example: 2, nullable: true }) numeroCuota?: number | null;
+  @ApiProperty({ enum: EstadoPago }) estado: EstadoPago;
+  @ApiPropertyOptional({ nullable: true }) fechaAnulacion: Date | null;
+  @ApiPropertyOptional({ nullable: true }) usuarioAnulacionId: number | null;
+  @ApiPropertyOptional({ enum: MotivoAnulacionPago, nullable: true }) motivoAnulacion: MotivoAnulacionPago | null;
+  @ApiPropertyOptional({ nullable: true }) observacionAnulacion: string | null;
   @ApiProperty({ example: { id: 1, nombre: 'EFECTIVO' } }) formaPago: { id: number; nombre: string };
   @ApiProperty({ example: { id: 10, estado: 'ACTIVO', capital: 100000, interes: 15000, montoTotal: 115000 } }) prestamo: { id: number; estado: string; capital: number; interes: number; montoTotal: number };
   @ApiProperty({ example: { id: 1, identificacion: '1-1111-1111', nombreCompleto: 'JUAN PEREZ' } }) cliente: { id: number; identificacion?: string; nombreCompleto?: string };

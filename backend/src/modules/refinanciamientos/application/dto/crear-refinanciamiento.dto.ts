@@ -1,11 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsInt, IsNumber, IsOptional, IsPositive, IsString, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsBoolean, IsDateString, IsDefined, IsInt, IsNumber, IsOptional, IsPositive, IsString, Matches, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { CuotaPlanPagoDto } from '../../../planes-pago/application/dto/cuota-plan-pago.dto';
 export class CrearRefinanciamientoDto {
   @ApiProperty({ example: 10 }) @Type(() => Number) @IsInt() @IsPositive() prestamoOrigenId!: number;
   @ApiProperty({ example: 2 }) @Type(() => Number) @IsInt() @IsPositive() periodicidadPagoId!: number;
   @ApiProperty({ example: 1 }) @Type(() => Number) @IsInt() @IsPositive() formaPagoId!: number;
+  @ApiPropertyOptional({ example: 2, nullable: true, description: 'Obligatoria cuando montoNuevoDesembolsado es mayor que cero.' }) @ValidateIf(dto => Number(dto.montoNuevoDesembolsado) > 0) @IsDefined() @Type(() => Number) @IsInt() @IsPositive() formaDesembolsoId?: number | null;
   @ApiProperty({ example: '2026-09-01', format: 'date' }) @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fecha!: string;
   @ApiProperty({ example: 25000, minimum: 0 }) @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) montoNuevoDesembolsado!: number;
   @ApiProperty({ example: 18000, minimum: 0 }) @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) interesNuevo!: number;
