@@ -16,6 +16,9 @@ export class PagoResponseDto {
   @ApiPropertyOptional({ example: 31, nullable: true }) planPagoId?: number | null;
   @ApiPropertyOptional({ example: 2, nullable: true }) numeroCuota?: number | null;
   @ApiProperty({ enum: EstadoPago }) estado: EstadoPago;
+  @ApiProperty({ example: 'EFECTIVO' }) formaPagoNombre: string;
+  @ApiProperty({ example: false }) puedeAnular: boolean;
+  @ApiPropertyOptional({ nullable: true, type: 'object', additionalProperties: false, example: { fecha: '2026-08-31', motivo: 'OTRO', observacion: 'Correction' } }) anulacion: { fecha: Date; motivo: MotivoAnulacionPago; observacion: string | null } | null;
   @ApiPropertyOptional({ nullable: true }) fechaAnulacion: Date | null;
   @ApiPropertyOptional({ nullable: true }) usuarioAnulacionId: number | null;
   @ApiPropertyOptional({ enum: MotivoAnulacionPago, nullable: true }) motivoAnulacion: MotivoAnulacionPago | null;

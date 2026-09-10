@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { apiClient } from '@/core/api/client'
 import { PrestamoError } from '../domain/prestamo.error'
-import type { Pago, PagoRegistrado, PagoResumen, RegistrarPagoInput } from '../domain/pago.types'
+import type { AnularPagoInput, Pago, PagoRegistrado, PagoResumen, RegistrarPagoInput } from '../domain/pago.types'
 import type { PagoRepository } from '../domain/pago.repository'
 
 function rethrow(error: unknown): never {
@@ -24,5 +24,8 @@ export class AxiosPagoRepository implements PagoRepository {
 
   async getSummaryByPrestamo(prestamoId: number): Promise<PagoResumen> {
     try { return (await apiClient.get<PagoResumen>(`/pagos/prestamo/${prestamoId}/resumen`)).data } catch (error) { return rethrow(error) }
+  }
+  async cancel(id: number, input: AnularPagoInput): Promise<void> {
+    try { await apiClient.post(`/pagos/${id}/anular`, input) } catch (error) { return rethrow(error) }
   }
 }

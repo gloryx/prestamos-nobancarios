@@ -10,7 +10,8 @@ export interface PrestamoPagoRelacion { id: number; estado: string; capital: num
 export interface PagoRelacion { id: number; nombre?: string; identificacion?: string; nombreCompleto?: string; telefono?: string | null; correo?: string | null; }
 export interface FormaPagoPagoRelacion { id: number; nombre: string; }
 export interface CobradorPagoRelacion { id: number; identificacion: string; nombreCompleto: string; telefono: string | null; correo: string | null; }
-export interface PagoConRelaciones extends Pago { formaPago: FormaPagoPagoRelacion; prestamo: PrestamoPagoRelacion; cliente: PagoRelacion; cobrador: CobradorPagoRelacion; numeroCuota?: number | null; fechaAnulacion?: Date | null; usuarioAnulacionId?: number | null; motivoAnulacion?: MotivoAnulacionPago | null; observacionAnulacion?: string | null; }
+export interface PagoAnulacionRelacion { fecha: Date; motivo: MotivoAnulacionPago; observacion: string | null; }
+export interface PagoConRelaciones extends Pago { formaPago: FormaPagoPagoRelacion; prestamo: PrestamoPagoRelacion; cliente: PagoRelacion; cobrador: CobradorPagoRelacion; numeroCuota?: number | null; fechaAnulacion?: Date | null; usuarioAnulacionId?: number | null; motivoAnulacion?: MotivoAnulacionPago | null; observacionAnulacion?: string | null; anulacion?: PagoAnulacionRelacion | null; puedeAnular?: boolean; }
 export interface PagosPaginados { datos: PagoConRelaciones[]; pagina: number; limite: number; total: number; totalPaginas: number; }
 export interface TotalesPago { total: number; capital: number; interes: number; }
 export interface PagoRepository {

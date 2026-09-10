@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req } from '@n
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CrearRefinanciamientoDto } from '../../application/dto/crear-refinanciamiento.dto';
 import { FiltrosRefinanciamientosDto } from '../../application/dto/filtros-refinanciamientos.dto';
+import { FiltrosRefinanciamientosReporteDto } from '../../application/dto/filtros-refinanciamientos-reporte.dto';
 import { CrearRefinanciamientoUseCase } from '../../application/use-cases/crear-refinanciamiento.use-case';
 import { RefinanciamientoQueries } from '../../application/use-cases/refinanciamiento-queries.use-cases';
 import { RefinanciamientoConRelaciones } from '../../domain/repositories/refinanciamiento.repository';
@@ -15,6 +16,7 @@ import { PrevisualizarRefinanciamientoResponseDto } from '../dto/previsualizar-r
 import { ObtenerCadenasClienteUseCase } from '../../application/use-cases/obtener-cadenas-cliente.use-case';
 import { CadenasClienteResponseDto } from '../dto/cadenas-cliente-response.dto';
 import { calcularDiasGanados } from '../../application/services/calcular-dias-ganados';
+import { RefinanciamientosReporteResponseDto } from '../dto/refinanciamientos-reporte-response.dto';
 const response = (v: RefinanciamientoConRelaciones): RefinanciamientoResponseDto => {
   const nuevo = v.prestamoNuevo!;
   const dineroNuevoDesembolsado = nuevo.montoDesembolsado;
@@ -35,6 +37,8 @@ export class RefinanciamientosController {
   async crearRefinanciamiento(@Body() dto: CrearRefinanciamientoDto, @Req() request: AuthenticatedRequest) { return response(await this.crear.execute(dto, authenticatedUserId(request))); }
   @Get() @ApiOperation({ summary: 'Listar refinanciamientos', description: 'Listado paginado ordenado por fecha e identificador descendente.' }) @ApiQuery({ name: 'pagina', required: false, type: Number }) @ApiQuery({ name: 'limite', required: false, type: Number }) @ApiQuery({ name: 'buscar', required: false }) @ApiQuery({ name: 'clienteId', required: false, type: Number }) @ApiQuery({ name: 'fechaDesde', required: false, type: String }) @ApiQuery({ name: 'fechaHasta', required: false, type: String }) @ApiResponse({ status: 200, type: RefinanciamientosPaginadosResponseDto })
   async listar(@Query() dto: FiltrosRefinanciamientosDto) { const r = await this.queries.listar(dto); return { ...r, datos: r.datos.map(listadoResponse) }; }
+  @Get('reporte') @ApiOperation({ summary: 'Obtener reporte de refinanciamientos', description: 'Reporte sin paginación con cuatro métricas monetarias: capital trasladado, dinero nuevo desembolsado, capital nuevo e interés nuevo pactado; también informa el promedio de días ganados usando únicamente días conocidos.' }) @ApiQuery({ name: 'buscar', required: false }) @ApiQuery({ name: 'clienteId', required: false, type: Number }) @ApiQuery({ name: 'fechaDesde', required: false, type: String }) @ApiQuery({ name: 'fechaHasta', required: false, type: String }) @ApiResponse({ status: 200, type: RefinanciamientosReporteResponseDto })
+  async reporte(@Query() dto: FiltrosRefinanciamientosReporteDto) { return this.queries.reporte(dto); }
   @Get('cliente/:clienteId/cadenas') @ApiOperation({ summary: 'Obtener cadenas de refinanciamiento del cliente', description: 'Construye las cadenas exclusivamente con las FK prestamoOrigenId -> prestamoNuevoId. Capital trasladado proviene de capitalPendiente; dinero nuevo del desembolso real; interés nuevo de interesNuevo.' }) @ApiParam({ name: 'clienteId', type: Number }) @ApiResponse({ status: 200, type: CadenasClienteResponseDto }) @ApiResponse({ status: 404, description: 'Cliente no encontrado.' }) @ApiResponse({ status: 409, description: 'Corrupción estructural o relación cruzada entre clientes.' })
   async cadenasPorCliente(@Param('clienteId', ParseIntPipe) clienteId: number) { return this.cadenasCliente.execute(clienteId); }
   @Get('prestamo-origen/:prestamoId') @ApiOperation({ summary: 'Buscar por préstamo origen' }) @ApiParam({ name: 'prestamoId', type: Number }) @ApiResponse({ status: 200, type: RefinanciamientoResponseDto }) @ApiResponse({ status: 404, description: 'Refinanciamiento no encontrado.' }) async origen(@Param('prestamoId', ParseIntPipe) id: number) { return response(await this.queries.origen(id)); }

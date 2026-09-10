@@ -1,39 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
+  ArrowRightLeft,
+  Banknote,
+  CalendarClock,
+  CalendarDays,
+  CircleDollarSign,
   FileText,
+  HandCoins,
+  Link2,
   Printer,
-  Search,
-  X,
+  RefreshCw,
+  TrendingUp,
+  UserRound,
+  WalletCards,
 } from "lucide-react";
-import { listarClientes } from "@/features/clientes/application/clientes.use-cases";
-import { clienteErrorMessage } from "@/features/clientes/domain/cliente.error";
+import { useLocation } from "react-router-dom";
 import type {
   Cliente,
-  ClienteFilters,
-  ClientePage,
 } from "@/features/clientes/domain/cliente.types";
-import { AxiosClienteRepository } from "@/features/clientes/infrastructure/axios-cliente.repository";
 import { abrirEstadoCuentaPdf } from "@/features/prestamos/application/prestamos.use-cases";
 import { AxiosPrestamoRepository } from "@/features/prestamos/infrastructure/axios-prestamo.repository";
 import { formatCRC } from "@/shared/utils/currency";
 import { listarCadenasPorCliente } from "../application/cadenas.use-case";
 import type {
   Cadena,
+  CadenaCliente,
   CadenasClienteResponse,
   PrestamoCadena,
 } from "../domain/cadenas.types";
 import { AxiosCadenasRepository } from "../infrastructure/axios-cadenas.repository";
+import { ClientePicker } from "./ClientePicker";
 import "./cadenas-refinanciamiento.css";
 
-const clienteRepository = new AxiosClienteRepository();
 const cadenasRepository = new AxiosCadenasRepository();
 const prestamoRepository = new AxiosPrestamoRepository();
-const nombreCliente = (c: Cliente) =>
-  [c.primerNombre, c.segundoNombre, c.primerApellido, c.segundoApellido]
-    .filter(Boolean)
-    .join(" ");
+const nombreCliente = (c: Pick<Cliente, "primerNombre" | "segundoNombre" | "primerApellido" | "segundoApellido"> | CadenaCliente) =>
+  "nombreCompleto" in c ? c.nombreCompleto : [c.primerNombre, c.segundoNombre, c.primerApellido, c.segundoApellido].filter(Boolean).join(" ");
 const dateLabel = (value: string) =>
   value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
 const statusClass = (value: string) =>
@@ -44,171 +46,8 @@ const daysTooltip = (contractualDate: string | null) =>
   contractualDate
     ? `Días de anticipación con que se inició una nueva operación respecto al vencimiento previsto del préstamo anterior. Vencimiento previsto: ${dateLabel(contractualDate)}.`
     : "Información histórica no disponible.";
-
-function ClientePicker({ onSelect }: { onSelect: (cliente: Cliente) => void }) {
-  const [open, setOpen] = useState(false);
-  const [page, setPage] = useState<ClientePage | null>(null);
-  const [buscar, setBuscar] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [pagina, setPagina] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const requestId = useRef(0);
-  const load = useCallback(async () => {
-    const id = ++requestId.current;
-    setLoading(true);
-    setError("");
-    const filters: ClienteFilters = { pagina, limite: 10 };
-    if (debounced) filters.buscar = debounced;
-    try {
-      const result = await listarClientes(clienteRepository, filters);
-      if (id === requestId.current) setPage(result);
-    } catch (cause) {
-      if (id === requestId.current) {
-        setPage(null);
-        setError(clienteErrorMessage(cause));
-      }
-    } finally {
-      if (id === requestId.current) setLoading(false);
-    }
-  }, [debounced, pagina]);
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebounced(buscar.trim());
-      setPagina(1);
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [buscar]);
-  useEffect(() => {
-    if (open) void load();
-  }, [load, open]);
-  return (
-    <>
-      <button
-        type="button"
-        className="secondary-button"
-        onClick={() => setOpen(true)}
-      >
-        <Search size={16} /> Buscar cliente
-      </button>
-      {open && (
-        <div
-          className="cliente-selector-backdrop"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setOpen(false);
-          }}
-        >
-          <div
-            className="cliente-selector-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cadenas-selector-title"
-          >
-            <div className="cliente-selector-header">
-              <h2 id="cadenas-selector-title">Seleccionar cliente</h2>
-              <button
-                type="button"
-                className="table-action"
-                onClick={() => setOpen(false)}
-                aria-label="Cerrar selector de cliente"
-              >
-                <X size={19} />
-              </button>
-            </div>
-            <label className="analisis-client-search">
-              Nombre o identificación
-              <input
-                value={buscar}
-                placeholder="Buscar por nombre o identificación"
-                onChange={(event) => setBuscar(event.target.value)}
-              />
-            </label>
-            {loading && (
-              <div className="state-box" role="status">
-                Cargando clientes...
-              </div>
-            )}
-            {!loading && error && (
-              <div className="cliente-selector-error" role="alert">
-                <p>{error}</p>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => void load()}
-                >
-                  Reintentar
-                </button>
-              </div>
-            )}
-            {!loading && !error && page && (
-              <div className="table-wrap cliente-selector-table-wrap">
-                <table className="cliente-selector-table">
-                  <thead>
-                    <tr>
-                      <th>Identificación</th>
-                      <th>Nombre</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {page.datos.map((cliente) => (
-                      <tr key={cliente.id}>
-                        <td>{cliente.identificacion}</td>
-                        <td>{nombreCliente(cliente)}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="primary-button"
-                            onClick={() => {
-                              onSelect(cliente);
-                              setOpen(false);
-                            }}
-                          >
-                            Seleccionar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!page.datos.length && (
-                  <p className="form-note">No hay clientes para mostrar.</p>
-                )}
-              </div>
-            )}
-            {!loading && !error && page && (
-              <div className="cliente-selector-pagination">
-                <button
-                  type="button"
-                  className="table-action"
-                  aria-label="Página anterior"
-                  disabled={pagina <= 1}
-                  onClick={() => setPagina((value) => value - 1)}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <span>
-                  Página {pagina} de {Math.max(page.totalPaginas, 1)} ·{" "}
-                  {page.total} clientes
-                </span>
-                <button
-                  type="button"
-                  className="table-action"
-                  aria-label="Página siguiente"
-                  disabled={pagina >= page.totalPaginas}
-                  onClick={() => setPagina((value) => value + 1)}
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+const netClass = (value: number) =>
+  value >= 0 ? "cadena-summary-net-positive" : "cadena-summary-net-negative";
 
 function LoanNode({
   loan,
@@ -222,7 +61,7 @@ function LoanNode({
   return (
     <article className="loan-node">
       <div className="loan-node-header">
-        <strong>Préstamo #{loan.id}</strong>
+        <strong><FileText size={16} aria-hidden="true" /> Préstamo #{loan.id}</strong>
         <span className={statusClass(loan.estado)}>{loan.estado}</span>
       </div>
       <dl>
@@ -261,10 +100,12 @@ function ChainSection({
   chain,
   statementStates,
   onStatement,
+  highlighted,
 }: {
   chain: Cadena;
   statementStates: Record<number, "loading" | "error">;
   onStatement: (id: number) => void;
+  highlighted?: boolean;
 }) {
   const transitions = new Map(
     chain.transiciones.map((transition) => [
@@ -274,13 +115,13 @@ function ChainSection({
   );
   return (
     <section
-      className="panel cadena-section"
+      className={`panel cadena-section${highlighted ? " cadena-section-highlighted" : ""}`}
       aria-labelledby={`cadena-${chain.prestamoRaizId}`}
     >
       <div className="cadena-heading">
         <div>
           <h2 id={`cadena-${chain.prestamoRaizId}`}>
-            <FileText size={17} aria-hidden="true" /> Cadena desde préstamo #
+            <Link2 size={17} aria-hidden="true" /> Cadena desde préstamo #
             {chain.prestamoRaizId}
           </h2>
           <div className="cadena-meta">
@@ -293,7 +134,36 @@ function ChainSection({
             </span>
           </div>
         </div>
-        <strong>Terminal #{chain.prestamoTerminalId}</strong>
+         <strong className="cadena-terminal"><CircleDollarSign size={15} aria-hidden="true" /> Terminal #{chain.prestamoTerminalId}</strong>
+      </div>
+      <div className="cadena-summary" aria-label="Resumen de la cadena">
+        <div className="panel cadenas-summary-item cadenas-summary-delivered">
+          <span
+            className="cadenas-summary-label"
+            title="Dinero que efectivamente salió hacia el cliente: desembolso inicial más dinero nuevo entregado en refinanciamientos."
+          >
+            <span className="summary-icon"><HandCoins size={16} aria-hidden="true" /></span> Monto realmente entregado
+          </span>
+          <strong>{formatCRC(chain.resumen.montoRealmenteEntregado)}</strong>
+        </div>
+        <div className="panel cadenas-summary-item cadenas-summary-received">
+          <span
+            className="cadenas-summary-label"
+            title="Pagos efectivos registrados recibidos en todos los préstamos que forman parte de las cadenas."
+          >
+            <span className="summary-icon"><CircleDollarSign size={16} aria-hidden="true" /></span> Monto realmente recibido
+          </span>
+          <strong>{formatCRC(chain.resumen.montoRealmenteRecibido)}</strong>
+        </div>
+        <div className={`panel cadenas-summary-item cadena-summary-net ${netClass(chain.resumen.efectivoNetoRecuperado)}`}>
+          <span
+            className="cadenas-summary-label"
+            title="Diferencia entre dinero realmente recibido y dinero realmente entregado. No representa utilidad."
+          >
+            <span className="summary-icon"><WalletCards size={16} aria-hidden="true" /></span> Efectivo neto recuperado
+          </span>
+          <strong>{formatCRC(chain.resumen.efectivoNetoRecuperado)}</strong>
+        </div>
       </div>
       <div
         className="cadena-flow"
@@ -314,17 +184,17 @@ function ChainSection({
                 return transition ? (
                   <div className="chain-connector">
                     <div className="transition-card">
-                      <span>
-                        Transición: #{transition.prestamoOrigenId} a #
+                      <span className="transition-heading">
+                        <ArrowRightLeft size={15} aria-hidden="true" /> Transición: #{transition.prestamoOrigenId} a #
                         {transition.prestamoNuevoId}
                       </span>
                       <dl className="transition-details">
-                        <div>
-                          <dt>C. trasladado.</dt>
+                          <div className="transition-detail-capital" title="Capital pendiente trasladado desde el préstamo anterior.">
+                          <dt><ArrowRightLeft size={13} aria-hidden="true" /> C. trasladado.</dt>
                           <dd>{formatCRC(transition.capitalTrasladado)}</dd>
                         </div>
-                        <div className="transition-detail-new-money">
-                          <dt>Dinero nuevo</dt>
+                        <div className="transition-detail-new-money" title="Dinero nuevo entregado al cliente en esta refinanciación.">
+                          <dt><Banknote size={13} aria-hidden="true" /> Dinero nuevo</dt>
                           <dd>
                             {formatCRC(transition.dineroNuevoDesembolsado)}
                             {transition.dineroNuevoDesembolsado === 0 && (
@@ -332,8 +202,8 @@ function ChainSection({
                             )}
                           </dd>
                         </div>
-                        <div className="transition-detail-interest">
-                          <dt>Interés nuevo</dt>
+                        <div className="transition-detail-interest" title="Interés nuevo pactado para el préstamo.">
+                            <dt><TrendingUp size={13} aria-hidden="true" /> Interés nuevo</dt>
                           <dd>{formatCRC(transition.interesNuevo)}</dd>
                         </div>
                         <div
@@ -342,12 +212,12 @@ function ChainSection({
                             transition.fechaLimiteContractualOrigen,
                           )}
                         >
-                          <dt>Días ganados</dt>
+                           <dt><CalendarClock size={13} aria-hidden="true" /> Días ganados</dt>
                           <dd>{daysLabel(transition.diasGanados)}</dd>
                         </div>
                       </dl>
-                      <p>
-                        Fecha: {dateLabel(transition.fecha)}. El préstamo
+                       <p>
+                         <CalendarDays size={13} aria-hidden="true" /> Fecha: {dateLabel(transition.fecha)}. El préstamo
                         siguiente continúa esta cadena.
                       </p>
                     </div>
@@ -362,7 +232,8 @@ function ChainSection({
 }
 
 export function CadenasRefinanciamientoPage() {
-  const [cliente, setCliente] = useState<Cliente | null>(null);
+  const location = useLocation();
+  const [cliente, setCliente] = useState<Cliente | CadenaCliente | null>(null);
   const [response, setResponse] = useState<CadenasClienteResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -370,7 +241,8 @@ export function CadenasRefinanciamientoPage() {
     Record<number, "loading" | "error">
   >({});
   const requestId = useRef(0);
-  const selectClient = (value: Cliente) => {
+  const [chainTarget, setChainTarget] = useState<{ prestamoOrigenId: number; prestamoNuevoId: number } | null>(null);
+  const loadClient = useCallback((value: Cliente | CadenaCliente) => {
     const id = ++requestId.current;
     setCliente(value);
     setResponse(null);
@@ -378,7 +250,7 @@ export function CadenasRefinanciamientoPage() {
     setLoading(true);
     void listarCadenasPorCliente(cadenasRepository, value.id)
       .then((result) => {
-        if (id === requestId.current) setResponse(result);
+        if (id === requestId.current) { setResponse(result); setCliente(result.cliente); }
       })
       .catch(() => {
         if (id === requestId.current)
@@ -387,9 +259,21 @@ export function CadenasRefinanciamientoPage() {
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  };
+  }, []);
+  const selectClient = (value: Cliente) => loadClient(value);
+  useEffect(() => {
+    const state = location.state;
+    if (!state || typeof state !== "object") return;
+    const candidate = state as Record<string, unknown>;
+    const clienteId = candidate.clienteId;
+    const prestamoOrigenId = candidate.prestamoOrigenId;
+    const prestamoNuevoId = candidate.prestamoNuevoId;
+    if (![clienteId, prestamoOrigenId, prestamoNuevoId].every((value) => typeof value === "number" && Number.isInteger(value) && value > 0)) return;
+    setChainTarget({ prestamoOrigenId: prestamoOrigenId as number, prestamoNuevoId: prestamoNuevoId as number });
+    loadClient({ id: clienteId as number, identificacion: "", nombreCompleto: "Cliente seleccionado" });
+  }, [loadClient, location.state]);
   const retry = () => {
-    if (cliente) selectClient(cliente);
+    if (cliente) loadClient(cliente);
   };
   const statement = async (id: number) => {
     setStatementStates((current) => ({ ...current, [id]: "loading" }));
@@ -408,8 +292,8 @@ export function CadenasRefinanciamientoPage() {
     <section className="cadenas-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">REFINANCIAMIENTOS</p>
-          <h1>Cadenas de refinanciamiento</h1>
+           <p className="eyebrow">REFINANCIAMIENTOS</p>
+           <h1><Link2 size={24} aria-hidden="true" /> Cadenas de refinanciamiento</h1>
           <p className="muted">
             Visualiza la continuidad de las operaciones de un cliente.
           </p>
@@ -428,7 +312,7 @@ export function CadenasRefinanciamientoPage() {
       {cliente && (
         <div className="panel cadenas-client-header">
           <div>
-            <h2>{nombreCliente(cliente)}</h2>
+          <h2><UserRound size={18} aria-hidden="true" /> {nombreCliente(cliente)}</h2>
             <p>
               <strong>Identificación:</strong> {cliente.identificacion}
             </p>
@@ -463,31 +347,76 @@ export function CadenasRefinanciamientoPage() {
       {response && (
         <>
           <div className="cadenas-summary" aria-label="Resumen de cadenas">
-            <div className="panel cadenas-summary-item">
-              <span>Cadenas</span>
-              <strong>{response.resumen.cantidadCadenas}</strong>
+            <div className="cadenas-summary-row">
+               <div className="panel cadenas-summary-item">
+                <span title="Cantidad de cadenas registradas para el cliente."><span className="summary-icon"><Link2 size={16} aria-hidden="true" /></span> Cadenas</span>
+                <strong>{response.resumen.cantidadCadenas}</strong>
+              </div>
+               <div className="panel cadenas-summary-item cadenas-summary-delivered">
+                <span title="Cantidad de refinanciamientos registrados en las cadenas."><span className="summary-icon"><RefreshCw size={16} aria-hidden="true" /></span> Refinanciamientos</span>
+                <strong>{response.resumen.cantidadRefinanciamientos}</strong>
+              </div>
+              <div className="panel cadenas-summary-item">
+                <span title="Capital pendiente trasladado desde préstamos anteriores."><span className="summary-icon"><ArrowRightLeft size={16} aria-hidden="true" /></span> Capital trasladado</span>
+                <strong>
+                  {formatCRC(response.resumen.totalCapitalTrasladado)}
+                </strong>
+              </div>
+              <div className="panel cadenas-summary-item">
+                <span title="Dinero nuevo desembolsado en refinanciamientos."><span className="summary-icon"><Banknote size={16} aria-hidden="true" /></span> Dinero nuevo</span>
+                <strong>
+                  {formatCRC(response.resumen.totalDineroNuevoDesembolsado)}
+                </strong>
+              </div>
+              <div className="panel cadenas-summary-item">
+                <span title="Interés nuevo pactado en refinanciamientos."><span className="summary-icon"><TrendingUp size={16} aria-hidden="true" /></span> Interés nuevo pactado</span>
+                <strong>
+                  {formatCRC(response.resumen.totalInteresNuevoPactado)}
+                </strong>
+              </div>
             </div>
-            <div className="panel cadenas-summary-item">
-              <span>Refinanciamientos</span>
-              <strong>{response.resumen.cantidadRefinanciamientos}</strong>
-            </div>
-            <div className="panel cadenas-summary-item">
-              <span>Capital trasladado</span>
-              <strong>
-                {formatCRC(response.resumen.totalCapitalTrasladado)}
-              </strong>
-            </div>
-            <div className="panel cadenas-summary-item">
-              <span>Dinero nuevo</span>
-              <strong>
-                {formatCRC(response.resumen.totalDineroNuevoDesembolsado)}
-              </strong>
-            </div>
-            <div className="panel cadenas-summary-item">
-              <span>Interés nuevo pactado</span>
-              <strong>
-                {formatCRC(response.resumen.totalInteresNuevoPactado)}
-              </strong>
+            <div className="cadenas-summary-row cadenas-summary-row-secondary">
+              <div className="panel cadenas-summary-item">
+                <span
+                  className="cadenas-summary-label"
+                  title="Dinero que efectivamente salió hacia el cliente: desembolso inicial más dinero nuevo entregado en refinanciamientos."
+                >
+                   <span className="summary-icon"><HandCoins size={16} aria-hidden="true" /></span> Monto realmente entregado
+                </span>
+                <strong>{formatCRC(response.resumen.montoRealmenteEntregado)}</strong>
+              </div>
+               <div className="panel cadenas-summary-item cadenas-summary-received">
+                <span
+                  className="cadenas-summary-label"
+                  title="Pagos efectivos registrados recibidos en todos los préstamos que forman parte de las cadenas."
+                >
+                   <span className="summary-icon"><CircleDollarSign size={16} aria-hidden="true" /></span> Monto realmente recibido
+                </span>
+                <strong>{formatCRC(response.resumen.montoRealmenteRecibido)}</strong>
+              </div>
+              <div className={`panel cadenas-summary-item cadena-summary-net ${netClass(response.resumen.efectivoNetoRecuperado)}`}>
+                <span
+                  className="cadenas-summary-label"
+                  title="Diferencia entre dinero realmente recibido y dinero realmente entregado. No representa utilidad."
+                >
+                   <span className="summary-icon"><WalletCards size={16} aria-hidden="true" /></span> Efectivo neto recuperado
+                </span>
+                <strong>{formatCRC(response.resumen.efectivoNetoRecuperado)}</strong>
+              </div>
+               <div
+                 className="panel cadenas-summary-item cadenas-summary-days"
+                title={daysTooltip(null)}
+              >
+                <span className="cadenas-summary-label">
+                  <span className="summary-icon"><CalendarClock size={16} aria-hidden="true" /></span>
+                  {response.resumen.diasGanadosCompletos
+                    ? "Días ganados"
+                    : "Días ganados conocidos"}
+                </span>
+                <strong>
+                  {response.resumen.diasGanadosAcumulados} días
+                </strong>
+              </div>
             </div>
           </div>
           {response.cadenas.length === 0 ? (
@@ -496,9 +425,10 @@ export function CadenasRefinanciamientoPage() {
             </div>
           ) : (
             response.cadenas.map((chain) => (
-              <ChainSection
-                key={chain.prestamoRaizId}
-                chain={chain}
+               <ChainSection
+                 key={chain.prestamoRaizId}
+                 chain={chain}
+                 highlighted={Boolean(chainTarget && (chain.prestamos.some((loan) => loan.id === chainTarget.prestamoOrigenId || loan.id === chainTarget.prestamoNuevoId) || chain.transiciones.some((transition) => transition.prestamoOrigenId === chainTarget.prestamoOrigenId || transition.prestamoNuevoId === chainTarget.prestamoNuevoId)))}
                 statementStates={statementStates}
                 onStatement={(id) => void statement(id)}
               />

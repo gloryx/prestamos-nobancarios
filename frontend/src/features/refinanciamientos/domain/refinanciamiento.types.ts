@@ -40,7 +40,41 @@ export interface RefinanciamientoResponse {
   planNuevo?: unknown[]
 }
 
+export interface RefinanciamientoListFilters {
+  pagina: number
+  limite: number
+  buscar?: string
+  clienteId?: number
+  fechaDesde?: string
+  fechaHasta?: string
+}
+
+export interface RefinanciamientoListado {
+  id: number
+  prestamoOrigenId: number
+  prestamoNuevoId: number
+  fecha: string
+  capitalPendiente: number
+  interesNuevo: number
+  fechaLimiteContractualOrigen: string | null
+  diasGanados: number | null
+  cliente: { id: number; identificacion: string; nombreCompleto: string }
+  prestamoOrigen?: { id: number; [key: string]: unknown }
+  prestamoNuevo?: { id: number; capital: number; montoDesembolsado?: number; [key: string]: unknown }
+  nuevaOperacion?: { dineroNuevoDesembolsado?: number; [key: string]: unknown }
+  composicion?: { dineroNuevoDesembolsado?: number; [key: string]: unknown }
+}
+
+export interface RefinanciamientoPage {
+  datos: RefinanciamientoListado[]
+  pagina: number
+  limite: number
+  total: number
+  totalPaginas: number
+}
+
 export interface RefinanciamientoRepository {
+  list(filters: RefinanciamientoListFilters): Promise<RefinanciamientoPage>
   preview(prestamoId: number): Promise<RefinanciamientoPreview>
   create(input: CrearRefinanciamientoInput): Promise<RefinanciamientoResponse>
 }

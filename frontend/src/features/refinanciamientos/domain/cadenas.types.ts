@@ -34,7 +34,12 @@ export interface CadenaResumen {
   capitalTerminal: number
   totalCapitalTrasladado: number
   totalDineroNuevoDesembolsado: number
+  montoRealmenteEntregado: number
+  montoRealmenteRecibido: number
+  efectivoNetoRecuperado: number
   totalInteresNuevoPactado: number
+  diasGanadosAcumulados: number
+  diasGanadosCompletos: boolean
   fechaUltimoRefinanciamiento: string
 }
 
@@ -55,7 +60,12 @@ export interface CadenasClienteResponse {
     cantidadRefinanciamientos: number
     totalCapitalTrasladado: number
     totalDineroNuevoDesembolsado: number
+    montoRealmenteEntregado: number
+    montoRealmenteRecibido: number
+    efectivoNetoRecuperado: number
     totalInteresNuevoPactado: number
+    diasGanadosAcumulados: number
+    diasGanadosCompletos: boolean
   }
   cadenas: Cadena[]
 }

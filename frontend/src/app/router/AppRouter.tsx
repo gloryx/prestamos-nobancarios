@@ -17,6 +17,7 @@ import { SeguimientoCarteraPage } from "@/features/prestamos/presentation/Seguim
 import { AnalisisFinancieroClientePage } from "@/features/clientes/presentation/AnalisisFinancieroClientePage";
 import { NuevoRefinanciamientoPage } from "@/features/refinanciamientos/presentation/NuevoRefinanciamientoPage";
 import { CadenasRefinanciamientoPage } from "@/features/refinanciamientos/presentation/CadenasRefinanciamientoPage";
+import { RefinanciamientosPage } from "@/features/refinanciamientos/presentation/RefinanciamientosPage";
 
 export function AppRouter() {
   return (
@@ -42,6 +43,7 @@ export function AppRouter() {
               <Route path="prestamos/nuevo" element={<PrestamosPage />} />
               <Route path="prestamos/seguimiento-cartera" element={<SeguimientoCarteraPage />} />
               <Route path="pagos/registrar" element={<RegistrarPagoPage />} />
+              <Route path="refinanciamientos" element={<RefinanciamientosPage />} />
               <Route path="refinanciamientos/nuevo" element={<NuevoRefinanciamientoPage />} />
               <Route path="refinanciamientos/cadenas" element={<CadenasRefinanciamientoPage />} />
               <Route path="*" element={<PlaceholderPage />} />

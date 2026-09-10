@@ -1,5 +1,7 @@
 import type { PrestamoFilters } from '@/features/prestamos/domain/prestamo.types'
-import type { ActiveLoanRepository, CrearRefinanciamientoInput, RefinanciamientoRepository } from '../domain/refinanciamiento.types'
+import type { ActiveLoanRepository, CrearRefinanciamientoInput, RefinanciamientoListFilters, RefinanciamientoRepository } from '../domain/refinanciamiento.types'
+
+export const listarRefinanciamientos = (repository: RefinanciamientoRepository, filters: RefinanciamientoListFilters) => repository.list(filters)
 
 export const previsualizarRefinanciamiento = (repository: RefinanciamientoRepository, prestamoId: number) => repository.preview(prestamoId)
 export const crearRefinanciamiento = (repository: RefinanciamientoRepository, input: CrearRefinanciamientoInput) => repository.create(input)

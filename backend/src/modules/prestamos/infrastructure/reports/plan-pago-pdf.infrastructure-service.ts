@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { Cliente } from '../../../clientes/domain/entities/cliente';
 import { PlanPago } from '../../../planes-pago/domain/entities/plan-pago';
 import { PrestamoConRelaciones } from '../../domain/repositories/prestamo.repository';
+import { EstadoPrestamo } from '../../domain/enums/estado-prestamo.enum';
 type Applied = Map<number, { total: number; fechas: string[] }>;
 
 const PAGE_WIDTH = 400;
@@ -17,6 +18,22 @@ const FIRST_ROW_Y = 195;
 const date = (value: Date): string => `${String(value.getUTCDate()).padStart(2, '0')}/${String(value.getUTCMonth() + 1).padStart(2, '0')}/${value.getUTCFullYear()}`;
 const money = (value: number): string => `₡ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)}`;
 const fullName = (cliente: Cliente): string => [cliente.primerNombre, cliente.segundoNombre, cliente.primerApellido, cliente.segundoApellido].filter((value): value is string => Boolean(value?.trim())).join(' ');
+
+export const drawRefinancedWatermark = (document: InstanceType<typeof PDFDocument>): void => {
+  const page = document.page;
+  document.save();
+  document.rotate(-35, { origin: [page.width / 2, page.height / 2] });
+  document.opacity(0.20).fillColor('#6b7280').font('Helvetica-Bold').fontSize(48).text('REFINANCIADO', 0, page.height / 2 - 24, { width: page.width, align: 'center', lineBreak: false });
+  document.restore();
+};
+
+export const drawRefinancedWatermarks = (document: InstanceType<typeof PDFDocument>): void => {
+  const range = document.bufferedPageRange();
+  for (let pageIndex = range.start; pageIndex < range.start + range.count; pageIndex += 1) {
+    document.switchToPage(pageIndex);
+    drawRefinancedWatermark(document);
+  }
+};
 
 const existingPath = async (candidates: string[]): Promise<string> => {
   for (const candidate of candidates) {
@@ -48,16 +65,16 @@ export class PlanPagoPdfInfrastructureService {
     ]);
 
      const pageHeight = FIRST_ROW_Y + plan.length * ROW_HEIGHT + BOTTOM_GAP;
-    const document = new PDFDocument({ size: [PAGE_WIDTH, pageHeight], margins: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN } });
-    document.registerFont('Unicode', font);
-    const chunks: Buffer[] = [];
+      const document = new PDFDocument({ bufferPages: true, size: [PAGE_WIDTH, pageHeight], margins: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN } });
+     document.registerFont('Unicode', font);
+     const chunks: Buffer[] = [];
 
     return new Promise<Buffer>((resolvePdf, reject) => {
       document.on('data', (chunk: Buffer) => chunks.push(chunk));
-      document.once('end', () => resolvePdf(Buffer.concat(chunks)));
-      document.once('error', reject);
+       document.once('end', () => resolvePdf(Buffer.concat(chunks)));
+       document.once('error', reject);
 
-       const text = (value: string, x: number, y: number, width: number, size: number, color = '#243447', options: Record<string, unknown> = {}, font = 'Unicode'): void => {
+        const text = (value: string, x: number, y: number, width: number, size: number, color = '#243447', options: Record<string, unknown> = {}, font = 'Unicode'): void => {
          document.font(font).fontSize(size).fillColor(color).text(value || '-', x, y, { width, lineGap: 0, paragraphGap: 0, ...options });
       };
        const field = (label: string, value: string, x: number, y: number, width: number, size = 8): void => {
@@ -110,7 +127,8 @@ export class PlanPagoPdfInfrastructureService {
         text('Detalle de cuotas', MARGIN, y, CONTENT_WIDTH, 9, '#1f5f8b'); y = tableHeader(y + 10);
 
        plan.forEach((cuota, index) => { y = renderRow(cuota, index, y); });
-      document.end();
+       if (prestamo.estado === EstadoPrestamo.REFINANCIADO) drawRefinancedWatermarks(document);
+       document.end();
     });
   }
 }

@@ -13,6 +13,15 @@ export interface Pago {
   cobrador?: { id: number; identificacion: string; nombreCompleto: string; telefono: string; correo: string } | null
   planPagoId?: number | null
   numeroCuota?: number | null
+  formaPagoNombre?: string | null
+  estado?: 'REGISTRADO' | 'ANULADO' | string
+  puedeAnular?: boolean
+  anulacion?: { motivo: string; observacion?: string | null; fecha?: string | null } | null
+}
+
+export interface AnularPagoInput {
+  motivo: string
+  observacion?: string
 }
 
 export interface PagoResumen {

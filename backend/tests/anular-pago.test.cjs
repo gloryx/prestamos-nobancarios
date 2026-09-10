@@ -23,6 +23,7 @@ class Store {
       prestamos: seed.prestamos || [{ id: 1, montoTotal: 300, capital: 250, interes: 50, cantidadPagos: 3, estado: EstadoPrestamo.ACTIVO }],
       pagos: seed.pagos || [], anulaciones: seed.anulaciones || [], planes: seed.planes || defaultPlans(), refinanciamientos: seed.refinanciamientos || [], movimientos: seed.movimientos || [],
     };
+    this.failPaymentSave = seed.failPaymentSave === true;
     this.next = { movimientos: 100 };
     this.events = [];
   }
@@ -40,7 +41,7 @@ class Manager {
 
 class Repository {
   constructor(state, store, collection) { this.state = state; this.store = store; this.collection = collection; }
-  save(value) { const index = this.state[this.collection].findIndex(item => item.id === value.id); if (index >= 0) this.state[this.collection][index] = value; else this.state[this.collection].push(value); return Promise.resolve(value); }
+  save(value) { if (this.collection === 'pagos' && this.store.failPaymentSave) return Promise.reject(new Error('payment persistence failure')); const index = this.state[this.collection].findIndex(item => item.id === value.id); if (index >= 0) this.state[this.collection][index] = value; else this.state[this.collection].push(value); return Promise.resolve(value); }
   createQueryBuilder(alias) { return new QueryBuilder(this.state, this.store, this.collection, alias); }
 }
 
@@ -91,7 +92,7 @@ function cashFor(store, { fail = false } = {}) {
 const history = { registrar: async () => undefined };
 const dto = { motivo: MotivoAnulacionPago.OTRO, observacion: 'Correction' };
 const audit = { guardarEnTransaccion: async (manager, value) => { if (manager.state.anulaciones.some(item => item.pagoId === value.pagoId)) throw new Error('duplicate audit'); const saved = { ...value, id: manager.state.anulaciones.length + 1 }; manager.state.anulaciones.push(saved); return saved; } };
-function useCase(store, options) { return new AnularPagoUseCase(store, cashFor(store, options), history, audit); }
+function useCase(store, options = {}) { return new AnularPagoUseCase(store, cashFor(store, options), options.history || history, audit); }
 function originalMovement(id, amount = 100) { return { id, tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.PAGO_CLIENTE, monto: amount, pagoId: id, prestamoId: 1 }; }
 
 test('cancellation endpoint metadata allows ADMINISTRADOR only and RolesGuard denies VENDEDOR', () => {
@@ -158,8 +159,10 @@ test('redistribuyoPlan false allows cancellation regardless of current plan shap
 
 test('CANCELADO returns to ACTIVO when cancellation restores a balance', async () => {
   const store = new Store({ prestamos: [{ id: 1, montoTotal: 100, capital: 80, interes: 20, cantidadPagos: 3, estado: EstadoPrestamo.CANCELADO }], pagos: [payment(1)], movimientos: [originalMovement(1)] });
-  await useCase(store).execute(1, dto, 7);
+  const transitions = [];
+  await useCase(store, { history: { registrar: async (_manager, ...values) => transitions.push(values) } }).execute(1, dto, 7);
   assert.equal(store.state.prestamos[0].estado, EstadoPrestamo.ACTIVO);
+  assert.deepEqual(transitions.map(([loanId, previous, next, _date, userId, observation]) => [loanId, previous, next, userId, observation]), [[1, EstadoPrestamo.CANCELADO, EstadoPrestamo.ACTIVO, 7, 'Correction']]);
 });
 
 test('double annulment and double reversal are rejected', async () => {
@@ -191,4 +194,42 @@ test('three-payment C-to-B-to-A sequence cancels only in reverse chronological o
   await useCase(store).execute(2, dto, 7);
   await useCase(store).execute(1, dto, 7);
   assert.equal(store.state.movimientos.filter(value => value.concepto === ConceptoMovimientoCaja.REVERSO).length, 3);
+});
+
+test('600000 loan with 30x20000 plan restores 40000, 60000, and 80000 debt through C-to-B-to-A', async () => {
+  const plans = Array.from({ length: 30 }, (_, index) => ({ id: index + 1, prestamoId: 1, numeroPago: index + 1, fechaVencimiento: `2026-${String(index + 1).padStart(2, '0')}-15`, montoProgramado: 20000 }));
+  const payments = Array.from({ length: 29 }, (_, index) => payment(index + 1, { fecha: `2026-${String(index + 1).padStart(2, '0')}-01`, monto: 20000, capitalAplicado: 20000, interesAplicado: 0 }));
+  const store = new Store({
+    prestamos: [{ id: 1, montoTotal: 600000, capital: 600000, interes: 0, cantidadPagos: 30, estado: EstadoPrestamo.ACTIVO }],
+    pagos: payments,
+    planes: plans,
+    movimientos: payments.map(value => originalMovement(value.id, 20000)),
+  });
+  const originalPlan = clone(store.state.planes);
+  const expected = [[29, 40000], [28, 60000], [27, 80000]];
+
+  await assert.rejects(() => useCase(store).execute(28, dto, 7), /pagos posteriores/);
+  await assert.rejects(() => useCase(store).execute(27, dto, 7), /pagos posteriores/);
+  for (const [paymentId, balance] of expected) {
+    const result = await useCase(store).execute(paymentId, dto, 7);
+    assert.equal(result.saldoPendiente, balance);
+    assert.equal(store.state.pagos.find(value => value.id === paymentId).estado, EstadoPago.ANULADO);
+    assert.equal(store.state.movimientos.filter(value => value.concepto === ConceptoMovimientoCaja.REVERSO && value.pagoId === paymentId).length, 1);
+  }
+
+  assert.deepEqual(store.state.planes, originalPlan);
+  assert.equal(store.state.planes.length, 30);
+  assert.deepEqual(store.state.planes.map(value => [value.numeroPago, value.montoProgramado]), plans.map(value => [value.numeroPago, 20000]));
+  assert.equal(store.state.anulaciones.length, 3);
+  assert.equal(new Set(store.state.anulaciones.map(value => value.pagoId)).size, 3);
+  assert.equal(store.state.movimientos.filter(value => value.concepto === ConceptoMovimientoCaja.REVERSO).length, 3);
+  assert.equal(store.state.pagos.filter(value => value.estado === EstadoPago.REGISTRADO).reduce((sum, value) => sum + value.monto, 0), 520000);
+});
+
+test('transaction rollback removes the Caja reversal when payment persistence fails after Caja', async () => {
+  const store = new Store({ pagos: [payment(1)], movimientos: [originalMovement(1)], failPaymentSave: true });
+  await assert.rejects(() => useCase(store).execute(1, dto, 7), /payment persistence failure/);
+  assert.equal(store.state.pagos[0].estado, EstadoPago.REGISTRADO);
+  assert.equal(store.state.anulaciones.length, 0);
+  assert.equal(store.state.movimientos.length, 1);
 });
