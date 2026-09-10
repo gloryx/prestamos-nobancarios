@@ -13,6 +13,8 @@
     "@hookform/resolvers": "^5.9.1",
     "axios": "^1.20.0",
     "clsx": "^2.1.1",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.39.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

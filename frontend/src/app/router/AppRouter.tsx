@@ -18,6 +18,7 @@ import { AnalisisFinancieroClientePage } from "@/features/clientes/presentation/
 import { NuevoRefinanciamientoPage } from "@/features/refinanciamientos/presentation/NuevoRefinanciamientoPage";
 import { CadenasRefinanciamientoPage } from "@/features/refinanciamientos/presentation/CadenasRefinanciamientoPage";
 import { RefinanciamientosPage } from "@/features/refinanciamientos/presentation/RefinanciamientosPage";
+import { RefinanciamientosReportePage } from "@/features/refinanciamientos/presentation/RefinanciamientosReportePage";
 
 export function AppRouter() {
   return (
@@ -46,6 +47,7 @@ export function AppRouter() {
               <Route path="refinanciamientos" element={<RefinanciamientosPage />} />
               <Route path="refinanciamientos/nuevo" element={<NuevoRefinanciamientoPage />} />
               <Route path="refinanciamientos/cadenas" element={<CadenasRefinanciamientoPage />} />
+              <Route path="refinanciamientos/reporte" element={<RefinanciamientosReportePage />} />
               <Route path="*" element={<PlaceholderPage />} />
             </Route>
           </Route>

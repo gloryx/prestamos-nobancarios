@@ -7,6 +7,7 @@ export interface AnalisisPrestamo {
   capital: number;
   interes: number;
   montoTotal: number;
+  montoDesembolsado: number;
   cantidadPagos: number;
   periodicidad: string;
 }
@@ -28,8 +29,11 @@ export interface AnalisisPagoTotales {
 }
 
 export interface AnalisisRefinanciamiento {
+  id: number;
   prestamoOrigenId: number;
+  prestamoNuevoId: number;
   fecha: string;
+  capitalPendiente: number;
 }
 
 export interface AnalisisFinancieroRepository {

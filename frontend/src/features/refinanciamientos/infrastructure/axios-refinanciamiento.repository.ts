@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { apiClient } from '@/core/api/client'
-import type { CrearRefinanciamientoInput, RefinanciamientoListFilters, RefinanciamientoPage, RefinanciamientoPreview, RefinanciamientoRepository, RefinanciamientoResponse } from '../domain/refinanciamiento.types'
+import type { CrearRefinanciamientoInput, RefinanciamientoListFilters, RefinanciamientoPage, RefinanciamientoPreview, RefinanciamientoReportFilters, RefinanciamientoReportResponse, RefinanciamientoRepository, RefinanciamientoResponse } from '../domain/refinanciamiento.types'
 
 export class RefinanciamientoRequestError extends Error {
   status: number
@@ -20,6 +20,9 @@ function rethrow(error: unknown): never {
 export class AxiosRefinanciamientoRepository implements RefinanciamientoRepository {
   async list(filters: RefinanciamientoListFilters): Promise<RefinanciamientoPage> {
     try { return (await apiClient.get<RefinanciamientoPage>('/refinanciamientos', { params: filters })).data } catch (error) { return rethrow(error) }
+  }
+  async report(filters: RefinanciamientoReportFilters): Promise<RefinanciamientoReportResponse> {
+    try { return (await apiClient.get<RefinanciamientoReportResponse>('/refinanciamientos/reporte', { params: filters })).data } catch (error) { return rethrow(error) }
   }
   async preview(prestamoId: number): Promise<RefinanciamientoPreview> {
     try { return (await apiClient.get<RefinanciamientoPreview>(`/refinanciamientos/prestamo/${prestamoId}/preview`)).data } catch (error) { return rethrow(error) }
