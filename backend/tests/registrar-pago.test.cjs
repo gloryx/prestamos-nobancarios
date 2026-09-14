@@ -67,21 +67,54 @@ test('permite parcial exacta y conserva el programado', async () => {
   assert.equal(result.fecha.toISOString(), '2026-09-07T00:00:00.000Z');
 });
 
-test('keeps the first installment partial and leaves future installments unchanged', async () => {
-  const source = new FakeDataSource([plan(1, 1, 10000), plan(2, 2, 12000)], [], { capital: 22000, interes: 0 });
-  await useCase(source).execute(dto(1, 8000), 9);
-  assert.deepEqual(planAmounts(source), [10000, 12000]);
-  assert.equal(source.payments.at(-1).planPagoId, 1);
-  assert.equal(source.payments.at(-1).redistribuyoPlan, false);
-  assert.equal(source.plans.reduce((sum, item) => sum + item.montoProgramado, 0), 22000);
+test('transfers a partial payment shortage once to the next operational installment', async () => {
+  const source = new FakeDataSource([plan(4, 4, 100000), plan(5, 5, 100000), plan(6, 6, 100000)], [], { capital: 300000, interes: 0 });
+  await useCase(source).execute(dto(4, 50000), 9);
+  assert.deepEqual(planAmounts(source), [50000, 150000, 100000]);
+  assert.equal(source.payments.at(-1).planPagoId, 4);
+  assert.equal(source.payments.at(-1).redistribuyoPlan, true);
+  assert.equal(source.payments.at(-1).monto, 50000);
+  assert.equal(source.loan.montoTotal - source.payments.reduce((sum, item) => sum + item.monto, 0), 250000);
 });
 
 test('keeps the selected amount when a last installment receives a partial payment', async () => {
   const source = new FakeDataSource([plan(1, 1, 10000)], [], { capital: 10000, interes: 0 });
   await useCase(source).execute(dto(1, 8000), 9);
-  assert.deepEqual(planAmounts(source), [10000]);
+  assert.deepEqual(planAmounts(source), [8000]);
   assert.equal(source.payments.at(-1).monto, 8000);
   assert.equal(source.payments.at(-1).redistribuyoPlan, false);
+});
+
+test('allows the persisted increased next installment after a partial payment without blocking sequence', async () => {
+  const source = new FakeDataSource([plan(4, 4, 50000), plan(5, 5, 150000), plan(6, 6, 100000)], [payment(1, 4, 50000)], { capital: 300000, interes: 0 });
+  source.payments[0].redistribuyoPlan = true;
+  await useCase(source).execute(dto(5, 150000), 9);
+  assert.deepEqual(source.payments.map((item) => [item.planPagoId, item.monto]), [[4, 50000], [5, 150000]]);
+  assert.equal(source.payments.at(-1).redistribuyoPlan, false);
+  assert.equal(source.loan.montoTotal - source.payments.reduce((sum, item) => sum + item.monto, 0), 100000);
+});
+
+test('does not duplicate a carried shortage across several partial payments', async () => {
+  const source = new FakeDataSource([plan(4, 4, 100), plan(5, 5, 100), plan(6, 6, 100)], [], { capital: 300, interes: 0 });
+  await useCase(source).execute(dto(4, 50), 9);
+  await useCase(source).execute(dto(5, 50), 9);
+  assert.deepEqual(planAmounts(source), [50, 50, 200]);
+});
+
+test('preserves future dates when transferring a partial shortage', async () => {
+  const source = new FakeDataSource([
+    { ...plan(1, 1, 100), fechaVencimiento: '2026-09-01' },
+    { ...plan(2, 2, 100), fechaVencimiento: '2026-09-08' },
+    { ...plan(3, 3, 100), fechaVencimiento: '2026-09-15' },
+  ], [], { capital: 300, interes: 0 });
+  await useCase(source).execute(dto(1, 50, '2026-10-03'), 9);
+  assert.deepEqual(source.plans.map((item) => item.fechaVencimiento), ['2026-10-03', '2026-09-08', '2026-09-15']);
+});
+
+test('preserves cent precision while transferring a partial shortage', async () => {
+  const source = new FakeDataSource([plan(1, 1, 10.01), plan(2, 2, 10.02)], [], { capital: 20.03, interes: 0 });
+  await useCase(source).execute(dto(1, 10.00), 9);
+  assert.deepEqual(planAmounts(source), [10, 10.03]);
 });
 
 test('redistributes overpayment only after completing the current installment', async () => {
@@ -126,11 +159,12 @@ test('rejects a later pending installment while the first one is still pending',
   assert.equal(source.payments.length, 0);
 });
 
-test('keeps a partial installment current and blocks the next installment', async () => {
-  const source = new FakeDataSource([plan(1, 1, 100), plan(2, 2, 100)], [payment(1, 1, 40)], { capital: 0, interes: 200 });
-  await assert.rejects(useCase(source).execute(dto(2, 1), 9), (error) => error instanceof BadRequestException && error.message === 'Debe registrar el pago sobre la primera cuota pendiente del plan.');
-  assert.equal(source.plans[0].montoProgramado, 100);
-  assert.equal(source.payments.length, 1);
+test('permits the next operational installment after a carried partial payment', async () => {
+  const source = new FakeDataSource([plan(1, 1, 40), plan(2, 2, 160)], [payment(1, 1, 40)], { capital: 0, interes: 200 });
+  source.payments[0].redistribuyoPlan = true;
+  await useCase(source).execute(dto(2, 160), 9);
+  assert.equal(source.payments.at(-1).planPagoId, 2);
+  assert.equal(source.payments.length, 2);
 });
 
 test('completing the current installment enables the next one', async () => {
@@ -163,7 +197,7 @@ test('rejects overpayment beyond the financial balance without changing plan or 
 test('preserves exact cent arithmetic and rejects insufficient redistribution atomically', async () => {
   const source = new FakeDataSource([plan(1, 1, 10.01), plan(2, 2, 10.02)], [], { capital: 20.03, interes: 0 });
   await useCase(source).execute(dto(1, 10.00), 9);
-  assert.deepEqual(planAmounts(source), [10.01, 10.02]);
+  assert.deepEqual(planAmounts(source), [10, 10.03]);
   const failing = new FakeDataSource([plan(1, 1, 10), plan(2, 2, 1), plan(3, 3, 9)], [payment(3, 3, 1)], { capital: 20, interes: 0 });
    await assert.rejects(useCase(failing).execute(dto(1, 15), 9), /suficiente/);
    assert.deepEqual(planAmounts(failing), [10, 1, 9]);

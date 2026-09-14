@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { BarChart3, Banknote, BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, CircleDollarSign, ClipboardList, CreditCard, FileBarChart, HandCoins, LayoutDashboard, Landmark, ListChecks, Receipt, Settings, SlidersHorizontal, UserPlus, Users, WalletCards, WalletMinimal } from 'lucide-react'
+import { BarChart3, Banknote, BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, CircleAlert, CircleDollarSign, ClipboardList, CreditCard, FileBarChart, HandCoins, LayoutDashboard, Landmark, ListChecks, Receipt, Settings, SlidersHorizontal, UserPlus, Users, WalletCards, WalletMinimal } from 'lucide-react'
 
 export type NavItem = { label: string; path: string; icon?: LucideIcon; separatorBefore?: boolean }
 export type NavGroup = { label: string; icon: LucideIcon; items: Array<NavItem | NavGroup>; separatorBefore?: boolean }
@@ -9,8 +9,8 @@ export const navigation: Array<NavItem | NavGroup> = [
   { label: 'Clientes', icon: Users, items: [
     { label: 'Clientes', path: '/clientes', icon: Users }, { label: 'Nuevo cliente', path: '/clientes/nuevo', icon: UserPlus }, { label: 'Análisis financiero', path: '/clientes/analisis-financiero', icon: ChartNoAxesCombined }, { label: 'Reporte', path: '/clientes/reporte', icon: FileBarChart, separatorBefore: true },
   ] },
-  { label: 'Préstamos', icon: BriefcaseBusiness, items: [
-    { label: 'Préstamos', path: '/prestamos', icon: BriefcaseBusiness }, { label: 'Nuevo préstamo', path: '/prestamos/nuevo', icon: CreditCard }, { label: 'Seguimiento de cartera', path: '/prestamos/seguimiento-cartera', icon: ListChecks }, { label: 'Reporte de cartera', path: '/prestamos/reporte', icon: FileBarChart, separatorBefore: true }, { label: 'Proyección', path: '/prestamos/proyeccion', icon: BarChart3 },
+    { label: 'Préstamos', icon: BriefcaseBusiness, items: [
+    { label: 'Préstamos', path: '/prestamos', icon: BriefcaseBusiness }, { label: 'Nuevo préstamo', path: '/prestamos/nuevo', icon: CreditCard }, { label: 'Gestión de incobrables', path: '/prestamos/gestion-incobrables', icon: CircleAlert }, { label: 'Gestión de anulaciones', path: '/prestamos/gestion-anulaciones', icon: CircleAlert }, { label: 'Seguimiento de cartera', path: '/prestamos/seguimiento-cartera', icon: ListChecks }, { label: 'Reporte de cartera', path: '/prestamos/reporte', icon: FileBarChart, separatorBefore: true }, { label: 'Proyección', path: '/prestamos/proyeccion', icon: BarChart3 },
   ] },
   { label: 'Pagos', icon: HandCoins, items: [
     { label: 'Cobros del día', path: '/pagos', icon: HandCoins }, { label: 'Registrar pago', path: '/pagos/registrar', icon: CreditCard }, { label: 'Historial', path: '/pagos/historial', icon: ClipboardList }, { label: 'Reportes', path: '/pagos/reportes', icon: FileBarChart, separatorBefore: true },

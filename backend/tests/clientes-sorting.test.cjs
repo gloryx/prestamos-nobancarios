@@ -47,13 +47,14 @@ for (const direction of ['ASC', 'DESC']) test(`name ${direction} uses a safe Typ
   assert.ok(calls.findIndex(call => call[0] === 'skip') > calls.findIndex(call => call[0] === 'addOrderBy'));
 });
 
-test('default order remains unchanged', async () => {
+test('default order has a stable id tie-break', async () => {
   const { repository, calls } = setup();
   await repository.listar({ pagina: 1, limite: 10 });
   assert.deepEqual(calls.slice(0, 2), [
     ['orderBy', 'cliente.primer_apellido', 'ASC'],
     ['addOrderBy', 'cliente.primer_nombre', 'ASC'],
   ]);
+  assert.deepEqual(calls[2], ['addOrderBy', 'cliente.id', 'DESC']);
 });
 
 test('filters, sorting and pagination are applied together', async () => {
@@ -65,6 +66,27 @@ test('filters, sorting and pagination are applied together', async () => {
     ['take', 25],
     ['getManyAndCount'],
   ]);
+});
+
+test('normalizes search and creates one AND group per non-empty term', async () => {
+  const { repository, calls } = setup();
+  await repository.listar({ pagina: 1, limite: 10, buscar: '  jose   daniel  ' });
+  assert.equal(calls.filter((call) => call[0] === 'andWhere').length, 2);
+  const groups = calls.filter((call) => call[0] === 'andWhere').map((call) => call[1]);
+  const conditions = groups.map((group) => {
+    const terms = [];
+    group.whereFactory({
+      where(...args) { terms.push(args); return this; },
+      orWhere(...args) { terms.push(args); return this; },
+    });
+    return terms;
+  });
+  assert.equal(conditions[0][0][1].buscarTerm0, '%jose%');
+  assert.equal(conditions[1][0][1].buscarTerm1, '%daniel%');
+  assert.equal(conditions[0].length, 6);
+  assert.match(conditions[0][0][0], /CONCAT_WS/);
+  assert.match(conditions[0][4][0], /cliente\.direccion/);
+  assert.match(conditions[0][5][0], /cliente\.correo/);
 });
 
 test('all visible columns are whitelisted and fechaIngreso is not sortable', async () => {

@@ -252,11 +252,13 @@ test('mixed payment applies capital first and records exactly one total movement
   assert.equal(store.state.movimientos.length, 1);
   assert.equal(store.state.movimientos[0].monto, 120);
   assert.equal(store.state.prestamos[0].estado, E.ACTIVO);
+  assert.equal(store.state.planes[0].montoProgramado, 120);
 
-  const second = await useCase.execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 30, cobradorId: 1, fecha: '2026-08-31' }, 1);
-  assert.deepEqual({ capitalAplicado: second.capitalAplicado, interesAplicado: second.interesAplicado }, { capitalAplicado: 0, interesAplicado: 30 });
-  assert.equal(store.state.movimientos.length, 2);
-  assert.equal(store.state.prestamos[0].estado, E.CANCELADO);
+  await assert.rejects(
+    () => useCase.execute({ prestamoId: 1, planPagoId: 40, formaPagoId: 1, monto: 30, cobradorId: 1, fecha: '2026-08-31' }, 1),
+    /ya está PAGADA/,
+  );
+  assert.equal(store.state.movimientos.length, 1);
 });
 
 test('loan records a 500000 disbursement and rolls back when cash fails', async () => {

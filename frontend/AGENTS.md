@@ -137,6 +137,120 @@ El backend es la fuente de verdad para:
 
 Frontend puede mostrar previews, pero debe consumir el resultado backend definitivo.
 
+## Regla crítica: pagos y plan de cuotas
+
+El frontend NO es la autoridad de las reglas financieras.
+
+La lógica de:
+
+- aplicación del pago;
+- capital aplicado;
+- interés aplicado;
+- saldo pendiente;
+- redistribución de cuotas;
+- faltantes;
+- excedentes;
+- `redistribuyoPlan`;
+- `puedeAnular`;
+
+pertenece al backend.
+
+### Registro del monto real
+
+El campo de monto debe permitir registrar el dinero REAL entregado por el cliente.
+
+No limitar el monto del pago al monto programado de la cuota seleccionada.
+
+Un cliente puede:
+
+- pagar menos que la cuota;
+- pagar exactamente la cuota;
+- pagar más que la cuota;
+- ponerse al día;
+- adelantar pagos;
+
+siempre sujeto a las validaciones financieras devueltas por el backend.
+
+Ejemplo:
+
+Cuota mostrada: ₡100.000
+Pago real del cliente: ₡50.000
+
+El frontend debe enviar:
+
+monto: 50000
+
+Nunca completar automáticamente el pago a ₡100.000.
+
+Si posteriormente la cuota operativa es de ₡150.000 y el cliente paga ₡150.000,
+debe enviarse:
+
+monto: 150000
+
+### Plan después de registrar un pago
+
+Después de registrar, editar o realizar una operación que pueda modificar el plan,
+el frontend debe refrescar desde backend los datos necesarios.
+
+No calcular localmente:
+
+- nueva cuota;
+- faltante trasladado;
+- excedente;
+- saldo resultante;
+- estado financiero del préstamo.
+
+El backend es la fuente de verdad.
+
+Ejemplo:
+
+Cuota 4: ₡100.000
+Pago real: ₡50.000
+
+Si backend devuelve posteriormente:
+
+Cuota 4: PARCIAL
+Cuota 5: ₡150.000
+
+el frontend debe representar exactamente ese resultado.
+
+No reconstruir localmente ₡150.000.
+
+## Cuotas parciales
+
+Una cuota `PARCIAL` puede representar un hecho histórico aunque su faltante haya
+sido trasladado por backend a una cuota posterior.
+
+No asumir que toda cuota `PARCIAL` debe bloquear necesariamente la siguiente cuota.
+
+Las acciones disponibles deben basarse en las reglas/estado entregados por backend.
+
+No reimplementar en React la secuencia financiera de cuotas.
+
+## Pagos anulados
+
+Los pagos `ANULADO` no deben mostrarse como pagos vigentes dentro del plan cuando
+la interfaz actual haya definido ocultarlos.
+
+No eliminarlos ni reinterpretarlos desde frontend.
+
+La posibilidad de mostrar la acción Anular debe depender de `puedeAnular`
+proporcionado por backend y de los permisos correspondientes.
+
+## Fidelidad visual
+
+La interfaz debe distinguir claramente entre:
+
+- monto programado;
+- monto realmente pagado;
+- monto pendiente;
+- estado de la cuota.
+
+Nunca presentar el monto programado como si fuera el dinero efectivamente recibido.
+
+Los análisis y reportes deben utilizar los campos financieros proporcionados por
+backend sin reconstruir totales a partir de valores visuales del plan.
+
 ## CSS
 
 Evitar:

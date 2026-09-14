@@ -76,4 +76,33 @@ export class MovimientoCajaService {
       throw error;
     }
   }
+
+  async reversarDesembolsoPrestamoPorAnulacion(manager: EntityManager, prestamoId: number, fecha: Date, observaciones: string, usuarioId: number) {
+    if (this.periods) await this.periods.assertOpen(manager, fecha);
+    await this.validarActor(manager, usuarioId);
+    if (!observaciones?.trim()) throw new BadRequestException('Las observaciones son obligatorias para anular un préstamo.');
+    const original = await this.repo.buscarPorPrestamoYConceptoEnTransaccion(manager, prestamoId, ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO);
+    if (!original) throw new NotFoundException('Desembolso original del préstamo no encontrado.');
+    const locked = await this.repo.buscarPorIdEnTransaccion(manager, original.id!, true);
+    if (!locked || locked.concepto !== ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO || locked.prestamoId !== prestamoId) throw new BadRequestException('El desembolso original no es válido para anulación.');
+    if (await this.repo.contarReversionesEnTransaccion(manager, locked.id!)) throw new ConflictException('El desembolso del préstamo ya fue reversado.');
+    try {
+      return await this.repo.guardarEnTransaccion(manager, MovimientoCaja.crear({
+        tipo: locked.tipo === TipoMovimientoCaja.ENTRADA ? TipoMovimientoCaja.SALIDA : TipoMovimientoCaja.ENTRADA,
+        concepto: ConceptoMovimientoCaja.REVERSO,
+        monto: locked.monto,
+        fecha,
+        observaciones: observaciones.trim(),
+        pagoId: null,
+        prestamoId: locked.prestamoId,
+        refinanciamientoId: null,
+        movimientoReversadoId: locked.id,
+        formaPagoId: locked.formaPagoId,
+        usuarioId,
+      }));
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505') throw new ConflictException('El desembolso del préstamo ya fue reversado.');
+      throw error;
+    }
+  }
 }

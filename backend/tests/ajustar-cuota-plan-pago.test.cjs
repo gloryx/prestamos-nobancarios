@@ -54,9 +54,9 @@ test('rejects an invalid or non-chronological operational date', async () => {
   assert.deepEqual(plans.map((item) => item.fechaVencimiento), ['2026-09-05', '2026-09-12']);
 });
 
-test('rejects paid and partial current installments without touching them', async () => {
-  await message(execute(new FakeDataSource([plan(1, 1, 240), plan(2, 2, 280)], [payment(1, 1, 240)], { id: 1, estado: 'ACTIVO', montoTotal: 520 }), 1, 200), 'La cuota ya está PAGADA y no puede ajustarse.');
-  await message(execute(new FakeDataSource([plan(1, 1, 240), plan(2, 2, 280)], [payment(1, 1, 1)], { id: 1, estado: 'ACTIVO', montoTotal: 520 }), 1, 200), 'La cuota es PARCIAL y no puede ajustarse.');
+test('rejects paid and already-paid current installments without touching them', async () => {
+  await message(execute(new FakeDataSource([plan(1, 1, 240), plan(2, 2, 280)], [payment(1, 1, 240)], { id: 1, estado: 'ACTIVO', montoTotal: 520 }), 1, 200), 'La cuota tiene pagos y no puede ajustarse.');
+  await message(execute(new FakeDataSource([plan(1, 1, 240), plan(2, 2, 280)], [payment(1, 1, 1)], { id: 1, estado: 'ACTIVO', montoTotal: 520 }), 1, 200), 'La cuota tiene pagos y no puede ajustarse.');
 });
 
 test('rejects the last installment and a non-positive next installment', async () => {

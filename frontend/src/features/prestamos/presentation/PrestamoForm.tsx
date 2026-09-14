@@ -3,7 +3,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import type { FormEvent } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { listarClientes } from '@/features/clientes/application/clientes.use-cases'
 import { clienteErrorMessage } from '@/features/clientes/domain/cliente.error'
@@ -14,7 +14,8 @@ import type { Periodicidad } from '@/features/periodicidades-pago/domain/periodi
 import { CurrencyInput } from '@/shared/components/forms/CurrencyInput'
 import { abrirPlanPagoPdf, crearPrestamo } from '../application/prestamos.use-cases'
 import { PrestamoError, prestamoErrorMessage } from '../domain/prestamo.error'
-import type { PrestamoInput } from '../domain/prestamo.types'
+import type { PagoResumen } from '../domain/pago.types'
+import type { PlanPago, Prestamo, PrestamoInput, PrestamoUpdateInput } from '../domain/prestamo.types'
 import { AxiosPrestamoRepository } from '../infrastructure/axios-prestamo.repository'
 
 const schema = z.object({
@@ -84,50 +85,66 @@ function generatePlan(values: FinancialSnapshot, periodicidades: Periodicidad[])
   return rows
 }
 
-function ClienteSelector({ selectedClient, onSelectClient }: { selectedClient: Cliente | null; onSelectClient: (cliente: Cliente) => void }) {
+function ClienteSelector({ selectedClient, onSelectClient, locked = false }: { selectedClient: Cliente | null; onSelectClient: (cliente: Cliente) => void; locked?: boolean }) {
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState<ClientePage | null>(null)
-  const [identificacion, setIdentificacion] = useState('')
-  const [nombre, setNombre] = useState('')
-  const [telefono, setTelefono] = useState('')
-  const [direccion, setDireccion] = useState('')
+  const [buscar, setBuscar] = useState('')
+  const [debouncedBuscar, setDebouncedBuscar] = useState('')
   const [pagina, setPagina] = useState(1)
+  const [ordenarPor, setOrdenarPor] = useState<ClienteFilters['ordenarPor']>()
+  const [direccionOrden, setDireccionOrden] = useState<ClienteFilters['direccionOrden']>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const limite = 10
+  const requestSequence = useRef(0)
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current
     setLoading(true)
-    const filters: ClienteFilters = { pagina, limite, activo: true }
-    // The API exposes one general `buscar` term for identification, name and phone.
-    const buscar = identificacion.trim() || nombre.trim() || telefono.trim()
-    if (buscar) filters.buscar = buscar
-    if (direccion.trim()) filters.direccion = direccion.trim()
+    const filters: ClienteFilters = { pagina, limite, activo: true, ordenarPor, direccionOrden }
+    if (debouncedBuscar) filters.buscar = debouncedBuscar
     try {
-      setPage(await listarClientes(clienteRepository, filters))
-      setError('')
+      const result = await listarClientes(clienteRepository, filters)
+      if (requestId === requestSequence.current) { setPage(result); setError('') }
     } catch (cause) {
-      setError(clienteErrorMessage(cause))
+      if (requestId === requestSequence.current) { setPage(null); setError(clienteErrorMessage(cause)) }
     } finally {
-      setLoading(false)
+      if (requestId === requestSequence.current) setLoading(false)
     }
-  }, [direccion, identificacion, nombre, pagina, telefono])
+  }, [debouncedBuscar, direccionOrden, ordenarPor, pagina])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedBuscar(buscar.trim().replace(/\s+/g, ' '))
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [buscar])
 
   useEffect(() => {
     if (open) void load()
   }, [load, open])
 
-  const changeFilter = (setter: (value: string) => void, value: string) => {
-    setter(value)
+  const searchNow = () => {
+    setDebouncedBuscar(buscar.trim().replace(/\s+/g, ' '))
+    setPagina(1)
+  }
+  const changeSearch = (value: string) => {
+    setBuscar(value)
     setPagina(1)
   }
   const clearFilters = () => {
-    setIdentificacion('')
-    setNombre('')
-    setTelefono('')
-    setDireccion('')
+    setBuscar('')
+    setDebouncedBuscar('')
     setPagina(1)
   }
+  const sortColumn = (column: NonNullable<ClienteFilters['ordenarPor']>) => {
+    setPagina(1)
+    if (ordenarPor !== column) { setOrdenarPor(column); setDireccionOrden('ASC'); return }
+    setDireccionOrden((current) => current === 'ASC' ? 'DESC' : 'ASC')
+  }
+  const sortIcon = (column: NonNullable<ClienteFilters['ordenarPor']>) => ordenarPor !== column
+    ? <ArrowUpDown size={14} aria-hidden="true" />
+    : direccionOrden === 'ASC' ? <ArrowUp size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />
   const select = (cliente: Cliente) => {
     onSelectClient(cliente)
     setOpen(false)
@@ -135,29 +152,25 @@ function ClienteSelector({ selectedClient, onSelectClient }: { selectedClient: C
 
   return <>
     <div className="prestamo-client-selector">
-      {!selectedClient ? <button type="button" className="secondary-button prestamo-client-search" onClick={() => setOpen(true)}><Search size={16} /> Buscar cliente</button> : <>
+       {!selectedClient ? <button type="button" className="secondary-button prestamo-client-search" onClick={() => setOpen(true)}><Search size={16} /> Buscar cliente</button> : <>
         <div className="prestamo-selected-client">
           <strong>{nombreCliente(selectedClient)}</strong>
           <span><b>Identificación:</b> {selectedClient.identificacion}</span>
           <span><b>Teléfono:</b> {displayValue(selectedClient.telefono1)}</span>
           <span><b>Dirección:</b> {displayValue(selectedClient.direccion)}</span>
         </div>
-        <button type="button" className="secondary-button" onClick={() => setOpen(true)}>Cambiar cliente</button>
+        {!locked && <button type="button" className="secondary-button" onClick={() => setOpen(true)}>Cambiar cliente</button>}
       </>}
     </div>
     {open && <div className="cliente-selector-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false) }}>
       <div className="cliente-selector-modal" role="dialog" aria-modal="true" aria-labelledby="cliente-selector-title">
         <div className="cliente-selector-header"><h2 id="cliente-selector-title">Seleccionar cliente</h2><button type="button" className="table-action" onClick={() => setOpen(false)} aria-label="Cerrar selector de cliente"><X size={19} /></button></div>
         <div className="cliente-selector-filters">
-          <label>Identificación<input value={identificacion} onChange={(event) => changeFilter(setIdentificacion, event.target.value)} /></label>
-          <label>Nombre<input value={nombre} onChange={(event) => changeFilter(setNombre, event.target.value)} /></label>
-          <label>Teléfono<input value={telefono} onChange={(event) => changeFilter(setTelefono, event.target.value)} /></label>
-          <label>Dirección<input value={direccion} onChange={(event) => changeFilter(setDireccion, event.target.value)} /></label>
-          <div className="cliente-selector-filter-actions"><button type="button" className="primary-button" onClick={() => void load()}>Buscar</button><button type="button" className="secondary-button" onClick={clearFilters}>Limpiar</button></div>
+           <label className="prestamo-wide">Buscar<input value={buscar} placeholder="Nombre completo, identificación, teléfono o dirección" onChange={(event) => changeSearch(event.target.value)} /></label>
+           <div className="cliente-selector-filter-actions"><button type="button" className="primary-button" onClick={searchNow}>Buscar</button><button type="button" className="secondary-button" onClick={clearFilters}>Limpiar</button></div>
         </div>
-        <p className="form-note">Identificación, nombre y teléfono utilizan la búsqueda general disponible; se aplica el primer campo informado. Dirección usa su filtro independiente.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
-        {loading ? <div className="state-box">Cargando clientes...</div> : <div className="table-wrap cliente-selector-table-wrap"><table className="cliente-selector-table"><thead><tr><th>Identificación</th><th>Nombre</th><th>Teléfono</th><th>Dirección</th><th>Acción</th></tr></thead><tbody>{page?.datos.map((cliente) => <tr key={cliente.id}><td>{cliente.identificacion}</td><td>{nombreCliente(cliente)}</td><td>{cliente.telefono1}</td><td className="cliente-selector-address" title={cliente.direccion ?? undefined}>{displayValue(cliente.direccion)}</td><td><button type="button" className="primary-button" onClick={() => select(cliente)}>Seleccionar</button></td></tr>)}</tbody></table>{!page?.datos.length && <p className="form-note">No hay clientes para mostrar.</p>}</div>}
+         {loading ? <div className="state-box">Cargando clientes...</div> : <div className="table-wrap cliente-selector-table-wrap"><table className="cliente-selector-table"><thead><tr><th><button type="button" className="cliente-selector-sort-button" onClick={() => sortColumn('identificacion')}>Identificación {sortIcon('identificacion')}</button></th><th><button type="button" className="cliente-selector-sort-button" onClick={() => sortColumn('nombre')}>Nombre {sortIcon('nombre')}</button></th><th><button type="button" className="cliente-selector-sort-button" onClick={() => sortColumn('telefono')}>Teléfono {sortIcon('telefono')}</button></th><th><button type="button" className="cliente-selector-sort-button" onClick={() => sortColumn('direccion')}>Dirección {sortIcon('direccion')}</button></th><th>Acción</th></tr></thead><tbody>{page?.datos.map((cliente) => <tr key={cliente.id}><td>{cliente.identificacion}</td><td>{nombreCliente(cliente)}</td><td>{cliente.telefono1}</td><td className="cliente-selector-address" title={cliente.direccion ?? undefined}>{displayValue(cliente.direccion)}</td><td><button type="button" className="primary-button" onClick={() => select(cliente)}>Seleccionar</button></td></tr>)}</tbody></table>{!page?.datos.length && <p className="form-note">No hay clientes para mostrar.</p>}</div>}
         {page && <div className="cliente-selector-pagination"><button type="button" className="table-action" disabled={pagina <= 1} onClick={() => setPagina((value) => value - 1)}><ChevronLeft size={16} /></button><span>Página {pagina} de {Math.max(page.totalPaginas, 1)} · {page.total} clientes</span><button type="button" className="table-action" disabled={pagina >= page.totalPaginas} onClick={() => setPagina((value) => value + 1)}><ChevronRight size={16} /></button></div>}
       </div>
     </div>}
@@ -170,8 +183,9 @@ const defaults: Values = {
 }
 
 export function PrestamoForm({
-  formasPago, periodicidades, initialSelectedClient, onCancel,
-}: { formasPago: FormaPago[]; periodicidades: Periodicidad[]; initialSelectedClient?: Cliente; onCancel: () => void }) {
+  formasPago, periodicidades, initialSelectedClient, initialLoan, initialPlan = [], initialSummary, mode = 'create', onUpdate, onCancel,
+}: { formasPago: FormaPago[]; periodicidades: Periodicidad[]; initialSelectedClient?: Cliente; initialLoan?: Prestamo; initialPlan?: PlanPago[]; initialSummary?: PagoResumen; mode?: 'create' | 'edit'; onUpdate?: (input: PrestamoUpdateInput) => Promise<Prestamo>; onCancel: () => void }) {
+  const isEdit = mode === 'edit'
   const [selectedClient, setSelectedClient] = useState<Cliente | null>(() => initialSelectedClient ?? null)
   const [stage, setStage] = useState<1 | 2 | 3>(1)
   const [planType, setPlanType] = useState<PlanType>('automatico')
@@ -183,10 +197,26 @@ export function PrestamoForm({
   const [saveSuccess, setSaveSuccess] = useState('')
   const savingRef = useRef(false)
   const navigate = useNavigate()
-  const { register, control, handleSubmit, setValue, formState: { errors } } = useForm<Values>({
+  const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { ...defaults, clienteId: initialSelectedClient?.id ?? defaults.clienteId },
   })
+  useEffect(() => {
+    if (!isEdit || !initialLoan) return
+    setSelectedClient(initialSelectedClient ?? null)
+    setPlanType(initialLoan.planPersonalizado ? 'personalizado' : 'automatico')
+    reset({
+      clienteId: initialLoan.clienteId,
+      fechaAlta: initialLoan.fechaAlta,
+      capital: initialLoan.capital,
+      interes: initialLoan.interes,
+      periodicidadPagoId: initialLoan.periodicidadPagoId,
+      formaPagoId: initialLoan.formaPagoId,
+      formaDesembolsoId: initialLoan.formaDesembolsoId ?? 0,
+      cantidadPagos: initialLoan.cantidadPagos,
+      observaciones: initialLoan.observaciones ?? '',
+    })
+  }, [initialLoan, initialSelectedClient, isEdit, reset])
   const values = useWatch({ control })
   const field = (name: keyof Values) => errors[name] && <small className="field-error">{errors[name]?.message as string}</small>
   const handleSelectClient = (cliente: Cliente) => {
@@ -214,6 +244,11 @@ export function PrestamoForm({
     setPlan(generatePlan(financialData(values as Values), periodicidades))
   }
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (isEdit) {
+      event.preventDefault()
+      void handleSubmit(save)(event)
+      return
+    }
     if (stage === 3) {
       event.preventDefault()
       void handleSubmit(save)(event)
@@ -227,7 +262,7 @@ export function PrestamoForm({
       setSaveError('Seleccioná un cliente antes de guardar el préstamo.')
       return
     }
-    if (!planValid) {
+    if (!isEdit && !planValid) {
       setSaveError('Revisá el plan de pagos antes de guardar el préstamo.')
       return
     }
@@ -241,9 +276,9 @@ export function PrestamoForm({
       capital: current.capital,
       interes: current.interes,
       cantidadPagos: current.cantidadPagos,
-      planPersonalizado: planType === 'personalizado',
+       planPersonalizado: isEdit ? (initialLoan?.planPersonalizado ?? false) : planType === 'personalizado',
       ...(current.observaciones.trim() ? { observaciones: current.observaciones.trim() } : {}),
-      ...(planType === 'personalizado' ? {
+       ...(!isEdit && planType === 'personalizado' ? {
         cuotas: plan.map((row) => ({
           numeroPago: row.numero,
           fechaVencimiento: row.fecha,
@@ -257,7 +292,15 @@ export function PrestamoForm({
     setSaveError('')
     setSaveSuccess('')
     try {
-      const prestamo = await crearPrestamo(prestamoRepository, input)
+      const prestamo = isEdit
+        ? await onUpdate?.(input)
+        : await crearPrestamo(prestamoRepository, input)
+      if (!prestamo) return
+      if (isEdit) {
+        setSaved(true)
+        setSaveSuccess('Cambios guardados correctamente. El plan y el resumen fueron actualizados.')
+        return
+      }
       setSaved(true)
       try {
         await abrirPlanPagoPdf(prestamoRepository, prestamo.id)
@@ -279,13 +322,21 @@ export function PrestamoForm({
   const formaPagoNombre = formasPago.find((item) => item.id === values.formaPagoId)?.nombre ?? '—'
   const formaDesembolsoNombre = formasPago.find((item) => item.id === values.formaDesembolsoId)?.nombre ?? '—'
   const tasaInformativa = (values.capital ?? 0) > 0 ? ((values.interes ?? 0) / (values.capital ?? 0)) * 100 : 0
+  const operationalPending = initialPlan.reduce((total, item) => total + item.montoPendiente, 0)
+  const planMismatch = initialSummary != null && Math.round(initialSummary.saldoPendiente * 100) !== Math.round(operationalPending * 100)
+  const changedFinancialData = isEdit && initialLoan != null && (
+    values.capital !== initialLoan.capital || values.interes !== initialLoan.interes
+  )
+  const predictedSaldo = initialSummary == null ? 0 : (values.capital ?? 0) + (values.interes ?? 0) - initialSummary.totalPagado
+  const predictivePlanMismatch = changedFinancialData && initialSummary != null && predictedSaldo >= 0 && Math.round(predictedSaldo * 100) !== Math.round(operationalPending * 100)
+  const canPersonalize = initialLoan?.estado === 'ACTIVO'
   return <form className="prestamo-form" onSubmit={onSubmit} noValidate>
      <div className="prestamo-stages" aria-label="Etapas del nuevo préstamo">
         <div className={`prestamo-stage ${stage === 1 ? 'active' : ''} ${stage > 1 ? 'completed' : ''}`}><strong>1</strong><span>Datos del préstamo</span></div>
         <div className={`prestamo-stage ${stage === 2 ? 'active' : ''} ${stage > 2 ? 'completed' : ''}`}><strong>2</strong><span>Plan de pagos</span></div>
         <div className={`prestamo-stage ${stage === 3 ? 'active' : ''}`}><strong>3</strong><span>Confirmación</span></div>
       </div>
-     {stage === 2 ? <>
+      {!isEdit && stage === 2 ? <>
        <div className="prestamo-payment-summary">
          <span>Capital<strong>{formatCRC(values.capital ?? 0)}</strong></span><span>Interés acordado<strong>{formatCRC(values.interes ?? 0)}</strong></span><span>Total a pagar<strong>{formatCRC(totalCents / 100)}</strong></span><span>Tasa informativa<strong>{`${((values.capital ?? 0) > 0 ? ((values.interes ?? 0) / (values.capital ?? 0)) * 100 : 0).toFixed(2)}%`}</strong></span><span>Periodicidad<strong>{periodicidades.find((item) => item.id === values.periodicidadPagoId)?.nombre ?? '—'}</strong></span><span>Cantidad de pagos<strong>{values.cantidadPagos ?? 0}</strong></span>
        </div>
@@ -306,7 +357,7 @@ export function PrestamoForm({
           <div className="prestamo-form-actions"><button type="button" className="secondary-button" onClick={onCancel} disabled={saving || saved}>Cancelar</button><button type="button" className="secondary-button" onClick={() => setStage(2)} disabled={saving || saved}>Volver</button><button type="submit" className="primary-button" disabled={!planValid || saving || saved} aria-disabled={!planValid || saving || saved}>{saving ? 'Guardando...' : 'Guardar préstamo'}</button></div>
       </section> : <>
     <div className="prestamo-form-grid">
-      <div className="prestamo-client-field prestamo-wide"><span>Cliente</span><ClienteSelector selectedClient={selectedClient} onSelectClient={handleSelectClient} /><input type="hidden" {...register('clienteId', { valueAsNumber: true })} value={selectedClient?.id ?? 0} />{field('clienteId')}</div>
+       <div className="prestamo-client-field prestamo-wide"><span>Cliente</span><ClienteSelector selectedClient={selectedClient} onSelectClient={handleSelectClient} locked={isEdit} /><input type="hidden" {...register('clienteId', { valueAsNumber: true })} value={selectedClient?.id ?? 0} />{field('clienteId')}</div>
       <label>Fecha de alta<input type="date" {...register('fechaAlta')} />{field('fechaAlta')}</label>
        <label>Forma de pago<select {...register('formaPagoId', { setValueAs: (value) => Number(value) })}><option value="0">Seleccioná una forma de pago</option>{formasPago.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>{field('formaPagoId')}</label>
        <label>Forma de desembolso<select {...register('formaDesembolsoId', { setValueAs: (value) => Number(value) })}><option value="0">Seleccioná una forma de desembolso</option>{formasPago.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>{field('formaDesembolsoId')}</label>
@@ -316,9 +367,17 @@ export function PrestamoForm({
       <label>Cantidad de pagos<input type="number" min="1" step="1" {...register('cantidadPagos', { setValueAs: (value) => Number(value) })} />{field('cantidadPagos')}</label>
         <label className="prestamo-wide">Observaciones<textarea rows={3} maxLength={1000} {...register('observaciones')} />{field('observaciones')}</label>
     </div>
-    <div className="prestamo-form-actions">
+     {isEdit && initialSummary && <section className="prestamo-edit-plan" aria-labelledby="prestamo-edit-plan-title">
+       <div className="prestamo-confirmation-title-row"><div><h2 id="prestamo-edit-plan-title">Plan operativo actual</h2><p className="form-note">Las cuotas pagadas se conservan como historial. Las cuotas pendientes muestran la programación operativa vigente.</p></div>{planMismatch && canPersonalize && <button type="button" className="secondary-button" onClick={() => navigate('/pagos/registrar', { state: { prestamoId: initialLoan?.id } })}>Personalizar plan</button>}</div>
+       <div className="prestamo-payment-summary"><span>Saldo desde backend<strong>{formatCRC(initialSummary.saldoPendiente)}</strong></span><span>Total operativo pendiente<strong>{formatCRC(operationalPending)}</strong></span><span>Total pagado<strong>{formatCRC(initialSummary.totalPagado)}</strong></span></div>
+       {predictivePlanMismatch && <p className="form-note" role="status">Advertencia previa: el nuevo capital/interés podría requerir ajustar las cuotas futuras después de guardar. El backend confirmará el desajuste definitivo.</p>}
+       {planMismatch && <div className="form-error" role="alert">Las condiciones del préstamo cambiaron. Ajuste las cuotas futuras para distribuir el saldo pendiente.{!canPersonalize && ' La personalización del plan no está disponible para este estado del préstamo.'}</div>}
+       {!initialPlan.length ? <p className="form-note">No hay cuotas operativas para mostrar.</p> : <div className="table-wrap prestamo-payment-table-wrap"><table className="prestamo-payment-table"><thead><tr><th>N°</th><th>Fecha</th><th>Monto programado</th><th>Monto pendiente</th><th>Estado</th></tr></thead><tbody>{initialPlan.map((item) => <tr key={item.id}><td>{item.numeroPago}</td><td>{readableDate(item.fechaVencimiento.slice(0, 10))}</td><td>{formatCRC(item.montoProgramado)}</td><td>{formatCRC(item.montoPendiente)}</td><td><span>{item.estado === 'PAGADA' ? 'PAGADA · Protegida' : 'PENDIENTE · Operativa'}</span></td></tr>)}</tbody></table></div>}
+       {planMismatch && canPersonalize && <p className="form-note">Use Personalizar plan para ajustar únicamente las cuotas futuras.</p>}
+     </section>}
+     <div className="prestamo-form-actions">
       <button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button>
-       <button type="submit" className="primary-button">Continuar</button>
+       <button type="submit" className="primary-button" disabled={saving || saved}>{isEdit ? (saving ? 'Guardando...' : 'Guardar cambios') : 'Continuar'}</button>
      </div>
     </>}
    </form>

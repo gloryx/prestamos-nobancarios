@@ -7,9 +7,10 @@ import { CambiarEstadoPrestamoDto } from '../dto/cambiar-estado-prestamo.dto';
 import { PrestamoOrmEntity } from '../../infrastructure/persistence/typeorm/prestamo.orm-entity';
 import { PrestamoEstadoHistorialService } from '../services/prestamo-estado-historial.service';
 import { FinancialPeriodService } from '../../../cierre-financiero/application/financial-period.service';
+import { PrestamoIncobrableService } from '../services/prestamo-incobrable.service';
 @Injectable()
 export class CambiarEstadoPrestamoUseCase {
-  constructor(@Inject(PRESTAMO_REPOSITORY) private readonly repository: PrestamoRepository, @InjectDataSource() private readonly dataSource: DataSource, private readonly history: PrestamoEstadoHistorialService, @Optional() private readonly periods?: FinancialPeriodService) {}
+  constructor(@Inject(PRESTAMO_REPOSITORY) private readonly repository: PrestamoRepository, @InjectDataSource() private readonly dataSource: DataSource, private readonly history: PrestamoEstadoHistorialService, private readonly incobrables: PrestamoIncobrableService, @Optional() private readonly periods?: FinancialPeriodService) {}
   async execute(id: number, dto: CambiarEstadoPrestamoDto, actorUsuarioId?: number): Promise<PrestamoConRelaciones> {
     if (!actorUsuarioId) throw new BadRequestException('Se requiere una identidad autenticada para cambiar estados.');
     const effectiveDate = dto.fecha ? new Date(`${dto.fecha.slice(0, 10)}T00:00:00.000Z`) : new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
@@ -17,11 +18,20 @@ export class CambiarEstadoPrestamoUseCase {
     if (this.periods) await this.periods.assertOpen(manager, effectiveDate);
     const prestamo = await manager.getRepository(PrestamoOrmEntity).createQueryBuilder('p').where('p.id = :id', { id }).setLock('pessimistic_write').getOne();
     if (!prestamo) throw new NotFoundException('Préstamo no encontrado.');
+    if (prestamo.estado === EstadoPrestamo.ANULADO) throw new BadRequestException('Un préstamo anulado no admite cambios manuales de estado.');
     const previousState = prestamo.estado;
+    if ((prestamo.estado === EstadoPrestamo.ACTIVO && dto.estado === EstadoPrestamo.INCOBRABLE) || (prestamo.estado === EstadoPrestamo.INCOBRABLE && dto.estado === EstadoPrestamo.ACTIVO)) {
+      if (!dto.fecha) throw new BadRequestException('La fecha efectiva es obligatoria para cambiar entre ACTIVO e INCOBRABLE.');
+      if (!dto.observacion?.trim()) throw new BadRequestException('La observación es obligatoria para cambiar entre ACTIVO e INCOBRABLE.');
+    }
     if (effectiveDate.toISOString().slice(0, 10) < prestamo.fechaAlta) throw new BadRequestException('La fecha efectiva no puede ser anterior al alta del préstamo.');
     if (dto.estado === EstadoPrestamo.CANCELADO) throw new BadRequestException('El estado CANCELADO se asigna automáticamente al completar el pago del préstamo.');
     if (dto.estado === EstadoPrestamo.REFINANCIADO) throw new BadRequestException('El estado REFINANCIADO se asigna desde el proceso de refinanciamiento.');
-    if (prestamo.estado === EstadoPrestamo.ACTIVO && dto.estado === EstadoPrestamo.INCOBRABLE) prestamo.estado = EstadoPrestamo.INCOBRABLE;
+    if (prestamo.estado === EstadoPrestamo.ACTIVO && dto.estado === EstadoPrestamo.INCOBRABLE) {
+      const eligible = await this.incobrables.esElegible(id, dto.fecha.slice(0, 10), manager);
+      if (!eligible) throw new BadRequestException('El préstamo no cumple la elegibilidad vigente para pasar a INCOBRABLE.');
+      prestamo.estado = EstadoPrestamo.INCOBRABLE;
+    }
     else if (prestamo.estado === EstadoPrestamo.INCOBRABLE && dto.estado === EstadoPrestamo.ACTIVO) prestamo.estado = EstadoPrestamo.ACTIVO;
     else throw new BadRequestException(`No se permite cambiar el estado ${prestamo.estado} a ${dto.estado}.`);
     await manager.getRepository(PrestamoOrmEntity).save(prestamo);

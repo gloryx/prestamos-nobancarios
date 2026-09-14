@@ -3,4 +3,5 @@ export enum EstadoPrestamo {
   CANCELADO = 'CANCELADO',
   REFINANCIADO = 'REFINANCIADO',
   INCOBRABLE = 'INCOBRABLE',
+  ANULADO = 'ANULADO',
 }

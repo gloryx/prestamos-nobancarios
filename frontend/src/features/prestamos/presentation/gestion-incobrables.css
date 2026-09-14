@@ -1,0 +1,7 @@
+.gestion-incobrables-page .incobrables-tabs { display:flex; gap:8px; margin-bottom:16px; border-bottom:1px solid var(--border-color, #e5e7eb); }
+.gestion-incobrables-page .incobrables-tabs button { border:0; background:transparent; padding:12px 16px; cursor:pointer; color:inherit; }
+.gestion-incobrables-page .incobrables-tabs button.active { color:var(--primary-color, #2563eb); border-bottom:2px solid currentColor; font-weight:700; }
+.gestion-incobrables-page .incobrables-toolbar { display:flex; gap:16px; align-items:end; margin-bottom:16px; }
+.gestion-incobrables-page .incobrables-toolbar label { display:flex; flex-direction:column; gap:6px; flex:1; }
+.gestion-incobrables-page .incobrables-toolbar input { min-height:38px; }
+.gestion-incobrables-page td strong, .gestion-incobrables-page td small { display:block; }

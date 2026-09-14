@@ -1,31 +1,35 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CrearPlanPagoPersonalizadoUseCase } from '../../application/use-cases/crear-plan-pago-personalizado.use-case';
+import { PersonalizarPlanPagoUseCase } from '../../application/use-cases/personalizar-plan-pago.use-case';
 import { GenerarPlanPagoUseCase } from '../../application/use-cases/generar-plan-pago.use-case';
 import { ListarPlanPagoUseCase } from '../../application/use-cases/listar-plan-pago.use-case';
 import { ObtenerCuotaPlanPagoUseCase } from '../../application/use-cases/obtener-cuota-plan-pago.use-case';
 import { ActualizarPlanPagoUseCase } from '../../application/use-cases/actualizar-plan-pago.use-case';
-import { PlanPagoPersonalizadoDto } from '../../application/dto/plan-pago-personalizado.dto';
+import { PersonalizarPlanPagoDto, PlanPagoPersonalizadoDto } from '../../application/dto/plan-pago-personalizado.dto';
 import { PlanPago } from '../../domain/entities/plan-pago';
 import { PlanPagoResponseDto } from '../dto/plan-pago-response.dto';
 import { Roles } from '../../../auth/auth.decorators';
 import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
 import { AjustarCuotaPlanPagoDto } from '../../application/dto/ajustar-cuota-plan-pago.dto';
 import { AjustarCuotaPlanPagoUseCase } from '../../application/use-cases/ajustar-cuota-plan-pago.use-case';
+import { PersonalizarPlanPagoResponseDto } from '../dto/personalizar-plan-pago-response.dto';
 
-type PlanResponseInput = PlanPago & { montoPagado?: number; montoPendiente?: number; estado?: 'PENDIENTE' | 'PARCIAL' | 'PAGADA'; fechasPago?: string[] };
-const response = (plan: PlanResponseInput): PlanPagoResponseDto => ({ id: plan.id!, prestamoId: plan.prestamoId, numeroPago: plan.numeroPago, fechaVencimiento: plan.fechaVencimiento.toISOString().slice(0, 10), montoProgramado: plan.montoProgramado, fechaCreacion: plan.fechaCreacion, montoPagado: plan.montoPagado ?? 0, montoPendiente: plan.montoPendiente ?? plan.montoProgramado, estado: plan.estado ?? 'PENDIENTE', fechasPago: plan.fechasPago ?? [] });
+type PlanResponseInput = PlanPago & { montoPagado?: number; montoPendiente?: number; estado?: 'PENDIENTE' | 'PAGADA'; fechasPago?: string[]; protegida?: boolean; editable?: boolean; eliminable?: boolean };
+const response = (plan: PlanResponseInput): PlanPagoResponseDto => ({ id: plan.id!, prestamoId: plan.prestamoId, numeroPago: plan.numeroPago, fechaVencimiento: plan.fechaVencimiento.toISOString().slice(0, 10), montoProgramado: plan.montoProgramado, fechaCreacion: plan.fechaCreacion, montoPagado: plan.montoPagado ?? 0, montoPendiente: plan.montoPendiente ?? plan.montoProgramado, estado: plan.estado ?? 'PENDIENTE', fechasPago: plan.fechasPago ?? [], protegida: plan.protegida ?? false, editable: plan.editable ?? false, eliminable: plan.eliminable ?? false });
 const responses = (plans: PlanPago[]) => plans.map(response);
 
 @ApiTags('Planes de pago')
 @ApiBearerAuth()
 @Controller('planes-pago')
 export class PlanesPagoController {
-  constructor(private readonly generar: GenerarPlanPagoUseCase, private readonly personalizado: CrearPlanPagoPersonalizadoUseCase, private readonly listar: ListarPlanPagoUseCase, private readonly obtener: ObtenerCuotaPlanPagoUseCase, private readonly actualizar: ActualizarPlanPagoUseCase, private readonly ajustar: AjustarCuotaPlanPagoUseCase) {}
+  constructor(private readonly generar: GenerarPlanPagoUseCase, private readonly personalizado: CrearPlanPagoPersonalizadoUseCase, private readonly personalizar: PersonalizarPlanPagoUseCase, private readonly listar: ListarPlanPagoUseCase, private readonly obtener: ObtenerCuotaPlanPagoUseCase, private readonly actualizar: ActualizarPlanPagoUseCase, private readonly ajustar: AjustarCuotaPlanPagoUseCase) {}
   @Post('prestamo/:prestamoId/generar') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Generar plan automático', description: 'Genera cuotas con periodicidad semanal, diaria, quincenal o mensual.' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiResponse({ status: 201, type: [PlanPagoResponseDto] })
   async generarPlan(@Param('prestamoId', ParseIntPipe) id: number) { return responses(await this.generar.execute(id)); }
   @Post('prestamo/:prestamoId/personalizado') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Crear plan personalizado', description: 'Ejemplo: cinco cuotas semanales de 24.000 para un total de 120.000.' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiBody({ type: PlanPagoPersonalizadoDto }) @ApiResponse({ status: 201, type: [PlanPagoResponseDto] })
   async crearPersonalizado(@Param('prestamoId', ParseIntPipe) id: number, @Body() dto: PlanPagoPersonalizadoDto) { return responses(await this.personalizado.execute(id, dto)); }
+  @Put('prestamo/:prestamoId/personalizar') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Personalizar la parte futura editable del plan' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiBody({ type: PersonalizarPlanPagoDto }) @ApiResponse({ status: 200, type: PersonalizarPlanPagoResponseDto })
+  async personalizarPlan(@Param('prestamoId', ParseIntPipe) id: number, @Body() dto: PersonalizarPlanPagoDto) { return this.personalizar.execute(id, dto); }
   @Get('prestamo/:prestamoId') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Listar plan de un préstamo' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiResponse({ status: 200, type: [PlanPagoResponseDto] })
   async listarPlan(@Param('prestamoId', ParseIntPipe) id: number) { return responses(await this.listar.execute(id)); }
   @Get(':id') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Obtener una cuota' }) @ApiParam({ name: 'id', example: 1 }) @ApiResponse({ status: 200, type: PlanPagoResponseDto }) @ApiResponse({ status: 404, description: 'Cuota del plan de pago no encontrada.' })

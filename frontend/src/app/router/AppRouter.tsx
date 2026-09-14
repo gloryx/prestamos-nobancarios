@@ -19,6 +19,8 @@ import { NuevoRefinanciamientoPage } from "@/features/refinanciamientos/presenta
 import { CadenasRefinanciamientoPage } from "@/features/refinanciamientos/presentation/CadenasRefinanciamientoPage";
 import { RefinanciamientosPage } from "@/features/refinanciamientos/presentation/RefinanciamientosPage";
 import { RefinanciamientosReportePage } from "@/features/refinanciamientos/presentation/RefinanciamientosReportePage";
+import { GestionIncobrablesPage } from "@/features/prestamos/presentation/GestionIncobrablesPage";
+import { GestionAnulacionesPage } from "@/features/prestamos/presentation/GestionAnulacionesPage";
 
 export function AppRouter() {
   return (
@@ -32,6 +34,8 @@ export function AppRouter() {
               <Route element={<ProtectedRoute role="ADMINISTRADOR" />}>
                 <Route path="configuracion/usuarios" element={<UsuariosPage />} />
                 <Route path="configuracion/financiera" element={<ConfiguracionFinancieraPage />} />
+                <Route path="prestamos/gestion-incobrables" element={<GestionIncobrablesPage />} />
+                <Route path="prestamos/gestion-anulaciones" element={<GestionAnulacionesPage />} />
               </Route>
               <Route path="configuracion/formas-de-pago" element={<FormasPagoPage />} />
               <Route path="configuracion/periodicidades" element={<PeriodicidadesPage />} />
@@ -42,6 +46,7 @@ export function AppRouter() {
               <Route path="clientes/reporte" element={<PlaceholderPage />} />
               <Route path="prestamos" element={<PrestamosListPage />} />
               <Route path="prestamos/nuevo" element={<PrestamosPage />} />
+              <Route path="prestamos/:id/editar" element={<PrestamosPage />} />
               <Route path="prestamos/seguimiento-cartera" element={<SeguimientoCarteraPage />} />
               <Route path="pagos/registrar" element={<RegistrarPagoPage />} />
               <Route path="refinanciamientos" element={<RefinanciamientosPage />} />

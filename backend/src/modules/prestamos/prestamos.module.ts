@@ -26,11 +26,14 @@ import { PlanPagoOrmEntity } from '../planes-pago/infrastructure/persistence/typ
 import { IndicadorCobranzaService } from './application/services/indicador-cobranza.service';
 import { ExportarPrestamosExcelUseCase } from './application/use-cases/exportar-prestamos-excel.use-case';
 import { PrestamosExcelGenerator } from './infrastructure/reports/prestamos-excel.generator';
+import { AnularPrestamoUseCase } from './application/use-cases/anular-prestamo.use-case';
+import { PrestamoAnulacionService } from './application/services/prestamo-anulacion.service';
+import { PrestamoIncobrableService } from './application/services/prestamo-incobrable.service';
 
 @Module({
   imports: [ClientesModule, PeriodicidadesPagoModule, FormasPagoModule, MovimientosCajaModule, forwardRef(() => PlanesPagoModule), forwardRef(() => PagosModule), PrestamoEstadoHistorialModule, TypeOrmModule.forFeature([PrestamoOrmEntity, PrestamoEstadoHistorialOrmEntity, PagoOrmEntity, PlanPagoOrmEntity])],
   controllers: [PrestamosController],
-  providers: [CrearPrestamoUseCase, ListarPrestamosUseCase, ResumirPrestamosUseCase, ExportarPrestamosExcelUseCase, PrestamosExcelGenerator, ObtenerPrestamoPorIdUseCase, ActualizarPrestamoUseCase, CambiarEstadoPrestamoUseCase, PlanPagoPdfService, PlanPagoPdfInfrastructureService, PrestamoReferences, IndicadorCobranzaService, { provide: PRESTAMO_REPOSITORY, useClass: PrestamoTypeOrmRepository }],
+  providers: [CrearPrestamoUseCase, ListarPrestamosUseCase, ResumirPrestamosUseCase, ExportarPrestamosExcelUseCase, PrestamosExcelGenerator, ObtenerPrestamoPorIdUseCase, ActualizarPrestamoUseCase, CambiarEstadoPrestamoUseCase, AnularPrestamoUseCase, PrestamoAnulacionService, PrestamoIncobrableService, PlanPagoPdfService, PlanPagoPdfInfrastructureService, PrestamoReferences, IndicadorCobranzaService, { provide: PRESTAMO_REPOSITORY, useClass: PrestamoTypeOrmRepository }],
   exports: [PRESTAMO_REPOSITORY, PrestamoReferences],
 })
 export class PrestamosModule {}

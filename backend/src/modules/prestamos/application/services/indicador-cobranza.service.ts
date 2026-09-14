@@ -5,6 +5,7 @@ import { fechaDateOnly, calcularFechaLimiteContractual } from '../../../planes-p
 import { PagoOrmEntity } from '../../../pagos/infrastructure/persistence/typeorm/pago.orm-entity';
 import { PlanPagoOrmEntity } from '../../../planes-pago/infrastructure/persistence/typeorm/plan-pago.orm-entity';
 import { PrestamoConRelaciones } from '../../domain/repositories/prestamo.repository';
+import { EstadoPrestamo } from '../../domain/enums/estado-prestamo.enum';
 
 export const INDICADORES_COBRANZA = ['AL_DIA', 'ATRASADO', 'PLAZO_CUMPLIDO', 'SALDADO'] as const;
 export type IndicadorCobranza = (typeof INDICADORES_COBRANZA)[number];
@@ -46,6 +47,7 @@ export class IndicadorCobranzaService {
     const overdueLoans = new Set(overdue.map((row) => Number(row.prestamoId)));
 
     for (const prestamo of prestamos) {
+      if (prestamo.estado === EstadoPrestamo.ANULADO) continue;
       const fechaLimiteContractual = calcularFechaLimiteContractual(prestamo.fechaAlta, prestamo.periodicidadPago.nombre, prestamo.cantidadPagos);
       const saldo = Math.max(0, prestamo.montoTotal - (paidByLoan.get(prestamo.id!) ?? 0));
       result.set(prestamo.id!, { fechaLimiteContractual, indicadorCobranza: calcularIndicadorCobranza(saldo, fechaLimiteContractual, hoy, overdueLoans.has(prestamo.id!)) });

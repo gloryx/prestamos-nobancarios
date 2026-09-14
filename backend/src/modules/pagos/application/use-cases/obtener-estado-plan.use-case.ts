@@ -24,7 +24,7 @@ export class ObtenerEstadoPlanUseCase {
     if (!isValidDate(asOf)) throw new BadRequestException('La fecha debe ser una fecha calendario válida en formato YYYY-MM-DD.');
     const orderedPlan = [...plan].sort((a, b) => a.numeroPago - b.numeroPago);
     const esperado = orderedPlan.filter((cuota) => dateText(cuota.fechaVencimiento) <= asOf).reduce((sum, cuota) => sum + cents(cuota.montoProgramado), 0);
-    const pagos = await this.pagos.listarPorPrestamo(prestamoId);
+    const pagos = (await this.pagos.listarPorPrestamo(prestamoId)).filter((pago) => pago.estado === 'REGISTRADO');
     const pagadoHastaFecha = pagos.filter((pago) => dateText(pago.fecha) <= asOf).reduce((sum, pago) => sum + cents(pago.monto), 0);
     const totalPagado = pagos.reduce((sum, pago) => sum + cents(pago.monto), 0);
     const prestamo = await this.prestamos.buscarPorId(prestamoId);

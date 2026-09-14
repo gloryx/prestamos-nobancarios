@@ -40,7 +40,7 @@ export class AjustarCuotaPlanPagoUseCase {
       }
 
       const currentPayments = await payments.find({ where: { planPagoId: current.id } });
-      if (currentPayments.length) throw new BadRequestException(currentPayments.reduce((sum, payment) => sum + cents(payment.monto), 0) >= cents(current.montoProgramado) ? 'La cuota ya está PAGADA y no puede ajustarse.' : 'La cuota es PARCIAL y no puede ajustarse.');
+       if (currentPayments.length) throw new BadRequestException('La cuota tiene pagos y no puede ajustarse.');
 
       const candidates = allPlans.filter((plan) => plan.numeroPago > current.numeroPago);
       if (!candidates.length) throw new BadRequestException('No existe una cuota posterior pendiente para redistribuir la diferencia.');
@@ -58,7 +58,7 @@ export class AjustarCuotaPlanPagoUseCase {
       if (!lockedCurrent || !lockedNext || lockedCurrent.prestamoId !== lockedNext.prestamoId || lockedCurrent.prestamoId !== loan.id) throw new BadRequestException('Las cuotas no pertenecen al mismo préstamo.');
 
       const lockedPayments = await payments.find({ where: { planPagoId: In([lockedCurrent.id, lockedNext.id]) } });
-      if (lockedPayments.some((payment) => payment.planPagoId === lockedCurrent.id)) throw new BadRequestException('La cuota es PARCIAL y no puede ajustarse.');
+       if (lockedPayments.some((payment) => payment.planPagoId === lockedCurrent.id)) throw new BadRequestException('La cuota tiene pagos y no puede ajustarse.');
       if (lockedPayments.some((payment) => payment.planPagoId === lockedNext.id)) throw new BadRequestException('No existe una cuota posterior pendiente para redistribuir la diferencia.');
 
       const lockedPlans = await plans.find({ where: { prestamoId: loan.id } });

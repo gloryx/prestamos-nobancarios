@@ -19,20 +19,30 @@ const date = (value: Date): string => `${String(value.getUTCDate()).padStart(2, 
 const money = (value: number): string => `₡ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)}`;
 const fullName = (cliente: Cliente): string => [cliente.primerNombre, cliente.segundoNombre, cliente.primerApellido, cliente.segundoApellido].filter((value): value is string => Boolean(value?.trim())).join(' ');
 
-export const drawRefinancedWatermark = (document: InstanceType<typeof PDFDocument>): void => {
+const drawWatermark = (document: InstanceType<typeof PDFDocument>, value: string): void => {
   const page = document.page;
   document.save();
   document.rotate(-35, { origin: [page.width / 2, page.height / 2] });
-  document.opacity(0.20).fillColor('#6b7280').font('Helvetica-Bold').fontSize(48).text('REFINANCIADO', 0, page.height / 2 - 24, { width: page.width, align: 'center', lineBreak: false });
+  document.opacity(0.20).fillColor('#6b7280').font('Helvetica-Bold').fontSize(48).text(value, 0, page.height / 2 - 24, { width: page.width, align: 'center', lineBreak: false });
   document.restore();
 };
 
-export const drawRefinancedWatermarks = (document: InstanceType<typeof PDFDocument>): void => {
+const drawWatermarks = (document: InstanceType<typeof PDFDocument>, value: string): void => {
   const range = document.bufferedPageRange();
   for (let pageIndex = range.start; pageIndex < range.start + range.count; pageIndex += 1) {
     document.switchToPage(pageIndex);
-    drawRefinancedWatermark(document);
+    drawWatermark(document, value);
   }
+};
+
+export const drawRefinancedWatermark = (document: InstanceType<typeof PDFDocument>): void => drawWatermark(document, 'REFINANCIADO');
+
+export const drawRefinancedWatermarks = (document: InstanceType<typeof PDFDocument>): void => drawWatermarks(document, 'REFINANCIADO');
+
+const drawLoanStateWatermarks = (document: InstanceType<typeof PDFDocument>, estado: EstadoPrestamo): void => {
+  if (estado === EstadoPrestamo.REFINANCIADO) drawWatermarks(document, 'REFINANCIADO');
+  if (estado === EstadoPrestamo.CANCELADO) drawWatermarks(document, 'CANCELADO');
+  if (estado === EstadoPrestamo.ANULADO) drawWatermarks(document, 'ANULADO');
 };
 
 const existingPath = async (candidates: string[]): Promise<string> => {
@@ -127,7 +137,7 @@ export class PlanPagoPdfInfrastructureService {
         text('Detalle de cuotas', MARGIN, y, CONTENT_WIDTH, 9, '#1f5f8b'); y = tableHeader(y + 10);
 
        plan.forEach((cuota, index) => { y = renderRow(cuota, index, y); });
-       if (prestamo.estado === EstadoPrestamo.REFINANCIADO) drawRefinancedWatermarks(document);
+        drawLoanStateWatermarks(document, prestamo.estado);
        document.end();
     });
   }

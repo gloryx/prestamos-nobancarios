@@ -20,18 +20,18 @@ const cobranzaOptions: Array<{ value: IndicadorCobranza | ''; label: string }> =
   { value: 'PLAZO_CUMPLIDO', label: 'Plazo cumplido' },
 ]
 
-function dateLabel(value: string | undefined) {
+function dateLabel(value: string | null | undefined) {
   if (!value) return '—'
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
   return match ? `${match[3]}/${match[2]}/${match[1]}` : value
 }
 
-function cobranzaLabel(value: IndicadorCobranza) {
-  return value === 'AL_DIA' ? 'Al día' : value === 'PLAZO_CUMPLIDO' ? 'Plazo cumplido' : value === 'ATRASADO' ? 'Atrasado' : 'Saldado'
+function cobranzaLabel(value: IndicadorCobranza | null | undefined) {
+  return !value ? '—' : value === 'AL_DIA' ? 'Al día' : value === 'PLAZO_CUMPLIDO' ? 'Plazo cumplido' : value === 'ATRASADO' ? 'Atrasado' : 'Saldado'
 }
 
 function estadoClass(value: EstadoPrestamo) { return `prestamo-status prestamo-status-${value.toLowerCase()}` }
-function cobranzaClass(value: IndicadorCobranza) { return `cobranza-badge cobranza-${value.toLowerCase()}` }
+function cobranzaClass(value: IndicadorCobranza | null | undefined) { return value ? `cobranza-badge cobranza-${value.toLowerCase()}` : 'cobranza-badge' }
 function Detail({ label, value, className = '' }: { label: string; value: string; className?: string }) { return <div className={`cartera-detail ${className}`.trim()}><span>{label}</span><strong>{value}</strong></div> }
 
 export function SeguimientoCarteraPage() {

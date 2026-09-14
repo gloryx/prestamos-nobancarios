@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EstadoPrestamo } from '../../domain/enums/estado-prestamo.enum';
 
-export class PrestamoClienteResumenDto { @ApiProperty({ example: 1 }) id: number; @ApiProperty({ example: '1-2345-6789' }) identificacion: string; @ApiProperty({ example: 'ANA MARÍA PÉREZ MORA' }) nombreCompleto: string; @ApiPropertyOptional({ example: 'SAN JOSÉ, COSTA RICA', nullable: true }) direccion: string | null; }
+export class PrestamoClienteResumenDto { @ApiProperty({ example: 1 }) id: number; @ApiProperty({ example: '1-2345-6789' }) identificacion: string; @ApiProperty({ example: 'ANA MARÍA PÉREZ MORA' }) nombreCompleto: string; @ApiPropertyOptional({ example: 'SAN JOSÉ, COSTA RICA', nullable: true }) direccion: string | null; @ApiPropertyOptional({ example: '8888-8888', nullable: true }) telefono?: string | null; }
 export class PrestamoCatalogoResumenDto { @ApiProperty({ example: 1 }) id: number; @ApiProperty({ example: 'MENSUAL' }) nombre: string; }
 export class PrestamoResponseDto {
   @ApiProperty({ example: 1 }) id: number;
@@ -25,6 +25,7 @@ export class PrestamoResponseDto {
   @ApiProperty({ enum: ['AL_DIA', 'ATRASADO', 'PLAZO_CUMPLIDO', 'SALDADO'], example: 'AL_DIA', required: false }) indicadorCobranza?: string;
   @ApiProperty({ example: false }) planPersonalizado: boolean;
   @ApiProperty({ enum: EstadoPrestamo, example: EstadoPrestamo.ACTIVO }) estado: EstadoPrestamo;
+  @ApiProperty({ example: true, description: 'Indica si el préstamo cumple las condiciones para anulación.' }) puedeAnular: boolean;
   @ApiPropertyOptional({ example: 'Préstamo para capital de trabajo.', nullable: true }) observaciones: string | null;
   @ApiProperty({ example: '2026-08-30T12:00:00.000Z', format: 'date-time' }) fechaCreacion: Date;
   @ApiProperty({ example: '2026-08-30T12:00:00.000Z', format: 'date-time' }) fechaActualizacion: Date;

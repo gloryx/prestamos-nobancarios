@@ -77,6 +77,22 @@
   padding: 2px;
 }
 
+.prestamos-list-row-menu { position: relative; display: inline-flex; }
+.prestamos-list-row-menu-content { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; min-width: 180px; padding: 5px; border: 1px solid var(--border-color, #d1d5db); border-radius: 7px; background: var(--surface-color, #fff); box-shadow: 0 8px 20px rgb(0 0 0 / 12%); }
+.prestamos-list-row-menu-content button, .prestamos-list-row-menu-content a { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px; border: 0; border-radius: 5px; background: transparent; color: inherit; font: inherit; font-size: .78rem; text-align: left; text-decoration: none; cursor: pointer; }
+.prestamos-list-row-menu-content button:hover, .prestamos-list-row-menu-content a:hover { background: var(--color-accent-soft, #f3f4f6); color: var(--color-primary, #2563eb); }
+.prestamo-status-anulado { color: #6b21a8; background: #f3e8ff; }
+.prestamos-list-page .prestamos-list-actions .prestamo-status-anulado { color: #6b21a8; }
+
+.prestamo-cancellation-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(15 23 42 / 45%); }
+.prestamo-cancellation-modal { width: min(650px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 22px; border-radius: 10px; background: var(--surface-color, #fff); box-shadow: 0 20px 50px rgb(15 23 42 / 25%); }
+.prestamo-cancellation-text { margin: 0 0 16px; color: var(--color-text-muted, #64748b); font-size: .84rem; line-height: 1.5; }
+.prestamo-cancellation-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.prestamo-cancellation-field { display: grid; gap: 6px; margin-top: 12px; color: var(--color-text, #1f2937); font-size: .78rem; font-weight: 600; }
+.prestamo-cancellation-field :is(input, textarea) { box-sizing: border-box; width: 100%; border: 1px solid var(--color-border, #d1d5db); border-radius: 6px; padding: 9px 10px; background: var(--surface-color, #fff); color: inherit; font: inherit; font-weight: 400; }
+.prestamo-cancellation-field textarea { resize: vertical; }
+.prestamo-status-action-notes { margin: 0 0 16px; padding: 10px 10px 10px 28px; border: 1px solid var(--color-border, #d1d5db); border-radius: 6px; color: var(--color-text-muted, #64748b); font-size: .78rem; line-height: 1.6; }
+
 .prestamos-list-sort-button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .prestamos-list-sort-button:focus-visible { outline: 2px solid var(--primary-color, #2563eb); outline-offset: 2px; border-radius: 3px; }
 

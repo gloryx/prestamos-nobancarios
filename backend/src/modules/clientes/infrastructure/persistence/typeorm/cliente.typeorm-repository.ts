@@ -9,7 +9,7 @@ import { ClienteMapper } from './cliente.mapper';
 import { ClienteOrmEntity } from './cliente.orm-entity';
 import { PrestamoOrmEntity } from '../../../../prestamos/infrastructure/persistence/typeorm/prestamo.orm-entity';
 
-const clientNameExpression = "UPPER(TRIM(CONCAT_WS(' ', cliente.primer_nombre, cliente.segundo_nombre, cliente.primer_apellido, cliente.segundo_apellido)))";
+const clientNameExpression = "UPPER(TRIM(CONCAT_WS(' ', COALESCE(cliente.primer_nombre, ''), COALESCE(cliente.segundo_nombre, ''), COALESCE(cliente.primer_apellido, ''), COALESCE(cliente.segundo_apellido, ''))))";
 
 const applyOrdering = (query: SelectQueryBuilder<ClienteOrmEntity>, filtros: FiltrosClientes) => {
   const direction = filtros.direccionOrden ?? 'ASC';
@@ -24,7 +24,7 @@ const applyOrdering = (query: SelectQueryBuilder<ClienteOrmEntity>, filtros: Fil
     case 'direccion': query.orderBy('cliente.direccion', direction, 'NULLS LAST').addOrderBy('cliente.id', 'DESC'); break;
     case 'telefono': query.orderBy('cliente.telefono1', direction).addOrderBy('cliente.id', 'DESC'); break;
     case 'estado': query.orderBy('cliente.activo', direction).addOrderBy('cliente.id', 'DESC'); break;
-    default: query.orderBy('cliente.primer_apellido', 'ASC').addOrderBy('cliente.primer_nombre', 'ASC');
+    default: query.orderBy('cliente.primer_apellido', 'ASC').addOrderBy('cliente.primer_nombre', 'ASC').addOrderBy('cliente.id', 'DESC');
   }
   return query;
 };
@@ -54,18 +54,18 @@ export class ClienteTypeOrmRepository implements ClienteRepository {
 
   async listar(filtros: FiltrosClientes): Promise<ClientesPaginados> {
     const query = this.repository.createQueryBuilder('cliente');
-    if (filtros.buscar?.trim()) {
-      const term = `%${filtros.buscar.trim()}%`;
+    const searchTerms = filtros.buscar?.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean) ?? [];
+    searchTerms.forEach((term, index) => {
+      const parameter = `buscarTerm${index}`;
+      const value = `%${term}%`;
       query.andWhere(new Brackets((where) => where
-        .where('cliente.identificacion ILIKE :term', { term })
-        .orWhere('cliente.primer_nombre ILIKE :term', { term })
-        .orWhere('cliente.segundo_nombre ILIKE :term', { term })
-        .orWhere('cliente.primer_apellido ILIKE :term', { term })
-        .orWhere('cliente.segundo_apellido ILIKE :term', { term })
-        .orWhere('cliente.telefono1 ILIKE :term', { term })
-        .orWhere('cliente.telefono2 ILIKE :term', { term })
-        .orWhere('cliente.correo ILIKE :term', { term })));
-    }
+        .where(`${clientNameExpression} ILIKE :${parameter}`, { [parameter]: value })
+        .orWhere(`cliente.identificacion ILIKE :${parameter}`, { [parameter]: value })
+        .orWhere(`cliente.telefono1 ILIKE :${parameter}`, { [parameter]: value })
+        .orWhere(`cliente.telefono2 ILIKE :${parameter}`, { [parameter]: value })
+        .orWhere(`cliente.direccion ILIKE :${parameter}`, { [parameter]: value })
+        .orWhere(`cliente.correo ILIKE :${parameter}`, { [parameter]: value })));
+    });
     if (filtros.direccion?.trim()) {
       query.andWhere('cliente.direccion ILIKE :direccion', { direccion: `%${filtros.direccion.trim()}%` });
     }

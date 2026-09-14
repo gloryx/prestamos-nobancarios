@@ -85,6 +85,18 @@ test('rejects capital and interest below their accumulated paid totals', async t
   }
 });
 
+test('rejects capital below the historical disbursed amount without saving', async () => {
+  const value = loan();
+  value.montoDesembolsado = 1100;
+  const harness = updateHarness(value);
+  await assert.rejects(
+    () => harness.useCase.execute(7, { capital: 1099 }),
+    error => error.message === 'El capital del préstamo no puede ser menor al monto desembolsado.',
+  );
+  assert.equal(harness.saved, undefined);
+  assert.equal(value.capital, 1000);
+});
+
 test('allows reducing future interest while preserving already collected interest', async () => {
   const updated = await updateHarness(loan(), { capital: 300, interes: 500, total: 800 }).useCase.execute(7, { interes: 600 });
   assert.equal(updated.interes, 600);

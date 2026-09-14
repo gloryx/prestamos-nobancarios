@@ -23,7 +23,7 @@ export function Sidebar({
     .slice(0, 2)
     .join("")
     .toUpperCase();
-  const visibleNavigation = user?.rol === 'VENDEDOR' ? navigation.map((item) => item.label === 'Configuración' && isGroup(item) ? { ...item, items: item.items.filter((child) => child.label === 'Formas de pago' || child.label === 'Periodicidades') } : item) : navigation;
+  const visibleNavigation = user?.rol === 'VENDEDOR' ? navigation.map((item) => item.label === 'Préstamos' && isGroup(item) ? { ...item, items: item.items.filter((child) => child.label !== 'Gestión de incobrables') } : item.label === 'Configuración' && isGroup(item) ? { ...item, items: item.items.filter((child) => child.label === 'Formas de pago' || child.label === 'Periodicidades') } : item) : navigation;
   const [expanded, setExpanded] = useState<string | null>("Clientes");
   const toggle = (key: string) =>
     setExpanded((current) => (current === key ? null : key));

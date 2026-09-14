@@ -1,0 +1,4 @@
+.gestion-anulaciones-page .table-wrap { overflow-x: auto; }
+.gestion-anulaciones-page table { min-width: 1100px; }
+.gestion-anulaciones-page td small { display: block; color: var(--text-muted); margin-top: 3px; }
+.modal-warning { padding: 12px; border-radius: 8px; background: #fff7ed; color: #9a3412; line-height: 1.45; }

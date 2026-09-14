@@ -9,6 +9,9 @@ export class PlanPagoResponseDto {
   @ApiProperty({ example: '2026-08-30T12:00:00.000Z' }) fechaCreacion: Date;
   @ApiProperty({ example: 12000 }) montoPagado: number;
   @ApiProperty({ example: 12000 }) montoPendiente: number;
-  @ApiProperty({ enum: ['PENDIENTE', 'PARCIAL', 'PAGADA'] }) estado: 'PENDIENTE' | 'PARCIAL' | 'PAGADA';
+  @ApiProperty({ enum: ['PENDIENTE', 'PAGADA'] }) estado: 'PENDIENTE' | 'PAGADA';
   @ApiProperty({ example: ['2026-09-05'], type: [String] }) fechasPago: string[];
+  @ApiProperty({ example: false }) protegida: boolean;
+  @ApiProperty({ example: true }) editable: boolean;
+  @ApiProperty({ example: true }) eliminable: boolean;
 }

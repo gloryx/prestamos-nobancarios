@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Re
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ActualizarPrestamoDto } from '../../application/dto/actualizar-prestamo.dto';
 import { CambiarEstadoPrestamoDto } from '../../application/dto/cambiar-estado-prestamo.dto';
+import { AnularPrestamoDto } from '../../application/dto/anular-prestamo.dto';
 import { CrearPrestamoDto } from '../../application/dto/crear-prestamo.dto';
 import { FiltrosPrestamosDto } from '../../application/dto/filtros-prestamos.dto';
 import { ActualizarPrestamoUseCase } from '../../application/use-cases/actualizar-prestamo.use-case';
@@ -21,14 +22,17 @@ import { RolUsuario } from '../../../usuarios/domain/enums/rol-usuario.enum';
 import { PrestamoEstadoHistorialService } from '../../application/services/prestamo-estado-historial.service';
 import { PlanPagoPdfService } from '../../application/services/plan-pago-pdf.service';
 import { IndicadorCobranzaService } from '../../application/services/indicador-cobranza.service';
+import { AnularPrestamoUseCase } from '../../application/use-cases/anular-prestamo.use-case';
 import { INDICADORES_COBRANZA } from '../../application/services/indicador-cobranza.service';
+import { FiltrosIncobrablesDto } from '../../application/dto/filtros-incobrables.dto';
+import { PrestamoIncobrableService } from '../../application/services/prestamo-incobrable.service';
 
-const response = (value: PrestamoConRelaciones & { capitalPendiente?: number; saldoPendiente?: number }): PrestamoResponseDto => ({ ...value, id: value.id!, fechaAlta: value.fechaAlta.toISOString().slice(0, 10), cliente: { id: value.cliente.id, identificacion: value.cliente.identificacion!, nombreCompleto: value.cliente.nombre!, direccion: value.cliente.direccion ?? null } });
+const response = (value: PrestamoConRelaciones & { capitalPendiente?: number; saldoPendiente?: number }): PrestamoResponseDto => ({ ...value, id: value.id!, fechaAlta: value.fechaAlta.toISOString().slice(0, 10), puedeAnular: value.puedeAnular ?? false, cliente: { id: value.cliente.id, identificacion: value.cliente.identificacion!, nombreCompleto: value.cliente.nombre!, direccion: value.cliente.direccion ?? null, telefono: value.cliente.telefono ?? null } });
 @ApiTags('Préstamos')
 @ApiBearerAuth()
 @Controller('prestamos')
 export class PrestamosController {
-  constructor(private readonly crear: CrearPrestamoUseCase, private readonly listarUseCase: ListarPrestamosUseCase, private readonly resumirUseCase: ResumirPrestamosUseCase, private readonly exportarExcelUseCase: ExportarPrestamosExcelUseCase, private readonly obtenerUseCase: ObtenerPrestamoPorIdUseCase, private readonly actualizarUseCase: ActualizarPrestamoUseCase, private readonly estadoUseCase: CambiarEstadoPrestamoUseCase, private readonly history: PrestamoEstadoHistorialService, private readonly planPagoPdf: PlanPagoPdfService, private readonly cobranza: IndicadorCobranzaService) {}
+  constructor(private readonly crear: CrearPrestamoUseCase, private readonly listarUseCase: ListarPrestamosUseCase, private readonly resumirUseCase: ResumirPrestamosUseCase, private readonly exportarExcelUseCase: ExportarPrestamosExcelUseCase, private readonly obtenerUseCase: ObtenerPrestamoPorIdUseCase, private readonly actualizarUseCase: ActualizarPrestamoUseCase, private readonly estadoUseCase: CambiarEstadoPrestamoUseCase, private readonly anularUseCase: AnularPrestamoUseCase, private readonly history: PrestamoEstadoHistorialService, private readonly planPagoPdf: PlanPagoPdfService, private readonly cobranza: IndicadorCobranzaService, private readonly incobrables: PrestamoIncobrableService) {}
   @Post()
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   @ApiOperation({ summary: 'Crear un préstamo', description: 'Registra un préstamo asociado a un cliente activo.' })
@@ -51,6 +55,18 @@ export class PrestamosController {
    @ApiQuery({ name: 'pagina', required: false, type: Number, example: 1, default: 1 }) @ApiQuery({ name: 'limite', required: false, type: Number, example: 10, default: 10, maximum: 100 }) @ApiQuery({ name: 'buscar', required: false, example: 'perez' }) @ApiQuery({ name: 'direccion', required: false, example: 'San José' }) @ApiQuery({ name: 'estados', required: false, example: 'ACTIVO,CANCELADO' }) @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-01-01', format: 'date' }) @ApiQuery({ name: 'fechaFin', required: false, example: '2026-12-31', format: 'date' }) @ApiQuery({ name: 'estado', required: false, enum: EstadoPrestamo, example: EstadoPrestamo.ACTIVO }) @ApiQuery({ name: 'clienteId', required: false, type: Number, example: 1 }) @ApiQuery({ name: 'indicadorCobranza', required: false, enum: INDICADORES_COBRANZA }) @ApiQuery({ name: 'ordenarPor', required: false, enum: ['id', 'cliente', 'direccion', 'fechaAlta', 'capital', 'saldoPendiente', 'estado', 'indicadorCobranza'] }) @ApiQuery({ name: 'direccionOrden', required: false, enum: ['ASC', 'DESC'] })
   @ApiResponse({ status: 200, description: 'Listado obtenido correctamente.', type: PrestamosPaginadosResponseDto })
   async listar(@Query() dto: FiltrosPrestamosDto) { const result = await this.listarUseCase.execute(dto); const cobranza = await this.cobranza.calcular(result.datos); return { ...result, datos: result.datos.map((prestamo) => ({ ...response(prestamo), ...cobranza.get(prestamo.id!) })) }; }
+  @Get('candidatos-incobrables')
+  @Roles(RolUsuario.ADMINISTRADOR)
+  async candidatosIncobrables(@Query() dto: FiltrosIncobrablesDto) { const result = await this.incobrables.listarCandidatos(dto); return { ...result, datos: result.datos.map((prestamo) => ({ ...response(prestamo), fechaVencimiento: prestamo.fechaVencimiento, saldoCuota: prestamo.saldoCuota, puedePasarAIncobrable: prestamo.puedePasarAIncobrable, puedeReactivar: false })) }; }
+  @Get('incobrables')
+  @Roles(RolUsuario.ADMINISTRADOR)
+  async incobrablesActuales(@Query() dto: FiltrosIncobrablesDto) { const result = await this.incobrables.listarIncobrables(dto); return { ...result, datos: result.datos.map((prestamo) => ({ ...response(prestamo), fechaIncobrable: prestamo.fechaIncobrable, observacionIncobrable: prestamo.observacionIncobrable, diasEnEstado: prestamo.diasEnEstado, ultimaFechaPago: prestamo.ultimaFechaPago, puedePasarAIncobrable: false, puedeReactivar: prestamo.puedeReactivar })) }; }
+  @Get('candidatos-anulacion')
+  @Roles(RolUsuario.ADMINISTRADOR)
+  async candidatosAnulacion(@Query() dto: FiltrosPrestamosDto) { const result = await this.listarUseCase.listarCandidatosAnulacion(dto); return { ...result, datos: result.datos.map((prestamo) => ({ ...response(prestamo), puedeAnular: true })) }; }
+  @Get('anulados')
+  @Roles(RolUsuario.ADMINISTRADOR)
+  async anulados(@Query() dto: FiltrosPrestamosDto) { const result = await this.listarUseCase.listarAnulados(dto); return { ...result, datos: result.datos.map((prestamo) => ({ ...response(prestamo), fechaAnulacion: prestamo.fechaAnulacion, observacionAnulacion: prestamo.observacionAnulacion, fechaReverso: prestamo.fechaReverso, montoReversado: prestamo.montoReversado, usuarioAnulacion: prestamo.usuarioAnulacion })) }; }
   @Get(':id/historial-estados')
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   async historialEstados(@Param('id', ParseIntPipe) id: number) { await this.obtenerUseCase.execute(id); return (await this.history.listar(id)).map(h => ({ id: h.id, estadoAnterior: h.estadoAnterior, estadoNuevo: h.estadoNuevo, fecha: h.fecha.toISOString().slice(0, 10), observacion: h.observacion, usuario: h.usuario ? { id: h.usuario.id, nombreCompleto: h.usuario.nombreCompleto } : null })); }
@@ -66,4 +82,14 @@ export class PrestamosController {
   @Roles(RolUsuario.ADMINISTRADOR)
   @ApiOperation({ summary: 'Cambiar estado de un préstamo', description: 'Permite únicamente ACTIVO a INCOBRABLE e INCOBRABLE a ACTIVO.' }) @ApiParam({ name: 'id', example: 1 }) @ApiBody({ type: CambiarEstadoPrestamoDto, schema: { example: { estado: EstadoPrestamo.INCOBRABLE } } }) @ApiResponse({ status: 200, type: PrestamoResponseDto }) @ApiResponse({ status: 400, description: 'Transición de estado inválida.' }) @ApiResponse({ status: 404, description: 'Préstamo no encontrado.' })
   async cambiarEstado(@Param('id', ParseIntPipe) id: number, @Body() dto: CambiarEstadoPrestamoDto, @Req() request: AuthenticatedRequest) { return response(await this.estadoUseCase.execute(id, dto, authenticatedUserId(request))); }
+  @Post(':id/anular')
+  @Roles(RolUsuario.ADMINISTRADOR)
+  @ApiOperation({ summary: 'Anular un préstamo', description: 'Revierte el desembolso, conserva el préstamo y su plan, y cambia ACTIVO a ANULADO en una transacción atómica.' })
+  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiBody({ type: AnularPrestamoDto, schema: { example: { fecha: '2026-09-14', observacion: 'Desembolso registrado por error.' } } })
+  @ApiResponse({ status: 200, description: 'Préstamo anulado correctamente.', type: PrestamoResponseDto })
+  @ApiResponse({ status: 400, description: 'Fecha inválida o el préstamo no cumple las condiciones para anularse.' })
+  @ApiResponse({ status: 403, description: 'Solo ADMINISTRADOR puede anular préstamos.' })
+  @ApiResponse({ status: 409, description: 'El período está cerrado o el desembolso ya fue reversado.' })
+  async anular(@Param('id', ParseIntPipe) id: number, @Body() dto: AnularPrestamoDto, @Req() request: AuthenticatedRequest) { return response(await this.anularUseCase.execute(id, dto, authenticatedUserId(request)) as any); }
 }

@@ -1,25 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Ban,
   CircleAlert,
   Download,
   Eye,
   HandCoins,
   Pencil,
+  MoreHorizontal,
   Printer,
+  RotateCcw,
   RefreshCw,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
+import { useAuth } from "@/app/providers/auth-context";
 import { formatCRC } from "@/shared/utils/currency";
 import {
   abrirPlanPagoPdf,
+  cambiarEstadoPrestamo,
   descargarPrestamosExcel,
   listarPrestamos,
   obtenerPrestamo,
   resumirPrestamos,
+  anularPrestamo,
 } from "../application/prestamos.use-cases";
 import { obtenerResumenDelPrestamo } from "../application/pagos.use-cases";
 import { prestamoErrorMessage } from "../domain/prestamo.error";
@@ -34,6 +42,7 @@ import type {
   PrestamoSortField,
   PrestamosResumen,
 } from "../domain/prestamo.types";
+import type { AnularPrestamoInput, CambiarEstadoPrestamoInput } from "../domain/prestamo.types";
 import { AxiosPagoRepository } from "../infrastructure/axios-pago.repository";
 import { AxiosPrestamoRepository } from "../infrastructure/axios-prestamo.repository";
 import { Pagination } from "@/shared/components/Pagination";
@@ -47,17 +56,25 @@ const estados: Array<{ value: EstadoPrestamo; label: string }> = [
   { value: "REFINANCIADO", label: "REFINANCIADO" },
   { value: "CANCELADO", label: "CANCELADO" },
   { value: "INCOBRABLE", label: "INCOBRABLE" },
+  { value: "ANULADO", label: "ANULADO" },
 ];
 
-function displayDate(value: string) {
+function localDateValue() {
+  const today = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+}
+
+function displayDate(value: string | null | undefined) {
+  if (!value) return "—";
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
   return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
 }
-function cobranzaLabel(value: IndicadorCobranza) {
-  return value === "AL_DIA" ? "AL DÍA" : value.replace("_", " ");
+function cobranzaLabel(value: IndicadorCobranza | null | undefined) {
+  return !value ? "—" : value === "AL_DIA" ? "AL DÍA" : value.replace("_", " ");
 }
-function cobranzaClass(value: IndicadorCobranza) {
-  return `cobranza-badge cobranza-${value.toLowerCase()}`;
+function cobranzaClass(value: IndicadorCobranza | null | undefined) {
+  return value ? `cobranza-badge cobranza-${value.toLowerCase()}` : "cobranza-badge";
 }
 function visualBalance(value: number) {
   return Math.max(0, value);
@@ -79,6 +96,100 @@ function DetailItem({
   );
 }
 
+function AnularPrestamoModal({ prestamo, onClose, onSuccess }: { prestamo: Prestamo; onClose: () => void; onSuccess: () => Promise<void> }) {
+  const [fecha, setFecha] = useState(localDateValue);
+  const [observacion, setObservacion] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    firstFieldRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape" && !busy) onClose(); };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [busy, onClose]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (busy || !fecha) return;
+    setBusy(true);
+    setError("");
+    const input: AnularPrestamoInput = { fecha, ...(observacion.trim() ? { observacion: observacion.trim() } : {}) };
+    try {
+      await anularPrestamo(repository, prestamo.id, input);
+      await onSuccess();
+      onClose();
+      await Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Préstamo anulado correctamente.", showConfirmButton: false, timer: 2200, timerProgressBar: true });
+    } catch (cause) {
+      setError(prestamoErrorMessage(cause));
+      setBusy(false);
+    }
+  };
+
+  return <div className="prestamo-cancellation-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+    <div className="prestamo-cancellation-modal" role="dialog" aria-modal="true" aria-labelledby="prestamo-cancellation-title">
+      <div className="prestamo-detail-header"><div><p className="eyebrow">ACCIÓN ADMINISTRATIVA</p><h2 id="prestamo-cancellation-title">Anular préstamo</h2></div><button className="table-action" type="button" onClick={onClose} aria-label="Cerrar" disabled={busy}><X size={18} /></button></div>
+      <p className="prestamo-cancellation-text">Esta acción anulará el préstamo y generará el reverso correspondiente en Caja. El registro se conservará para fines históricos.</p>
+      <div className="prestamo-cancellation-summary"><DetailItem label="Nº" value={`#${prestamo.id}`} /><DetailItem label="Cliente" value={prestamo.cliente.nombreCompleto} /><DetailItem label="Capital" value={formatCRC(prestamo.capital)} /><DetailItem label="Monto desembolsado" value={formatCRC(prestamo.montoDesembolsado)} /><DetailItem label="Estado" value={prestamo.estado} /></div>
+      <form onSubmit={(event) => void submit(event)}>
+        <label className="prestamo-cancellation-field">Fecha *<input ref={firstFieldRef} type="date" value={fecha} onChange={(event) => setFecha(event.target.value)} required disabled={busy} /></label>
+        <label className="prestamo-cancellation-field">Motivo / observación<textarea rows={3} value={observacion} onChange={(event) => setObservacion(event.target.value)} disabled={busy} /></label>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="prestamo-detail-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={busy}>Cancelar</button><button className="primary-button" type="submit" disabled={busy || !fecha}><Ban size={15} />{busy ? "Anulando..." : "Anular préstamo"}</button></div>
+      </form>
+    </div>
+  </div>;
+}
+
+function ReactivarPrestamoModal({ prestamo, onClose, onSuccess }: { prestamo: Prestamo; onClose: () => void; onSuccess: () => Promise<void> }) {
+  const [fecha, setFecha] = useState(localDateValue());
+  const [observacion, setObservacion] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const firstFieldRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    firstFieldRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape" && !busy) onClose(); };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [busy, onClose]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    if (!fecha || !observacion.trim()) { setError("La fecha y la observación son obligatorias."); setBusy(false); return; }
+    const input: CambiarEstadoPrestamoInput = { estado: "ACTIVO", fecha, observacion: observacion.trim() };
+    try {
+      await cambiarEstadoPrestamo(repository, prestamo.id, input);
+      await onSuccess();
+      onClose();
+      await Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Préstamo reactivado correctamente.", showConfirmButton: false, timer: 2200, timerProgressBar: true });
+    } catch (cause) {
+      setError(prestamoErrorMessage(cause));
+      setBusy(false);
+    }
+  };
+
+  return <div className="prestamo-cancellation-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+    <div className="prestamo-cancellation-modal" role="dialog" aria-modal="true" aria-labelledby="prestamo-reactivation-title" aria-describedby="prestamo-reactivation-description" aria-busy={busy}>
+      <div className="prestamo-detail-header"><div><p className="eyebrow">ACCIÓN ADMINISTRATIVA</p><h2 id="prestamo-reactivation-title">Reactivar préstamo</h2></div><button className="table-action" type="button" onClick={onClose} aria-label="Cerrar" disabled={busy}><X size={18} /></button></div>
+      <p className="prestamo-cancellation-text" id="prestamo-reactivation-description">El préstamo volverá al estado ACTIVO y podrá continuar con su gestión normal de cobro.</p>
+      <div className="prestamo-cancellation-summary"><DetailItem label="Nº" value={`#${prestamo.id}`} /><DetailItem label="Cliente" value={prestamo.cliente.nombreCompleto} /><DetailItem label="Estado actual" value="INCOBRABLE" /><DetailItem label="Nuevo estado" value="ACTIVO" /></div>
+      <ul className="prestamo-status-action-notes"><li>No registra ningún pago.</li><li>No genera movimientos de Caja.</li><li>No modifica pagos históricos.</li><li>No modifica automáticamente el plan.</li></ul>
+      <form onSubmit={(event) => void submit(event)}>
+        <label className="prestamo-cancellation-field">Fecha *<input type="date" value={fecha} onChange={(event) => setFecha(event.target.value)} required disabled={busy} /></label>
+        <label className="prestamo-cancellation-field">Observación *<textarea ref={firstFieldRef} rows={3} maxLength={500} value={observacion} onChange={(event) => setObservacion(event.target.value)} required disabled={busy} /></label>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="prestamo-detail-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={busy}>Cancelar</button><button className="primary-button" type="submit" disabled={busy || !fecha || !observacion.trim()}><RotateCcw size={15} />{busy ? "Reactivando..." : "Reactivar préstamo"}</button></div>
+      </form>
+    </div>
+  </div>;
+}
+
 function PrestamoDetailModal({
   prestamoId,
   onClose,
@@ -86,6 +197,7 @@ function PrestamoDetailModal({
   prestamoId: number;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
   const [summary, setSummary] = useState<PagoResumen | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,6 +302,11 @@ function PrestamoDetailModal({
           </>
         )}
         <div className="prestamo-detail-actions">
+          {prestamo && prestamo.estado !== "CANCELADO" && prestamo.estado !== "ANULADO" && (
+            <button className="primary-button" type="button" onClick={() => { onClose(); navigate(`/prestamos/${prestamo.id}/editar`); }}>
+              <Pencil size={15} /> Editar préstamo
+            </button>
+          )}
           <button className="secondary-button" type="button" onClick={onClose}>
             Cerrar
           </button>
@@ -200,6 +317,8 @@ function PrestamoDetailModal({
 }
 
 export function PrestamosListPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.rol === "ADMINISTRADOR";
   const [page, setPage] = useState<PrestamoPage | null>(null);
   const [summary, setSummary] = useState<PrestamosResumen | null>(null);
   const [buscar, setBuscar] = useState("");
@@ -224,6 +343,9 @@ export function PrestamosListPage() {
   const [summaryError, setSummaryError] = useState("");
   const [notice, setNotice] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
+  const [cancellationTarget, setCancellationTarget] = useState<Prestamo | null>(null);
+  const [reactivationTarget, setReactivationTarget] = useState<Prestamo | null>(null);
+  const [openActionMenu, setOpenActionMenu] = useState<number | null>(null);
   const estadoDropdownRef = useRef<HTMLDivElement>(null);
   const listRequestId = useRef(0);
   const summaryRequestId = useRef(0);
@@ -326,6 +448,23 @@ export function PrestamosListPage() {
     document.addEventListener("mousedown", closeOnOutsideClick);
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, []);
+  useEffect(() => {
+    if (openActionMenu === null) return;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".prestamos-list-row-menu")) return;
+      setOpenActionMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenActionMenu(null);
+    };
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openActionMenu]);
   const datosFiltrados = page?.datos ?? [];
   const estadoSummary = selectedEstados.length
     ? selectedEstados.join(", ")
@@ -696,8 +835,9 @@ export function PrestamosListPage() {
               </tr>
             </thead>
             <tbody>
-              {datosFiltrados.map((prestamo) => (
-                <tr key={prestamo.id}>
+              {datosFiltrados.map((prestamo) => {
+                const puedeReactivar = isAdmin && prestamo.estado === "INCOBRABLE";
+                return <tr key={prestamo.id}>
                   <td>#{prestamo.id}</td>
                   <td>
                     <strong>{prestamo.cliente.nombreCompleto}</strong>
@@ -711,7 +851,7 @@ export function PrestamosListPage() {
                   <td>{formatCRC(prestamo.capital)}</td>
                   <td>{formatCRC(prestamo.saldoPendiente)}</td>
                   <td>
-                    <span className="status-badge">{prestamo.estado}</span>
+                    <span className={`status-badge prestamo-status-${prestamo.estado.toLowerCase()}`}>{prestamo.estado}</span>
                   </td>
                   <td>
                     <span className={cobranzaClass(prestamo.indicadorCobranza)}>
@@ -720,22 +860,28 @@ export function PrestamosListPage() {
                   </td>
                   <td>
                     <div className="prestamos-list-actions">
-                      <button
-                        className="table-action"
-                        type="button"
-                        title="Ver préstamo"
-                        onClick={() => setSelected(prestamo.id)}
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <Link
-                        className="table-action"
-                        title="Registrar pago"
-                        to="/pagos/registrar"
-                        state={{ prestamoId: prestamo.id }}
-                      >
+                      <div className="prestamos-list-row-menu">
+                          <button
+                            className="table-action"
+                           type="button"
+                           title="Más acciones"
+                           aria-label="Más acciones"
+                           aria-haspopup="menu"
+                           aria-expanded={openActionMenu === prestamo.id}
+                            onClick={() => setOpenActionMenu((current) => current === prestamo.id ? null : prestamo.id)}
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
+                           {openActionMenu === prestamo.id && <div className="prestamos-list-row-menu-content" role="menu">
+                             <button type="button" role="menuitem" onClick={() => { setSelected(prestamo.id); setOpenActionMenu(null); }}><Eye size={15} /> Ver préstamo</button>
+                             {prestamo.estado !== "CANCELADO" && prestamo.estado !== "ANULADO" && <Link role="menuitem" to={`/prestamos/${prestamo.id}/editar`} onClick={() => setOpenActionMenu(null)}><Pencil size={15} /> Editar préstamo</Link>}
+                             {isAdmin && prestamo.estado === "ACTIVO" && prestamo.puedeAnular === true && <button type="button" role="menuitem" onClick={() => { setCancellationTarget(prestamo); setOpenActionMenu(null); }}><Ban size={15} /> Anular préstamo</button>}
+                             {puedeReactivar && <button type="button" role="menuitem" onClick={() => { setReactivationTarget(prestamo); setOpenActionMenu(null); }}><RotateCcw size={15} /> Reactivar préstamo</button>}
+                          </div>}
+                      </div>
+                      {prestamo.estado !== "ANULADO" && <Link className="table-action" title="Registrar pago" to="/pagos/registrar" state={{ prestamoId: prestamo.id }}>
                         <HandCoins size={16} />
-                      </Link>
+                      </Link>}
                       {prestamo.estado === "ACTIVO" && (
                         <Link
                           className="table-action"
@@ -747,13 +893,6 @@ export function PrestamosListPage() {
                           <RefreshCw size={16} />
                         </Link>
                       )}
-                      <Link
-                        className="table-action"
-                        title="Editar préstamo"
-                        to={`/prestamos/${prestamo.id}/editar`}
-                      >
-                        <Pencil size={16} />
-                      </Link>
                       <button
                         className="table-action"
                         type="button"
@@ -769,8 +908,8 @@ export function PrestamosListPage() {
                       </button>
                     </div>
                   </td>
-                </tr>
-              ))}
+                </tr>;
+              })}
             </tbody>
           </table>
         </div>
@@ -795,6 +934,8 @@ export function PrestamosListPage() {
           onClose={() => setSelected(null)}
         />
       )}
+      {cancellationTarget && <AnularPrestamoModal prestamo={cancellationTarget} onClose={() => setCancellationTarget(null)} onSuccess={async () => { await Promise.all([loadList(), loadSummary()]); }} />}
+      {reactivationTarget && <ReactivarPrestamoModal prestamo={reactivationTarget} onClose={() => setReactivationTarget(null)} onSuccess={async () => { await Promise.all([loadList(), loadSummary()]); }} />}
     </section>
   );
 }

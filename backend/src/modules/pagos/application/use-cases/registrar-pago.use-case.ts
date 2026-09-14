@@ -47,14 +47,12 @@ export class RegistrarPagoUseCase {
            .orderBy('plan.numero_pago', 'ASC')
            .setLock('pessimistic_write')
            .getMany();
-        const planTotalCents = lockedPlans.reduce((sum, plan) => sum + cents(plan.montoProgramado), 0);
-        if (planTotalCents !== cents(prestamo.montoTotal)) throw new BadRequestException('El total del plan de pago no coincide con el monto total del préstamo.');
          const payments = await manager.getRepository(PagoOrmEntity).createQueryBuilder('pago')
             .where('pago.prestamo_id = :prestamoId AND pago.estado = :estado', { prestamoId: dto.prestamoId, estado: 'REGISTRADO' }).getMany();
-         const paidByPlan = new Map<number, number>();
-         for (const payment of payments) if (payment.planPagoId != null) paidByPlan.set(payment.planPagoId, (paidByPlan.get(payment.planPagoId) ?? 0) + cents(payment.monto));
+          const paidByPlan = new Map<number, number>();
+          for (const payment of payments) if (payment.planPagoId != null) paidByPlan.set(payment.planPagoId, (paidByPlan.get(payment.planPagoId) ?? 0) + cents(payment.monto));
          const hasPaymentsByPlan = new Set<number>(payments.flatMap((payment) => payment.planPagoId == null ? [] : [payment.planPagoId]));
-         const firstPending = lockedPlans.find((plan) => (paidByPlan.get(plan.id) ?? 0) < cents(plan.montoProgramado));
+          const firstPending = lockedPlans.find((plan) => (paidByPlan.get(plan.id) ?? 0) < cents(plan.montoProgramado));
          const planPago = lockedPlans.find((plan) => plan.id === dto.planPagoId);
          if (!planPago) throw new BadRequestException('La cuota seleccionada no pertenece al préstamo.');
           if (firstPending && planPago.id !== firstPending.id) throw new BadRequestException('Debe registrar el pago sobre la primera cuota pendiente del plan.');
@@ -68,20 +66,25 @@ export class RegistrarPagoUseCase {
        try { distribucion = DistribuidorPagoService.distribuir(dto.monto, capitalPendiente, interesPendiente); } catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'El pago no es válido.'); }
        const paymentCents = cents(dto.monto);
        const newPaidTotalCents = previousPaidCents + paymentCents;
-        // A partial payment must not rewrite the contractual amount of the current
-        // installment. Only the amount above that installment may be redistributed.
-        const overpaymentCents = newPaidTotalCents - oldCurrentCents;
+          const shortageCents = Math.max(0, oldCurrentCents - newPaidTotalCents);
+         const overpaymentCents = Math.max(0, newPaidTotalCents - oldCurrentCents);
        const futurePlans = lockedPlans
          .filter((plan) => plan.numeroPago > planPago.numeroPago && !hasPaymentsByPlan.has(plan.id))
          .sort((a, b) => a.numeroPago - b.numeroPago);
-        const hasFutureEligible = futurePlans.length > 0;
-         const redistribuyoPlan = hasFutureEligible && overpaymentCents > 0;
+          const redistribuyoPlan = (shortageCents > 0 && futurePlans.length > 0) || overpaymentCents > 0;
          const plansToDelete: PlanPagoOrmEntity[] = [];
         const affectedFuturePlans = new Set<PlanPagoOrmEntity>();
-         if (redistribuyoPlan) {
-          // Preserve the existing overpayment behavior only after the installment
-          // is complete: the extra paid amount becomes part of its operational
-          // amount while the same amount is removed from future installments.
+           if (shortageCents > 0) {
+             const next = futurePlans[0];
+             planPago.montoProgramado = newPaidTotalCents / 100;
+             if (next) {
+              next.montoProgramado = (cents(next.montoProgramado) + shortageCents) / 100;
+              affectedFuturePlans.add(next);
+            }
+          } else if (overpaymentCents > 0) {
+           // Preserve the existing overpayment behavior: the extra paid amount
+           // becomes part of the current operational amount while the same amount
+           // is removed from future installments.
           planPago.montoProgramado = newPaidTotalCents / 100;
             let remaining = overpaymentCents;
             for (const future of futurePlans) {
@@ -103,7 +106,7 @@ export class RegistrarPagoUseCase {
        const resultingPlanCents = lockedPlans
          .filter((plan) => !plansToDelete.includes(plan))
          .reduce((sum, plan) => sum + cents(plan.montoProgramado), 0);
-       if (resultingPlanCents !== planTotalCents) throw new BadRequestException('El total del plan de pago no coincide con el monto total del préstamo.');
+        if (resultingPlanCents > cents(prestamo.montoTotal)) throw new BadRequestException('El total del plan de pago no puede superar el monto total del préstamo.');
 
        const futureWithPayments = lockedPlans.some((plan) => plan.numeroPago > planPago.numeroPago && hasPaymentsByPlan.has(plan.id));
        const canRenumber = !futureWithPayments;
@@ -111,7 +114,7 @@ export class RegistrarPagoUseCase {
         // PostgreSQL date columns are represented as calendar strings here. Keep
         // the selected payment date unchanged; do not derive it from a Date.
         planPago.fechaVencimiento = dto.fecha;
-        for (const future of affectedFuturePlans) future.fechaVencimiento = dto.fecha;
+        if (overpaymentCents > 0) for (const future of affectedFuturePlans) future.fechaVencimiento = dto.fecha;
        if (canRenumber) {
          const temporaryBase = lockedPlans.reduce((maximum, plan) => Math.max(maximum, plan.numeroPago), 0) + 1_000_000;
          for (let index = 0; index < survivingFuturePlans.length; index += 1) {
