@@ -11,7 +11,7 @@
 .selected-refinanciamiento-client { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 2.35rem; padding: .35rem .5rem .35rem .65rem; border: 1px solid #dbe5ee; border-radius: .5rem; background: #fff; }
 .selected-refinanciamiento-client strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .refinanciamientos-table-wrap { padding: .35rem; overflow: hidden; background: #fff; border: 1px solid #e1e8ef; box-shadow: 0 3px 10px rgba(30, 64, 90, .05); }
-.refinanciamientos-table { min-width: 980px; }
+.refinanciamientos-table { min-width: 1120px; }
 .refinanciamientos-table th, .refinanciamientos-table td { padding: .65rem .55rem; white-space: nowrap; }
 .refinanciamientos-table th { color: #52667a; background: #f8fafc; font-size: .74rem; text-transform: uppercase; letter-spacing: .02em; }
 .refinanciamientos-table th, .refinanciamientos-table th svg { vertical-align: middle; }
@@ -29,11 +29,32 @@
 .refinanciamientos-error p { margin: 0; }
 .refinanciamientos-empty { display: flex; align-items: center; justify-content: center; gap: .6rem; min-height: 8rem; padding: 1.5rem; color: #52667a; text-align: center; }
 .refinanciamientos-empty svg { color: #64748b; }
+.refinanciamientos-row-actions { position: relative; display: flex; justify-content: center; }
+.refinanciamientos-row-menu { position: absolute; z-index: 3; right: 0; top: calc(100% + .25rem); display: grid; min-width: 12rem; padding: .3rem; border: 1px solid #dbe5ee; border-radius: .5rem; background: white; box-shadow: 0 8px 24px rgba(30, 64, 90, .16); }
+.refinanciamientos-row-menu button { display: flex; align-items: center; gap: .45rem; padding: .5rem .55rem; border: 0; border-radius: .35rem; color: #243b53; background: transparent; text-align: left; cursor: pointer; font: inherit; font-size: .8rem; }
+.refinanciamientos-row-menu button:hover:not(:disabled), .refinanciamientos-row-menu button:focus-visible { background: #eff6ff; color: #1d4ed8; outline: none; }
+.refinanciamientos-row-menu button:disabled { color: #94a3b8; cursor: not-allowed; }
+.refinanciamiento-detail-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgba(15, 23, 42, .5); }
+.refinanciamiento-detail-modal { width: min(900px, 100%); max-height: min(90vh, 760px); overflow: auto; padding: 1.25rem; border-radius: .8rem; background: #fff; box-shadow: 0 20px 60px rgba(15, 23, 42, .25); color: #243b53; }
+.refinanciamiento-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.refinanciamiento-detail-header h2 { margin: .15rem 0 0; color: #102a43; }
+.refinanciamiento-detail-section { padding: 1rem 0; border-top: 1px solid #e5eaf0; }
+.refinanciamiento-detail-section h3 { margin: 0 0 .75rem; color: #334e68; font-size: .9rem; text-transform: uppercase; letter-spacing: .03em; }
+.refinanciamiento-detail-section.current { border-left: 3px solid #2563eb; padding-left: .85rem; }
+.refinanciamiento-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; }
+.refinanciamiento-detail-value { display: grid; gap: .2rem; min-width: 0; padding: .55rem .65rem; border-radius: .45rem; background: #f8fafc; }
+.refinanciamiento-detail-value span { color: #64748b; font-size: .72rem; }
+.refinanciamiento-detail-value strong { overflow-wrap: anywhere; color: #243b53; }
+.refinanciamiento-detail-notes { margin: .8rem 0 0; color: #52667a; }
+.refinanciamiento-plan-table { min-width: 650px; }
+.refinanciamiento-plan-table th, .refinanciamiento-plan-table td { padding: .5rem; white-space: nowrap; }
+.refinanciamiento-detail-actions { display: flex; justify-content: flex-end; padding-top: .8rem; }
 @media (max-width: 800px) {
   .refinanciamientos-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .refinanciamientos-filters label:first-child, .refinanciamiento-client-filter { grid-column: 1 / -1; }
   .refinanciamientos-table-wrap { overflow: auto; }
   .refinanciamientos-table th:nth-child(3), .refinanciamientos-table td:nth-child(3), .refinanciamientos-table th:nth-child(6), .refinanciamientos-table td:nth-child(6), .refinanciamientos-table th:nth-child(7), .refinanciamientos-table td:nth-child(7), .refinanciamientos-table th:nth-child(8), .refinanciamientos-table td:nth-child(8), .refinanciamientos-table th:nth-child(9), .refinanciamientos-table td:nth-child(9) { display: none; }
-  .refinanciamientos-table { min-width: 700px; }
+   .refinanciamientos-table { min-width: 700px; }
+   .refinanciamiento-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 520px) { .refinanciamientos-filters { grid-template-columns: 1fr; } .refinanciamientos-filters label:first-child, .refinanciamiento-client-filter { grid-column: auto; } }
+@media (max-width: 520px) { .refinanciamientos-filters { grid-template-columns: 1fr; } .refinanciamientos-filters label:first-child, .refinanciamiento-client-filter { grid-column: auto; } .refinanciamiento-detail-grid { grid-template-columns: 1fr; } }

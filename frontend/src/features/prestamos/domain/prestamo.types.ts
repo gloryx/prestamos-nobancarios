@@ -18,7 +18,7 @@ export interface PrestamoInput {
   cuotas?: CuotaPrestamoInput[]
 }
 
-export type PrestamoUpdateInput = Omit<PrestamoInput, 'cuotas'>
+export type PrestamoUpdateInput = Partial<Omit<PrestamoInput, 'cuotas'>>
 
 export interface Prestamo {
   id: number
@@ -44,6 +44,8 @@ export interface Prestamo {
   fechaCreacion: string
   fechaActualizacion: string
   fechaLimiteContractual?: string | null
+  fechaCancelacion?: string | null
+  usuarioCancelacion?: { id: number; nombreCompleto: string } | null
   indicadorCobranza?: IndicadorCobranza | null
   puedeAnular: boolean
 }
@@ -52,9 +54,9 @@ export type EstadoPrestamo = 'ACTIVO' | 'CANCELADO' | 'REFINANCIADO' | 'INCOBRAB
 export interface AnularPrestamoInput { fecha: string; observacion?: string }
 export interface CambiarEstadoPrestamoInput { estado: 'ACTIVO' | 'INCOBRABLE'; fecha: string; observacion: string }
 export type IndicadorCobranza = 'AL_DIA' | 'ATRASADO' | 'PLAZO_CUMPLIDO' | 'SALDADO'
-export type PrestamoSortField = 'id' | 'cliente' | 'direccion' | 'fechaAlta' | 'capital' | 'saldoPendiente' | 'estado' | 'indicadorCobranza'
+export type PrestamoSortField = 'id' | 'cliente' | 'direccion' | 'fechaAlta' | 'fechaCancelacion' | 'capital' | 'saldoPendiente' | 'estado' | 'indicadorCobranza'
 export type PrestamoSortDirection = 'ASC' | 'DESC'
-export interface PrestamoFilters { pagina: number; limite: number; buscar?: string; direccion?: string; estados?: EstadoPrestamo[]; indicadorCobranza?: IndicadorCobranza; fechaInicio?: string; fechaFin?: string; estado?: EstadoPrestamo; clienteId?: number; ordenarPor?: PrestamoSortField; direccionOrden?: PrestamoSortDirection }
+export interface PrestamoFilters { pagina: number; limite: number; buscar?: string; direccion?: string; estados?: EstadoPrestamo[]; indicadorCobranza?: IndicadorCobranza; fechaInicio?: string; fechaFin?: string; fechaCancelacionDesde?: string; fechaCancelacionHasta?: string; estado?: EstadoPrestamo; clienteId?: number; ordenarPor?: PrestamoSortField; direccionOrden?: PrestamoSortDirection }
 export type PrestamoExportFilters = Pick<PrestamoFilters, 'buscar' | 'direccion' | 'estados' | 'fechaInicio' | 'fechaFin'>
 export interface PrestamoPage { datos: Prestamo[]; pagina: number; limite: number; total: number; totalPaginas: number }
 export interface IncobrableLoan extends Prestamo { fechaVencimiento?: string; saldoCuota?: number; fechaIncobrable?: string; observacionIncobrable?: string | null; diasEnEstado?: number; ultimaFechaPago?: string | null; puedePasarAIncobrable: boolean; puedeReactivar: boolean }

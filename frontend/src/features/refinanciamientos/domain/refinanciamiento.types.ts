@@ -1,4 +1,24 @@
-import type { CuotaPrestamoInput, Prestamo, PrestamoFilters, PrestamoPage } from '@/features/prestamos/domain/prestamo.types'
+import type { CuotaPrestamoInput, Prestamo } from '@/features/prestamos/domain/prestamo.types'
+
+export interface PrestamoElegible {
+  id: number
+  clienteId: number
+  estado: string
+  capital: number
+  interes: number
+  montoTotal: number
+  capitalPendiente: number
+  saldoFinanciero: number
+  cliente: { id: number; identificacion: string; nombreCompleto: string; telefono: string | null; direccion: string | null }
+}
+
+export interface PrestamosElegiblesPage {
+  datos: PrestamoElegible[]
+  pagina: number
+  limite: number
+  total: number
+  totalPaginas: number
+}
 
 export interface RefinanciamientoPreview {
   elegible: boolean
@@ -38,6 +58,15 @@ export interface RefinanciamientoResponse {
   prestamoNuevo?: Prestamo | Record<string, unknown>
   prestamoOrigen?: Prestamo | Record<string, unknown>
   planNuevo?: unknown[]
+  fecha?: string
+  interesPendiente?: number
+  observaciones?: string | null
+  fechaCreacion?: string
+  fechaLimiteContractualOrigen?: string | null
+  diasGanados?: number | null
+  saldoAnterior?: { capitalPendiente: number; interesPendiente: number; montoRefinanciado: number }
+  pagosOrigen?: unknown[]
+  pagosNuevo?: unknown[]
 }
 
 export interface RefinanciamientoListFilters {
@@ -78,6 +107,9 @@ export interface RefinanciamientoRepository {
   report(filters: RefinanciamientoReportFilters): Promise<RefinanciamientoReportResponse>
   preview(prestamoId: number): Promise<RefinanciamientoPreview>
   create(input: CrearRefinanciamientoInput): Promise<RefinanciamientoResponse>
+  detail(id: number): Promise<RefinanciamientoResponse>
+  byOriginLoan(id: number): Promise<RefinanciamientoResponse>
+  byNewLoan(id: number): Promise<RefinanciamientoResponse>
 }
 
 export interface RefinanciamientoReportFilters {
@@ -121,4 +153,4 @@ export interface RefinanciamientoReportResponse {
   datos: RefinanciamientoReportDetail[]
 }
 
-export type ActiveLoanRepository = { list(filters: PrestamoFilters): Promise<PrestamoPage> }
+export type ActiveLoanRepository = { listEligible(filters: { pagina: number; limite: number; buscar?: string }): Promise<PrestamosElegiblesPage> }

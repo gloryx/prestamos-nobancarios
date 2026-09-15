@@ -1,0 +1,16 @@
+.rentabilidad-report-page { display: grid; gap: 1.25rem; }
+.rentabilidad-month-picker { display: inline-flex; align-items: center; gap: .5rem; padding: .7rem .9rem; background: var(--color-surface, #fff); border: 1px solid #dce5e9; border-radius: .65rem; font-weight: 600; }
+.rentabilidad-month-picker input { border: 0; font: inherit; color: inherit; background: transparent; }
+.rentabilidad-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1rem; }
+.rentabilidad-metric { display: grid; gap: .35rem; min-height: 7rem; align-content: center; }
+.rentabilidad-metric-icon { color: var(--color-primary); }
+.rentabilidad-metric strong { font-size: 1.35rem; }
+.rentabilidad-charts { display: grid; grid-template-columns: 1.3fr 1fr; gap: 1rem; }
+.rentabilidad-chart-panel, .rentabilidad-table-panel { padding: 1.1rem; }
+.rentabilidad-chart-panel h2, .rentabilidad-table-panel h2 { margin: 0 0 1rem; font-size: 1rem; }
+.rentabilidad-chart { height: 280px; }
+.rentabilidad-total-row { border-top: 2px solid #dce5e9; }
+.rentabilidad-metadata { color: #687783; font-size: .9rem; }
+.rentabilidad-empty { text-align: center; }
+@media (max-width: 980px) { .rentabilidad-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rentabilidad-charts { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .rentabilidad-metrics { grid-template-columns: 1fr; } .rentabilidad-month-picker { justify-self: start; } }

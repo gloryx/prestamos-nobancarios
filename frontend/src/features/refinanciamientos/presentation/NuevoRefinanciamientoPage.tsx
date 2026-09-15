@@ -6,7 +6,7 @@ import {
   type FormEvent,
 } from "react";
 import { Printer, Search, X } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/providers/auth-context";
 import { CurrencyInput } from "@/shared/components/forms/CurrencyInput";
 import { formatCRC } from "@/shared/utils/currency";
@@ -17,7 +17,6 @@ import { listPeriodicidades } from "@/features/periodicidades-pago/application/p
 import { AxiosPeriodicidadRepository } from "@/features/periodicidades-pago/infrastructure/axios-periodicidad.repository";
 import {
   abrirEstadoCuentaPdf,
-  obtenerPrestamo,
 } from "@/features/prestamos/application/prestamos.use-cases";
 import { AxiosPrestamoRepository } from "@/features/prestamos/infrastructure/axios-prestamo.repository";
 import { AxiosRefinanciamientoRepository } from "../infrastructure/axios-refinanciamiento.repository";
@@ -29,15 +28,13 @@ import {
 } from "../application/refinanciamientos.use-cases";
 import type {
   CrearRefinanciamientoInput,
+  PrestamoElegible,
+  PrestamosElegiblesPage,
   RefinanciamientoPreview,
   RefinanciamientoResponse,
 } from "../domain/refinanciamiento.types";
 import type { FormaPago } from "@/features/formas-pago/domain/forma-pago.types";
 import type { Periodicidad } from "@/features/periodicidades-pago/domain/periodicidad-pago.types";
-import type {
-  Prestamo,
-  PrestamoPage,
-} from "@/features/prestamos/domain/prestamo.types";
 import "./nuevo-refinanciamiento.css";
 
 const loanRepository = new AxiosPrestamoRepository();
@@ -53,10 +50,10 @@ function LoanModal({
   onSelect,
   onClose,
 }: {
-  onSelect: (loan: Prestamo) => void;
+  onSelect: (loan: PrestamoElegible) => void;
   onClose: () => void;
 }) {
-  const [page, setPage] = useState<PrestamoPage | null>(null);
+  const [page, setPage] = useState<PrestamosElegiblesPage | null>(null);
   const [search, setSearch] = useState("");
   const [pagina, setPagina] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -68,7 +65,7 @@ function LoanModal({
     setError("");
     try {
       const next = await listarPrestamosActivosParaRefinanciar(
-        loanRepository,
+         refRepository,
         pagina,
         search,
       );
@@ -81,7 +78,7 @@ function LoanModal({
     }
   }, [pagina, search]);
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 300);
+    const timer = window.setTimeout(() => void load(), 350);
     return () => window.clearTimeout(timer);
   }, [load]);
   useEffect(() => {
@@ -120,7 +117,7 @@ function LoanModal({
         aria-labelledby="loan-modal-title"
       >
         <header>
-          <h2 id="loan-modal-title">Seleccionar préstamo activo</h2>
+         <h2 id="loan-modal-title">Seleccionar préstamo elegible</h2>
           <button
             type="button"
             className="icon-button"
@@ -131,9 +128,10 @@ function LoanModal({
           </button>
         </header>
         <label htmlFor="loan-search">
-          Buscar por cliente o identificación
+           Préstamo a refinanciar
           <input
             id="loan-search"
+            placeholder="Número de préstamo, nombre, identificación, teléfono o dirección"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
@@ -148,41 +146,34 @@ function LoanModal({
           </p>
         )}
         {!loading && !error && !page?.datos.length && (
-          <p role="status">No se encontraron préstamos activos.</p>
+           <p role="status">No se encontraron préstamos elegibles.</p>
         )}
         {!loading && !error && page?.datos.length ? (
           <>
             <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Préstamo</th>
-                    <th>Cliente</th>
-                    <th>Identificación</th>
-                    <th>Capital pendiente</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {page.datos.map((loan) => (
-                    <tr key={loan.id}>
-                      <td>#{loan.id}</td>
-                      <td>{loan.cliente.nombreCompleto}</td>
-                      <td>{loan.cliente.identificacion}</td>
-                      <td>{money(loan.capitalPendiente ?? loan.capital)}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="text-button"
-                          onClick={() => onSelect(loan)}
-                        >
-                          Seleccionar
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="loan-options" role="list">
+                {page.datos.map((loan) => (
+                  <article className="loan-option" key={loan.id} role="listitem">
+                    <div className="loan-option-details">
+                      <strong className="loan-option-title">Préstamo #{loan.id}</strong>
+                      <span className="loan-option-client">
+                        {loan.cliente.nombreCompleto} — {loan.cliente.identificacion}
+                      </span>
+                      <span className="loan-option-financial">
+                        <span>Saldo: <b>{formatCRC(loan.saldoFinanciero)}</b></span>
+                        <span className="status-badge active">{loan.estado}</span>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-button loan-option-action"
+                      onClick={() => onSelect(loan)}
+                    >
+                      Seleccionar
+                    </button>
+                  </article>
+                ))}
+              </div>
             </div>
             <Pagination
               pagina={page.pagina}
@@ -218,7 +209,7 @@ export function NuevoRefinanciamientoPage() {
   const navigate = useNavigate();
   const allowed = user?.rol === "ADMINISTRADOR" || user?.rol === "VENDEDOR";
   const [step, setStep] = useState(1);
-  const [loan, setLoan] = useState<Prestamo | null>(null);
+  const [loan, setLoan] = useState<PrestamoElegible | null>(null);
   const [preview, setPreview] = useState<RefinanciamientoPreview | null>(null);
   const [modal, setModal] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -254,7 +245,7 @@ export function NuevoRefinanciamientoPage() {
       })
       .catch((cause) => setCatalogError(refinanciamientoErrorMessage(cause)));
   }, []);
-  const selectLoan = useCallback(async (selected: Prestamo) => {
+  const selectLoan = useCallback(async (selected: PrestamoElegible) => {
     const id = ++previewRequestId.current;
     setModal(false);
     setLoan(selected);
@@ -278,9 +269,12 @@ export function NuevoRefinanciamientoPage() {
   useEffect(() => {
     if (navigationPrestamoId === null) return;
     const requestId = ++previewRequestId.current;
-    void obtenerPrestamo(loanRepository, navigationPrestamoId)
-      .then((selected) => {
-        if (requestId === previewRequestId.current) void selectLoan(selected);
+    void listarPrestamosActivosParaRefinanciar(refRepository, 1, String(navigationPrestamoId), 1)
+      .then((result) => {
+        const selected = result.datos.find((item) => item.id === navigationPrestamoId);
+        if (requestId !== previewRequestId.current) return;
+        if (selected) void selectLoan(selected);
+        else setError("El préstamo seleccionado no es elegible para refinanciamiento.");
       })
       .catch((cause) => {
         if (requestId === previewRequestId.current)
@@ -288,6 +282,8 @@ export function NuevoRefinanciamientoPage() {
       });
   }, [navigationPrestamoId, selectLoan]);
   const reset = () => {
+    previewRequestId.current += 1;
+    setModal(false);
     setStep(1);
     setLoan(null);
     setPreview(null);
@@ -473,6 +469,15 @@ export function NuevoRefinanciamientoPage() {
             <button className="secondary-button" type="button" onClick={reset}>
               Nuevo refinanciamiento
             </button>
+            <Link className="text-button" to="/refinanciamientos" state={{ refinanciamientoId: success.id }}>
+              Ver detalle
+            </Link>
+            <Link className="text-button" to="/prestamos" state={{ prestamoId: success.prestamoNuevoId }}>
+              Ver préstamo nuevo
+            </Link>
+            {loan && <Link className="text-button" to="/refinanciamientos/cadenas" state={{ clienteId: loan.clienteId, prestamoOrigenId: success.prestamoOrigenId, prestamoNuevoId: success.prestamoNuevoId }}>
+              Ver cadena
+            </Link>}
             <button
               className="text-button"
               type="button"
@@ -525,11 +530,13 @@ export function NuevoRefinanciamientoPage() {
           {previewLoading && <p role="status">Consultando elegibilidad...</p>}
           {loan && preview && (
             <div className="preview-summary">
-              <p>
-                <b>Cliente</b>
-                {preview.cliente.nombreCompleto} (
-                {preview.cliente.identificacion})
-              </p>
+              <div className="selected-loan-summary">
+                <strong>Préstamo #{loan.id}</strong>
+                <span>{loan.cliente.nombreCompleto}</span>
+                <span>{loan.cliente.identificacion}</span>
+                <span>Saldo: <b>{formatCRC(loan.saldoFinanciero)}</b></span>
+                <span className="status-badge active">{loan.estado}</span>
+              </div>
               <p>
                 <b>Préstamo</b>#{preview.prestamo.id} ·{" "}
                 {preview.prestamo.estado} · Alta{" "}

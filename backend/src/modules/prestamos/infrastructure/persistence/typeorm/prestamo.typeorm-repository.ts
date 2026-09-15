@@ -12,6 +12,19 @@ import { AnulacionListado, AnulacionesPaginadas, IncobrableListado, IncobrablesP
 const clientNameExpression = "UPPER(TRIM(CONCAT_WS(' ', cliente.primer_nombre, cliente.segundo_nombre, cliente.primer_apellido, cliente.segundo_apellido)))";
 const statePriorityExpression = "CASE prestamo.estado WHEN 'ACTIVO' THEN 1 WHEN 'INCOBRABLE' THEN 2 WHEN 'REFINANCIADO' THEN 3 WHEN 'CANCELADO' THEN 4 ELSE 5 END";
 const statePriorityFallbackExpression = "CASE prestamo.estado WHEN 'ACTIVO' THEN 1 WHEN 'INCOBRABLE' THEN 2 WHEN 'REFINANCIADO' THEN 3 WHEN 'CANCELADO' THEN 4 END";
+// Real cancellation is the latest CANCELADO transition, ordered by economic date and history id.
+const realCancellationDateExpression = "(SELECT h.fecha FROM prestamo_estado_historial h WHERE h.prestamo_id = prestamo.id AND h.estado_nuevo = 'CANCELADO' ORDER BY h.fecha DESC, h.id DESC LIMIT 1)";
+
+const serializeRawDateOnly = (value: unknown): string | null => {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    // PostgreSQL history.fecha is a calendar date; raw Date values are formatted locally to avoid UTC day shifts.
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/.exec(value.trim());
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+};
 
 const paymentTotalsQuery = (repository: Repository<PrestamoOrmEntity>) => repository.manager.createQueryBuilder()
   .select('pago.prestamo_id', 'prestamo_id')
@@ -41,6 +54,7 @@ const applyOrdering = (query: SelectQueryBuilder<PrestamoOrmEntity>, filtros: Fi
     }
     case 'direccion': query.orderBy('cliente.direccion', direction, 'NULLS LAST').addOrderBy('prestamo.id', 'DESC'); break;
     case 'fechaAlta': query.orderBy('prestamo.fecha_alta', direction).addOrderBy('prestamo.id', direction); break;
+    case 'fechaCancelacion': query.orderBy('fecha_cancelacion_orden', direction, 'NULLS LAST').addOrderBy('prestamo.id', direction); break;
     case 'capital': query.orderBy('prestamo.capital', direction).addOrderBy('prestamo.id', 'DESC'); break;
     case 'saldoPendiente': {
       query.orderBy('saldo_pendiente_orden', direction).addOrderBy('prestamo.id', direction);
@@ -58,6 +72,21 @@ const applyOrdering = (query: SelectQueryBuilder<PrestamoOrmEntity>, filtros: Fi
   return query;
 };
 
+const applyClientSearch = (query: SelectQueryBuilder<PrestamoOrmEntity>, value: string | undefined, parameterPrefix: string) => {
+  const terms = value?.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean) ?? [];
+  terms.forEach((term, index) => {
+    const parameter = `${parameterPrefix}${index}`;
+    const search = `%${term}%`;
+    query.andWhere(new Brackets((where) => where
+      .where(`${clientNameExpression} ILIKE :${parameter}`, { [parameter]: search })
+      .orWhere(`cliente.identificacion ILIKE :${parameter}`, { [parameter]: search })
+      .orWhere(`cliente.telefono1 ILIKE :${parameter}`, { [parameter]: search })
+      .orWhere(`cliente.telefono2 ILIKE :${parameter}`, { [parameter]: search })
+      .orWhere(`cliente.direccion ILIKE :${parameter}`, { [parameter]: search })));
+  });
+  return query;
+};
+
 @Injectable()
 export class PrestamoTypeOrmRepository implements PrestamoRepository {
   constructor(@InjectRepository(PrestamoOrmEntity) private readonly repository: Repository<PrestamoOrmEntity>) {}
@@ -66,10 +95,7 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
   async buscarPorId(id: number): Promise<PrestamoConRelaciones | null> { const entity = await this.withRelations().where('prestamo.id = :id', { id }).getOne(); return entity ? PrestamoMapper.toDomain(entity) : null; }
   async actualizar(prestamo: Prestamo): Promise<PrestamoConRelaciones> { const saved = await this.repository.save(PrestamoMapper.toOrm(prestamo)); return this.buscarPorId(saved.id) as Promise<PrestamoConRelaciones>; }
   private applyFilters(query: SelectQueryBuilder<PrestamoOrmEntity>, filtros: FiltrosPrestamos) {
-    if (filtros.buscar?.trim()) {
-      const term = `%${filtros.buscar.trim()}%`;
-      query.andWhere(new Brackets((where) => where.where('cliente.identificacion ILIKE :term', { term }).orWhere('cliente.primer_nombre ILIKE :term', { term }).orWhere('cliente.segundo_nombre ILIKE :term', { term }).orWhere('cliente.primer_apellido ILIKE :term', { term }).orWhere('cliente.segundo_apellido ILIKE :term', { term })));
-    }
+    applyClientSearch(query, filtros.buscar, 'buscarTerm');
     if (filtros.direccion?.trim()) query.andWhere('cliente.direccion ILIKE :direccion', { direccion: `%${filtros.direccion.trim()}%` });
     if (filtros.estados !== undefined) {
       if (filtros.estados.length) query.andWhere('prestamo.estado IN (:...estados)', { estados: filtros.estados });
@@ -77,6 +103,8 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
     } else if (filtros.estado !== undefined) query.andWhere('prestamo.estado = :estado', { estado: filtros.estado });
     if (filtros.fechaInicio) query.andWhere('prestamo.fecha_alta >= :fechaInicio', { fechaInicio: filtros.fechaInicio });
     if (filtros.fechaFin) query.andWhere('prestamo.fecha_alta <= :fechaFin', { fechaFin: filtros.fechaFin });
+    if (filtros.fechaCancelacionDesde) query.andWhere(`${realCancellationDateExpression} >= CAST(:fechaCancelacionDesde AS date)`, { fechaCancelacionDesde: filtros.fechaCancelacionDesde });
+    if (filtros.fechaCancelacionHasta) query.andWhere(`${realCancellationDateExpression} < (CAST(:fechaCancelacionHasta AS date) + INTERVAL '1 day')`, { fechaCancelacionHasta: filtros.fechaCancelacionHasta });
     if (filtros.clienteId !== undefined) query.andWhere('prestamo.cliente_id = :clienteId', { clienteId: filtros.clienteId });
     if (filtros.candidateIds !== undefined) {
       if (filtros.candidateIds.length) query.andWhere('prestamo.id IN (:...candidateIds)', { candidateIds: filtros.candidateIds });
@@ -90,15 +118,45 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
   }
   async listar(filtros: FiltrosPrestamos): Promise<PrestamosPaginados> {
     const query = this.applyFilters(this.withRelations(), filtros);
+    const incluyeCancelados = filtros.estados?.includes(EstadoPrestamo.CANCELADO) || filtros.estado === EstadoPrestamo.CANCELADO;
+    if (incluyeCancelados) {
+      query.addSelect(realCancellationDateExpression, 'fecha_cancelacion_orden')
+        .addSelect(realCancellationDateExpression, 'cancelacion_fecha')
+        .addSelect("(SELECT u.id FROM prestamo_estado_historial h JOIN usuario u ON u.id = h.usuario_id WHERE h.prestamo_id = prestamo.id AND h.estado_nuevo = 'CANCELADO' ORDER BY h.fecha DESC, h.id DESC LIMIT 1)", 'cancelacion_usuario_id')
+        .addSelect("(SELECT u.nombre_completo FROM prestamo_estado_historial h JOIN usuario u ON u.id = h.usuario_id WHERE h.prestamo_id = prestamo.id AND h.estado_nuevo = 'CANCELADO' ORDER BY h.fecha DESC, h.id DESC LIMIT 1)", 'cancelacion_usuario_nombre');
+    }
     if (filtros.ordenarPor === 'saldoPendiente') {
       const paymentTotals = paymentTotalsQuery(this.repository);
       query.leftJoin(`(${paymentTotals.getQuery()})`, 'pagos_orden', 'pagos_orden.prestamo_id = prestamo.id')
         .setParameters(paymentTotals.getParameters())
        .addSelect("GREATEST(CASE WHEN prestamo.estado = 'ANULADO' THEN 0 ELSE prestamo.monto_total - COALESCE(pagos_orden.total_pagado, 0) END, 0)", 'saldo_pendiente_orden');
     }
-    applyOrdering(query, filtros).skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
-    const [entities, total] = await query.getManyAndCount();
-    const loans = entities.map((entity) => PrestamoMapper.toDomain(entity));
+    let entities: PrestamoOrmEntity[];
+    let raw: Array<Record<string, unknown>> = [];
+    let total: number;
+    if (incluyeCancelados) {
+      if (filtros.ordenarPor) applyOrdering(query, filtros);
+      else query.orderBy('fecha_cancelacion_orden', 'DESC', 'NULLS LAST').addOrderBy('prestamo.id', 'DESC');
+      total = await query.clone().getCount();
+      query.skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
+      const result = await query.getRawAndEntities();
+      entities = result.entities;
+      raw = result.raw as Array<Record<string, unknown>>;
+    } else {
+      applyOrdering(query, filtros).skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
+      [entities, total] = await query.getManyAndCount();
+    }
+    const loans = entities.map((entity, index) => {
+      const loan = PrestamoMapper.toDomain(entity);
+      if (incluyeCancelados) {
+        const row = raw[index] ?? {};
+        Object.assign(loan, {
+          fechaCancelacion: serializeRawDateOnly(row.cancelacion_fecha),
+          usuarioCancelacion: row.cancelacion_usuario_id == null ? null : { id: Number(row.cancelacion_usuario_id), nombreCompleto: String(row.cancelacion_usuario_nombre ?? '') },
+        });
+      }
+      return loan;
+    });
     if (!loans.length) return { datos: [], pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
     const ids = loans.map((loan) => loan.id!);
     const totals = await this.repository.manager.createQueryBuilder()
@@ -126,7 +184,7 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
        .addSelect("COALESCE(SUM(CASE WHEN prestamo.estado <> 'ANULADO' THEN prestamo.capital ELSE 0 END), 0)", 'prestado')
        .addSelect("COALESCE(SUM(CASE WHEN prestamo.estado <> 'ANULADO' THEN prestamo.interes ELSE 0 END), 0)", 'ganancia')
        .addSelect("COALESCE(SUM(CASE WHEN prestamo.estado <> 'ANULADO' THEN COALESCE(pagos.recuperado, 0) ELSE 0 END), 0)", 'recuperado')
-       .addSelect("COALESCE(SUM(CASE WHEN prestamo.estado <> 'ANULADO' THEN GREATEST(prestamo.capital + prestamo.interes - COALESCE(pagos.recuperado, 0), 0) ELSE 0 END), 0)", 'pendiente');
+       .addSelect("COALESCE(SUM(CASE WHEN prestamo.estado <> 'ANULADO' THEN GREATEST(prestamo.monto_total - COALESCE(pagos.recuperado, 0), 0) ELSE 0 END), 0)", 'pendiente');
     const raw = await query.getRawOne<{ total: string; prestado: string; ganancia: string; recuperado: string; pendiente: string }>();
     return { total: Number(raw?.total ?? 0), prestado: Number(raw?.prestado ?? 0), ganancia: Number(raw?.ganancia ?? 0), recuperado: Number(raw?.recuperado ?? 0), pendiente: Number(raw?.pendiente ?? 0) };
   }
@@ -160,7 +218,7 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
     query.addSelect(`(SELECT COALESCE(SUM(px.monto), 0) FROM pago px WHERE px.prestamo_id = prestamo.id AND px.estado = 'REGISTRADO')`, 'total_pagado');
     query.addSelect(`GREATEST(prestamo.monto_total - ${paidLoan}, 0)`, 'saldo_pendiente_orden');
     query.addSelect(`(SELECT COALESCE(SUM(px.capital_aplicado), 0) FROM pago px WHERE px.prestamo_id = prestamo.id AND px.estado = 'REGISTRADO')`, 'capital_pagado');
-    if (filtros.buscar?.trim()) { const term = `%${filtros.buscar.trim()}%`; query.andWhere(new Brackets((where) => where.where('cliente.identificacion ILIKE :incTerm', { incTerm: term }).orWhere('cliente.primer_nombre ILIKE :incTerm', { incTerm: term }).orWhere('cliente.segundo_nombre ILIKE :incTerm', { incTerm: term }).orWhere('cliente.primer_apellido ILIKE :incTerm', { incTerm: term }).orWhere('cliente.segundo_apellido ILIKE :incTerm', { incTerm: term }))); }
+    applyClientSearch(query, filtros.buscar, 'incBuscarTerm');
     if (filtros.direccion?.trim()) query.andWhere('cliente.direccion ILIKE :incDireccion', { incDireccion: `%${filtros.direccion.trim()}%` });
     return { query, fecha };
   }
@@ -208,7 +266,7 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
       .addSelect("(SELECT h.fecha FROM prestamo_estado_historial h WHERE h.prestamo_id = prestamo.id AND h.estado_anterior = 'ACTIVO' AND h.estado_nuevo = 'ANULADO' ORDER BY h.id DESC LIMIT 1)", 'anulacion_fecha')
       .addSelect("(SELECT h.observacion FROM prestamo_estado_historial h WHERE h.prestamo_id = prestamo.id AND h.estado_anterior = 'ACTIVO' AND h.estado_nuevo = 'ANULADO' ORDER BY h.id DESC LIMIT 1)", 'anulacion_observacion')
       .addSelect("(SELECT u.id FROM prestamo_estado_historial h JOIN usuario u ON u.id = h.usuario_id WHERE h.prestamo_id = prestamo.id AND h.estado_anterior = 'ACTIVO' AND h.estado_nuevo = 'ANULADO' ORDER BY h.id DESC LIMIT 1)", 'anulacion_usuario_id')
-      .addSelect("(SELECT CONCAT_WS(' ', u.primer_nombre, u.segundo_nombre, u.primer_apellido, u.segundo_apellido) FROM prestamo_estado_historial h JOIN usuario u ON u.id = h.usuario_id WHERE h.prestamo_id = prestamo.id AND h.estado_anterior = 'ACTIVO' AND h.estado_nuevo = 'ANULADO' ORDER BY h.id DESC LIMIT 1)", 'anulacion_usuario_nombre')
+      .addSelect("(SELECT u.nombre_completo FROM prestamo_estado_historial h JOIN usuario u ON u.id = h.usuario_id WHERE h.prestamo_id = prestamo.id AND h.estado_anterior = 'ACTIVO' AND h.estado_nuevo = 'ANULADO' ORDER BY h.id DESC LIMIT 1)", 'anulacion_usuario_nombre')
       .addSelect("(SELECT m.id FROM movimiento_caja m WHERE m.prestamo_id = prestamo.id AND m.concepto = 'DESEMBOLSO_PRESTAMO' ORDER BY m.id ASC LIMIT 1)", 'desembolso_id')
       .addSelect("(SELECT r.fecha FROM movimiento_caja r WHERE r.movimiento_reversado_id = (SELECT m.id FROM movimiento_caja m WHERE m.prestamo_id = prestamo.id AND m.concepto = 'DESEMBOLSO_PRESTAMO' ORDER BY m.id ASC LIMIT 1) ORDER BY r.id DESC LIMIT 1)", 'reverso_fecha')
       .addSelect("(SELECT r.id FROM movimiento_caja r WHERE r.movimiento_reversado_id = (SELECT m.id FROM movimiento_caja m WHERE m.prestamo_id = prestamo.id AND m.concepto = 'DESEMBOLSO_PRESTAMO' ORDER BY m.id ASC LIMIT 1) ORDER BY r.id DESC LIMIT 1)", 'reverso_id')

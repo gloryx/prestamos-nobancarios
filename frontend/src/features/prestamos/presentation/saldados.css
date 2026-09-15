@@ -1,0 +1,8 @@
+.saldados-toolbar { display: flex; flex-wrap: wrap; gap: 1rem; max-width: 100%; margin-bottom: 1rem; }
+.saldados-toolbar label { display: flex; flex: 1 1 14rem; flex-direction: column; gap: .35rem; min-width: min(100%, 14rem); max-width: 100%; font-size: .8rem; font-weight: 700; color: var(--text-muted, #64748b); }
+.saldados-toolbar input { box-sizing: border-box; width: 100%; min-height: 2.5rem; padding: .55rem .7rem; border: 1px solid var(--border, #dbe3ed); border-radius: .45rem; background: white; color: inherit; }
+.saldados-table-wrap { overflow-x: auto; }
+.saldados-table { min-width: 1100px; }
+.saldados-table th, .saldados-table td { white-space: nowrap; }
+.saldados-state { padding: 1.25rem; margin-bottom: 1rem; }
+@media (max-width: 700px) { .saldados-toolbar { gap: .75rem; } .saldados-toolbar label { flex-basis: 100%; min-width: 100%; } }

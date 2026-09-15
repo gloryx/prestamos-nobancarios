@@ -17,11 +17,17 @@ export class PrestamoResponseDto {
   @ApiProperty({ example: 100000 }) capital: number;
   @ApiPropertyOptional({ example: 75000 }) capitalPendiente?: number;
   @ApiPropertyOptional({ example: 90000 }) saldoPendiente?: number;
+  @ApiProperty({ example: 90000, description: 'Saldo financiero real: max(0, montoTotal - suma de pagos REGISTRADO.monto).' }) saldoFinanciero: number;
+  @ApiProperty({ example: 90000, description: 'Suma de los saldos pendientes operativos de las cuotas.' }) totalPlanOperativoPendiente: number;
+  @ApiProperty({ example: 0, description: 'Saldo financiero menos totalPlanOperativoPendiente, comparado en centavos.' }) diferenciaPlan: number;
+  @ApiProperty({ example: false, description: 'Indica si diferenciaPlan es distinta de cero centavos.' }) planRequiereAjuste: boolean;
   @ApiProperty({ example: 15000 }) interes: number;
   @ApiProperty({ example: 115000 }) montoTotal: number;
   @ApiProperty({ example: 100000 }) montoDesembolsado: number;
   @ApiProperty({ example: 12 }) cantidadPagos: number;
   @ApiProperty({ example: '2027-08-30', format: 'date', required: false }) fechaLimiteContractual?: string;
+  @ApiPropertyOptional({ example: '2027-08-30', format: 'date', nullable: true, description: 'Fecha de la transición económica ACTIVO a CANCELADO.' }) fechaCancelacion?: string | null;
+  @ApiPropertyOptional({ example: { id: 2, nombreCompleto: 'Ana Pérez' }, nullable: true, description: 'Usuario que registró la transición a CANCELADO, si existe.' }) usuarioCancelacion?: { id: number; nombreCompleto: string } | null;
   @ApiProperty({ enum: ['AL_DIA', 'ATRASADO', 'PLAZO_CUMPLIDO', 'SALDADO'], example: 'AL_DIA', required: false }) indicadorCobranza?: string;
   @ApiProperty({ example: false }) planPersonalizado: boolean;
   @ApiProperty({ enum: EstadoPrestamo, example: EstadoPrestamo.ACTIVO }) estado: EstadoPrestamo;

@@ -8,7 +8,7 @@ import { PrestamoOrmEntity } from '../../../prestamos/infrastructure/persistence
 import { PlanPagoOrmEntity } from '../../infrastructure/persistence/typeorm/plan-pago.orm-entity';
 import { PersonalizarPlanPagoDto } from '../dto/plan-pago-personalizado.dto';
 import { validarFechaVencimientoPlan } from './validar-plan-pago';
-import { calculatePlanPagoFlags, getProtectedPlanPagoIds, getRegisteredPlanPagoTotals, PlanPagoEditabilityService } from '../services/plan-pago-editability.service';
+import { calculatePlanPagoFlags, getProtectedPlanPagoIds, getRegisteredPlanPagoTotals, getPlanPagoPendingCents, getTotalPlanOperativoPendienteCents, PlanPagoEditabilityService } from '../services/plan-pago-editability.service';
 
 const cents = (value: number) => Math.round(value * 100);
 const money = (value: number) => cents(value) / 100;
@@ -95,13 +95,13 @@ export class PersonalizarPlanPagoUseCase {
 
       const all = [...preservedBeforeEditable, ...plans.filter((plan) => protectedIds.has(plan.id)), ...finalEntities].sort((a, b) => a.numeroPago - b.numeroPago);
       return {
-        saldoPendiente: money(balance),
-        totalPlanOperativoPendiente: money(proposedTotal),
+        saldoPendiente: balance / 100,
+        totalPlanOperativoPendiente: getTotalPlanOperativoPendienteCents(all, registeredByPlan as Map<number, number>) / 100,
         cuotas: all.map((plan) => {
           const paid = registeredByPlan.get(plan.id) ?? 0;
            const flags = this.editability?.calcularFlags(plan.numeroPago, protectedIds, plan.id!, loan.estado, lastProtectedNumber) ?? calculatePlanPagoFlags(plan.numeroPago, protectedIds, plan.id!, loan.estado, lastProtectedNumber);
-            const pending = paid > 0 ? 0 : cents(plan.montoProgramado);
-             return { id: plan.id, numeroPago: plan.numeroPago, fechaVencimiento: dateText(plan.fechaVencimiento), montoProgramado: plan.montoProgramado, montoPagado: money(paid), montoPendiente: money(pending), estado: paid > 0 ? 'PAGADA' : 'PENDIENTE', ...flags };
+             const pending = getPlanPagoPendingCents(plan, registeredByPlan as Map<number, number>);
+             return { id: plan.id, numeroPago: plan.numeroPago, fechaVencimiento: dateText(plan.fechaVencimiento), montoProgramado: plan.montoProgramado, montoPagado: paid / 100, montoPendiente: pending / 100, estado: paid > 0 ? 'PAGADA' : 'PENDIENTE', ...flags };
         }),
       };
     });

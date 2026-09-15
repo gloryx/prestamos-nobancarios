@@ -4,6 +4,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { EstadoPago } from '../../../pagos/domain/enums/estado-pago.enum';
 import { PagoOrmEntity } from '../../../pagos/infrastructure/persistence/typeorm/pago.orm-entity';
 import { EstadoPrestamo } from '../../../prestamos/domain/enums/estado-prestamo.enum';
+import { PlanPago } from '../../domain/entities/plan-pago';
 
 export type PlanPagoEditability = {
   protegida: boolean;
@@ -28,6 +29,18 @@ export const getRegisteredPlanPagoTotals = (pagos: PagoOrmEntity[]): Map<number,
   return totals;
 };
 
+/**
+ * A registered payment closes the operational installment. Any shortfall has
+ * already been redistributed to a later installment by the payment flow, so
+ * counting it again here would duplicate the operational debt. Annulled
+ * payments are deliberately absent from registeredTotals.
+ */
+export const getPlanPagoPendingCents = (plan: Pick<PlanPago, 'id' | 'montoProgramado'>, registeredTotals: Map<number, number>): number =>
+  (registeredTotals.get(plan.id!) ?? 0) > 0 ? 0 : Math.round(plan.montoProgramado * 100);
+
+export const getTotalPlanOperativoPendienteCents = (planes: Array<Pick<PlanPago, 'id' | 'montoProgramado'>>, registeredTotals: Map<number, number>): number =>
+  planes.reduce((total, plan) => total + getPlanPagoPendingCents(plan, registeredTotals), 0);
+
 @Injectable()
 export class PlanPagoEditabilityService {
   constructor(@InjectRepository(PagoOrmEntity) private readonly pagos: Repository<PagoOrmEntity>) {}
@@ -49,5 +62,13 @@ export class PlanPagoEditabilityService {
 
   registeredTotals(pagos: PagoOrmEntity[]): Map<number, number> {
     return getRegisteredPlanPagoTotals(pagos);
+  }
+
+  totalPlanOperativoPendiente(planes: PlanPago[], pagos: PagoOrmEntity[]): number {
+    return getTotalPlanOperativoPendienteCents(planes, this.registeredTotals(pagos));
+  }
+
+  montoPendiente(plan: PlanPago, pagos: PagoOrmEntity[]): number {
+    return getPlanPagoPendingCents(plan, this.registeredTotals(pagos));
   }
 }

@@ -131,3 +131,9 @@ test('candidatos y anulados usan endpoints ADMINISTRADOR y consultas bulk pagina
   assert.match(controller, /@Get\('candidatos-anulacion'\)[\s\S]*?@Roles\(RolUsuario\.ADMINISTRADOR\)/);
   assert.match(controller, /@Get\('anulados'\)[\s\S]*?@Roles\(RolUsuario\.ADMINISTRADOR\)/);
 });
+
+test('listarAnulados usa la columna real nombre_completo de Usuario', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/modules/prestamos/infrastructure/persistence/typeorm/prestamo.typeorm-repository.ts'), 'utf8');
+  assert.match(source, /u\.nombre_completo[\s\S]*anulacion_usuario_nombre/);
+  assert.doesNotMatch(source, /u\.(primer_nombre|segundo_nombre|primer_apellido|segundo_apellido)/);
+});

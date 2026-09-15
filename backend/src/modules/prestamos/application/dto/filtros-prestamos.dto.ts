@@ -9,6 +9,7 @@ export enum OrdenarPrestamosPor {
   CLIENTE = 'cliente',
   DIRECCION = 'direccion',
   FECHA_ALTA = 'fechaAlta',
+  FECHA_CANCELACION = 'fechaCancelacion',
   CAPITAL = 'capital',
   SALDO_PENDIENTE = 'saldoPendiente',
   ESTADO = 'estado',
@@ -28,6 +29,8 @@ export class FiltrosPrestamosDto {
   @ApiPropertyOptional({ enum: EstadoPrestamo, isArray: true, example: [EstadoPrestamo.ACTIVO, EstadoPrestamo.CANCELADO] }) @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((estado: string) => estado.trim()).filter(Boolean) : value) @IsArray() @IsEnum(EstadoPrestamo, { each: true }) estados?: EstadoPrestamo[];
   @ApiPropertyOptional({ example: '2026-01-01', format: 'date' }) @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fechaInicio?: string;
   @ApiPropertyOptional({ example: '2026-12-31', format: 'date' }) @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fechaFin?: string;
+  @ApiPropertyOptional({ example: '2026-09-01', format: 'date', description: 'Fecha de cancelación real inicial inclusiva.' }) @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fechaCancelacionDesde?: string;
+  @ApiPropertyOptional({ example: '2026-09-30', format: 'date', description: 'Fecha de cancelación real final inclusiva.' }) @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fechaCancelacionHasta?: string;
   @ApiPropertyOptional({ enum: EstadoPrestamo, example: EstadoPrestamo.ACTIVO }) @IsOptional() @IsEnum(EstadoPrestamo) estado?: EstadoPrestamo;
   @ApiPropertyOptional({ enum: INDICADORES_COBRANZA }) @IsOptional() @IsIn(INDICADORES_COBRANZA) indicadorCobranza?: IndicadorCobranza;
   @ApiPropertyOptional({ example: 1 }) @IsOptional() @Type(() => Number) @IsInt() @IsPositive() clienteId?: number;

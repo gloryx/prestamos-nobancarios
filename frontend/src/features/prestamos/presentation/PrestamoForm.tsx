@@ -186,6 +186,7 @@ export function PrestamoForm({
   formasPago, periodicidades, initialSelectedClient, initialLoan, initialPlan = [], initialSummary, mode = 'create', onUpdate, onCancel,
 }: { formasPago: FormaPago[]; periodicidades: Periodicidad[]; initialSelectedClient?: Cliente; initialLoan?: Prestamo; initialPlan?: PlanPago[]; initialSummary?: PagoResumen; mode?: 'create' | 'edit'; onUpdate?: (input: PrestamoUpdateInput) => Promise<Prestamo>; onCancel: () => void }) {
   const isEdit = mode === 'edit'
+  const isRefinanced = isEdit && initialLoan?.estado === 'REFINANCIADO'
   const [selectedClient, setSelectedClient] = useState<Cliente | null>(() => initialSelectedClient ?? null)
   const [stage, setStage] = useState<1 | 2 | 3>(1)
   const [planType, setPlanType] = useState<PlanType>('automatico')
@@ -267,7 +268,7 @@ export function PrestamoForm({
       return
     }
 
-    const input: PrestamoInput = {
+    const input: PrestamoUpdateInput = isRefinanced ? { observaciones: current.observaciones.trim() } : {
       clienteId: selectedClient.id,
       periodicidadPagoId: current.periodicidadPagoId,
       formaPagoId: current.formaPagoId,
@@ -294,7 +295,7 @@ export function PrestamoForm({
     try {
       const prestamo = isEdit
         ? await onUpdate?.(input)
-        : await crearPrestamo(prestamoRepository, input)
+        : await crearPrestamo(prestamoRepository, input as PrestamoInput)
       if (!prestamo) return
       if (isEdit) {
         setSaved(true)
@@ -331,6 +332,7 @@ export function PrestamoForm({
   const predictivePlanMismatch = changedFinancialData && initialSummary != null && predictedSaldo >= 0 && Math.round(predictedSaldo * 100) !== Math.round(operationalPending * 100)
   const canPersonalize = initialLoan?.estado === 'ACTIVO'
   return <form className="prestamo-form" onSubmit={onSubmit} noValidate>
+     {isRefinanced && <p className="form-note" role="note">Este préstamo fue refinanciado. Los datos contractuales y financieros se conservan como históricos. Solo puede modificar las observaciones.</p>}
      <div className="prestamo-stages" aria-label="Etapas del nuevo préstamo">
         <div className={`prestamo-stage ${stage === 1 ? 'active' : ''} ${stage > 1 ? 'completed' : ''}`}><strong>1</strong><span>Datos del préstamo</span></div>
         <div className={`prestamo-stage ${stage === 2 ? 'active' : ''} ${stage > 2 ? 'completed' : ''}`}><strong>2</strong><span>Plan de pagos</span></div>
@@ -358,13 +360,13 @@ export function PrestamoForm({
       </section> : <>
     <div className="prestamo-form-grid">
        <div className="prestamo-client-field prestamo-wide"><span>Cliente</span><ClienteSelector selectedClient={selectedClient} onSelectClient={handleSelectClient} locked={isEdit} /><input type="hidden" {...register('clienteId', { valueAsNumber: true })} value={selectedClient?.id ?? 0} />{field('clienteId')}</div>
-      <label>Fecha de alta<input type="date" {...register('fechaAlta')} />{field('fechaAlta')}</label>
-       <label>Forma de pago<select {...register('formaPagoId', { setValueAs: (value) => Number(value) })}><option value="0">Seleccioná una forma de pago</option>{formasPago.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>{field('formaPagoId')}</label>
-       <label>Forma de desembolso<select {...register('formaDesembolsoId', { setValueAs: (value) => Number(value) })}><option value="0">Seleccioná una forma de desembolso</option>{formasPago.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>{field('formaDesembolsoId')}</label>
-      <label>Capital<Controller name="capital" control={control} render={({ field: input }) => <CurrencyInput {...input} value={input.value} onChange={input.onChange} inputMode="decimal" aria-invalid={!!errors.capital} />} />{field('capital')}</label>
-      <label>Monto interés<Controller name="interes" control={control} render={({ field: input }) => <CurrencyInput {...input} value={input.value} onChange={input.onChange} inputMode="decimal" aria-invalid={!!errors.interes} />} />{field('interes')}</label>
-      <label>Periodicidad<select {...register('periodicidadPagoId', { setValueAs: (value) => Number(value) })}><option value="0">Seleccioná una periodicidad</option>{periodicidades.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>{field('periodicidadPagoId')}</label>
-      <label>Cantidad de pagos<input type="number" min="1" step="1" {...register('cantidadPagos', { setValueAs: (value) => Number(value) })} />{field('cantidadPagos')}</label>
+       <label>Fecha de alta<input type="date" readOnly={isRefinanced} {...register('fechaAlta')} />{field('fechaAlta')}</label>
+        <label>Forma de pago<select disabled={isRefinanced} {...register('formaPagoId', { setValueAs: (value) => Number(value) })}><option value="0">Seleccioná una forma de pago</option>{formasPago.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>{field('formaPagoId')}</label>
+        <label>Forma de desembolso<select disabled={isRefinanced} {...register('formaDesembolsoId', { setValueAs: (value) => Number(value) })}><option value="0">Seleccioná una forma de desembolso</option>{formasPago.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>{field('formaDesembolsoId')}</label>
+       <label>Capital<Controller name="capital" control={control} render={({ field: input }) => <CurrencyInput {...input} disabled={isRefinanced} value={input.value} onChange={input.onChange} inputMode="decimal" aria-invalid={!!errors.capital} />} />{field('capital')}</label>
+       <label>Monto interés<Controller name="interes" control={control} render={({ field: input }) => <CurrencyInput {...input} disabled={isRefinanced} value={input.value} onChange={input.onChange} inputMode="decimal" aria-invalid={!!errors.interes} />} />{field('interes')}</label>
+       <label>Periodicidad<select disabled={isRefinanced} {...register('periodicidadPagoId', { setValueAs: (value) => Number(value) })}><option value="0">Seleccioná una periodicidad</option>{periodicidades.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>{field('periodicidadPagoId')}</label>
+       <label>Cantidad de pagos<input type="number" min="1" step="1" disabled={isRefinanced} {...register('cantidadPagos', { setValueAs: (value) => Number(value) })} />{field('cantidadPagos')}</label>
         <label className="prestamo-wide">Observaciones<textarea rows={3} maxLength={1000} {...register('observaciones')} />{field('observaciones')}</label>
     </div>
      {isEdit && initialSummary && <section className="prestamo-edit-plan" aria-labelledby="prestamo-edit-plan-title">

@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { apiClient } from '@/core/api/client'
-import type { CrearRefinanciamientoInput, RefinanciamientoListFilters, RefinanciamientoPage, RefinanciamientoPreview, RefinanciamientoReportFilters, RefinanciamientoReportResponse, RefinanciamientoRepository, RefinanciamientoResponse } from '../domain/refinanciamiento.types'
+import type { CrearRefinanciamientoInput, RefinanciamientoListFilters, RefinanciamientoPage, RefinanciamientoPreview, RefinanciamientoReportFilters, RefinanciamientoReportResponse, RefinanciamientoRepository, RefinanciamientoResponse, PrestamosElegiblesPage } from '../domain/refinanciamiento.types'
 
 export class RefinanciamientoRequestError extends Error {
   status: number
@@ -18,6 +18,9 @@ function rethrow(error: unknown): never {
 }
 
 export class AxiosRefinanciamientoRepository implements RefinanciamientoRepository {
+  async listEligible(filters: { pagina: number; limite: number; buscar?: string }): Promise<PrestamosElegiblesPage> {
+    try { return (await apiClient.get<PrestamosElegiblesPage>('/refinanciamientos/prestamos-elegibles', { params: filters })).data } catch (error) { return rethrow(error) }
+  }
   async list(filters: RefinanciamientoListFilters): Promise<RefinanciamientoPage> {
     try { return (await apiClient.get<RefinanciamientoPage>('/refinanciamientos', { params: filters })).data } catch (error) { return rethrow(error) }
   }
@@ -29,5 +32,14 @@ export class AxiosRefinanciamientoRepository implements RefinanciamientoReposito
   }
   async create(input: CrearRefinanciamientoInput): Promise<RefinanciamientoResponse> {
     try { return (await apiClient.post<RefinanciamientoResponse>('/refinanciamientos', input)).data } catch (error) { return rethrow(error) }
+  }
+  async detail(id: number): Promise<RefinanciamientoResponse> {
+    try { return (await apiClient.get<RefinanciamientoResponse>(`/refinanciamientos/${id}`)).data } catch (error) { return rethrow(error) }
+  }
+  async byOriginLoan(id: number): Promise<RefinanciamientoResponse> {
+    try { return (await apiClient.get<RefinanciamientoResponse>(`/refinanciamientos/prestamo-origen/${id}`)).data } catch (error) { return rethrow(error) }
+  }
+  async byNewLoan(id: number): Promise<RefinanciamientoResponse> {
+    try { return (await apiClient.get<RefinanciamientoResponse>(`/refinanciamientos/prestamo-nuevo/${id}`)).data } catch (error) { return rethrow(error) }
   }
 }

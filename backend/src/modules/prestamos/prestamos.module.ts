@@ -29,11 +29,14 @@ import { PrestamosExcelGenerator } from './infrastructure/reports/prestamos-exce
 import { AnularPrestamoUseCase } from './application/use-cases/anular-prestamo.use-case';
 import { PrestamoAnulacionService } from './application/services/prestamo-anulacion.service';
 import { PrestamoIncobrableService } from './application/services/prestamo-incobrable.service';
+import { ReporteRentabilidadCanceladosUseCase } from './application/use-cases/reporte-rentabilidad-cancelados.use-case';
+import { RENTABILIDAD_CANCELADOS_REPOSITORY } from './domain/repositories/rentabilidad-cancelados.repository';
+import { RentabilidadCanceladosTypeOrmRepository } from './infrastructure/persistence/typeorm/rentabilidad-cancelados.typeorm-repository';
 
 @Module({
   imports: [ClientesModule, PeriodicidadesPagoModule, FormasPagoModule, MovimientosCajaModule, forwardRef(() => PlanesPagoModule), forwardRef(() => PagosModule), PrestamoEstadoHistorialModule, TypeOrmModule.forFeature([PrestamoOrmEntity, PrestamoEstadoHistorialOrmEntity, PagoOrmEntity, PlanPagoOrmEntity])],
   controllers: [PrestamosController],
-  providers: [CrearPrestamoUseCase, ListarPrestamosUseCase, ResumirPrestamosUseCase, ExportarPrestamosExcelUseCase, PrestamosExcelGenerator, ObtenerPrestamoPorIdUseCase, ActualizarPrestamoUseCase, CambiarEstadoPrestamoUseCase, AnularPrestamoUseCase, PrestamoAnulacionService, PrestamoIncobrableService, PlanPagoPdfService, PlanPagoPdfInfrastructureService, PrestamoReferences, IndicadorCobranzaService, { provide: PRESTAMO_REPOSITORY, useClass: PrestamoTypeOrmRepository }],
+  providers: [CrearPrestamoUseCase, ListarPrestamosUseCase, ResumirPrestamosUseCase, ExportarPrestamosExcelUseCase, PrestamosExcelGenerator, ObtenerPrestamoPorIdUseCase, ActualizarPrestamoUseCase, CambiarEstadoPrestamoUseCase, AnularPrestamoUseCase, PrestamoAnulacionService, PrestamoIncobrableService, PlanPagoPdfService, PlanPagoPdfInfrastructureService, PrestamoReferences, IndicadorCobranzaService, ReporteRentabilidadCanceladosUseCase, { provide: PRESTAMO_REPOSITORY, useClass: PrestamoTypeOrmRepository }, { provide: RENTABILIDAD_CANCELADOS_REPOSITORY, useClass: RentabilidadCanceladosTypeOrmRepository }],
   exports: [PRESTAMO_REPOSITORY, PrestamoReferences],
 })
 export class PrestamosModule {}

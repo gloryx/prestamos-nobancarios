@@ -47,8 +47,8 @@ function updateHarness(value, totals = { capital: 0, interes: 0, total: 0 }) {
   return { useCase: new ActualizarPrestamoUseCase(repository, references, pagos), get saved() { return saved; } };
 }
 
-test('updates ACTIVO, INCOBRABLE, and REFINANCIADO loans', async t => {
-  for (const state of [EstadoPrestamo.ACTIVO, EstadoPrestamo.INCOBRABLE, EstadoPrestamo.REFINANCIADO]) {
+test('updates ACTIVO and INCOBRABLE loans', async t => {
+  for (const state of [EstadoPrestamo.ACTIVO, EstadoPrestamo.INCOBRABLE]) {
     await t.test(state, async () => {
       const value = loan(state);
       const harness = updateHarness(value);
@@ -75,7 +75,7 @@ test('allows changing a loan that already has payments', async () => {
 
 test('rejects capital and interest below their accumulated paid totals', async t => {
   const cases = [
-    ['capital', { capital: 999 }, { capital: 1000, interes: 0, total: 1000 }, 'El capital del préstamo no puede ser menor al capital ya pagado.'],
+    ['capital', { capital: 500 }, { capital: 600, interes: 0, total: 600 }, 'El capital del préstamo no puede ser menor al capital ya pagado.'],
     ['interest', { interes: 499 }, { capital: 0, interes: 500, total: 500 }, 'El interés del préstamo no puede ser menor al interés ya pagado.'],
   ];
   for (const [name, dto, totals, message] of cases) {
@@ -85,16 +85,29 @@ test('rejects capital and interest below their accumulated paid totals', async t
   }
 });
 
-test('rejects capital below the historical disbursed amount without saving', async () => {
+test('allows capital below the historical disbursed amount for ACTIVO and INCOBRABLE', async t => {
+  for (const state of [EstadoPrestamo.ACTIVO, EstadoPrestamo.INCOBRABLE]) await t.test(state, async () => {
+    const value = loan(state);
+    value.montoDesembolsado = 1000000;
+    const updated = await updateHarness(value, { capital: 200000, interes: 0, total: 200000 }).useCase.execute(7, { capital: 900000 });
+    assert.equal(updated.capital, 900000);
+    assert.equal(updated.interes, 200);
+    assert.equal(updated.montoTotal, 900200);
+    assert.equal(updated.montoDesembolsado, 1000000);
+  });
+});
+
+test('allows capital below disbursed amount when there are no payments', async () => {
   const value = loan();
   value.montoDesembolsado = 1100;
-  const harness = updateHarness(value);
-  await assert.rejects(
-    () => harness.useCase.execute(7, { capital: 1099 }),
-    error => error.message === 'El capital del préstamo no puede ser menor al monto desembolsado.',
-  );
-  assert.equal(harness.saved, undefined);
-  assert.equal(value.capital, 1000);
+  const updated = await updateHarness(value).useCase.execute(7, { capital: 900 });
+  assert.equal(updated.capital, 900);
+  assert.equal(updated.montoDesembolsado, 1100);
+});
+
+test('allows capital equal to the capital already applied', async () => {
+  const updated = await updateHarness(loan(), { capital: 600, interes: 0, total: 600 }).useCase.execute(7, { capital: 600 });
+  assert.equal(updated.capital, 600);
 });
 
 test('allows reducing future interest while preserving already collected interest', async () => {

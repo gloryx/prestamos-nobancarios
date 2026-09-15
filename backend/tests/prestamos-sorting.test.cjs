@@ -3,22 +3,24 @@ const assert = require('node:assert/strict');
 
 const Repository = require('../dist/modules/prestamos/infrastructure/persistence/typeorm/prestamo.typeorm-repository').PrestamoTypeOrmRepository;
 
-function setup(supportAliases = false) {
+function setup(supportAliases = false, listedEntities = [], listedRaw = []) {
   const calls = [];
+  const filters = [];
+  const countOrder = [];
   const selects = [];
   const qb = {
-    where() { return this; }, andWhere() { return this; }, leftJoinAndSelect() { return this; },
+    where(...args) { filters.push(['where', ...args]); return this; }, andWhere(...args) { filters.push(['andWhere', ...args]); return this; }, leftJoinAndSelect() { return this; },
     leftJoin() { return this; }, setParameter() { return this; }, setParameters() { return this; },
     orderBy(...args) { calls.push(['orderBy', ...args]); return this; },
     addOrderBy(...args) { calls.push(['addOrderBy', ...args]); return this; },
     skip(value) { calls.push(['skip', value]); return this; }, take(value) { calls.push(['take', value]); return this; },
-    async getManyAndCount() { return [[], 0]; },
+     async getManyAndCount() { return [[], 0]; }, async getRawAndEntities() { calls.push(['getRawAndEntities']); return { entities: listedEntities, raw: listedRaw }; }, async getCount() { countOrder.push('getCount'); return 0; }, clone() { return this; },
   };
   if (supportAliases) qb.addSelect = function(...args) { selects.push(args); return this; };
   const repository = Object.create(Repository.prototype);
   const aggregate = { select() { return this; }, addSelect() { return this; }, from() { return this; }, where() { return this; }, andWhere() { return this; }, groupBy() { return this; }, getQuery() { return 'SELECT pago.prestamo_id, SUM(pago.monto) AS total_pagado FROM pago pago GROUP BY pago.prestamo_id'; }, getParameters() { return {}; }, async getRawMany() { return []; } };
   repository.repository = { createQueryBuilder: () => qb, manager: { createQueryBuilder: () => aggregate } };
-  return { repository, calls, selects };
+  return { repository, calls, filters, selects, countOrder };
 }
 
 const expected = {
@@ -38,6 +40,82 @@ for (const field of Object.keys(expected)) for (const direction of ['ASC', 'DESC
 test('default order is unchanged', async () => {
   const { repository, calls } = setup(); await repository.listar({ pagina: 1, limite: 10 });
   assert.deepEqual(calls.slice(0, 2), [['orderBy', 'prestamo.fecha_alta', 'DESC'], ['addOrderBy', 'prestamo.id', 'DESC']]);
+});
+
+test('cancelled listings select the latest transition to CANCELADO in bulk and default to its date', async () => {
+  const { repository, calls, selects } = setup(true);
+  await repository.listar({ pagina: 1, limite: 10, estados: ['CANCELADO'] });
+  assert.equal(calls.filter((call) => call[0] === 'getRawAndEntities').length, 1);
+  assert.equal(selects.filter((select) => ['fecha_cancelacion_orden', 'cancelacion_fecha', 'cancelacion_usuario_id', 'cancelacion_usuario_nombre'].includes(select[1])).length, 4);
+  assert.deepEqual(calls.slice(0, 2), [['orderBy', 'fecha_cancelacion_orden', 'DESC', 'NULLS LAST'], ['addOrderBy', 'prestamo.id', 'DESC']]);
+});
+
+test('cancelled history accepts ACTIVO and INCOBRABLE predecessors and uses the latest date/id', () => {
+  const source = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../src/modules/prestamos/infrastructure/persistence/typeorm/prestamo.typeorm-repository.ts'), 'utf8');
+  const cancellationQueries = source.match(/SELECT [\s\S]*?estado_nuevo = 'CANCELADO'[\s\S]*?LIMIT 1\)/g) ?? [];
+  assert.ok(cancellationQueries.length >= 1);
+  for (const query of cancellationQueries) {
+    assert.doesNotMatch(query, /estado_anterior\s*=\s*'ACTIVO'/);
+    assert.match(query, /ORDER BY h\.fecha DESC, h\.id DESC LIMIT 1/);
+  }
+});
+
+test('real cancellation date range filters the latest CANCELADO transition before pagination', async () => {
+  const { repository, calls, filters, countOrder } = setup(true);
+  await repository.listar({ pagina: 3, limite: 10, estados: ['CANCELADO'], buscar: 'Ana', fechaInicio: '2026-01-01', fechaFin: '2026-12-31', fechaCancelacionDesde: '2026-09-01', fechaCancelacionHasta: '2026-09-30' });
+  const dateFilters = filters.filter(([kind, expression]) => kind === 'andWhere' && String(expression).includes('prestamo_estado_historial'));
+  assert.equal(dateFilters.length, 2);
+  assert.match(String(dateFilters[0][1]), /estado_nuevo = 'CANCELADO'/);
+  assert.match(String(dateFilters[0][1]), /ORDER BY h\.fecha DESC, h\.id DESC LIMIT 1/);
+  assert.match(String(dateFilters[1][1]), /INTERVAL '1 day'/);
+  assert.deepEqual(countOrder, ['getCount']);
+  assert.ok(calls.findIndex((call) => call[0] === 'skip') >= 0);
+});
+
+test('cancellation date filters are optional and preserve search, state, and date-alta filters', async () => {
+  const { repository, calls, filters } = setup(true);
+  await repository.listar({ pagina: 1, limite: 10, estado: 'CANCELADO', buscar: '555', fechaInicio: '2026-01-01', fechaFin: '2026-01-31' });
+  assert.equal(filters.some(([kind, expression]) => kind === 'andWhere' && String(expression).includes('prestamo_estado_historial')), false);
+  assert.ok(filters.some(([kind, expression]) => kind === 'andWhere' && typeof expression === 'object'));
+  assert.ok(filters.some(([kind, expression]) => kind === 'andWhere' && expression === 'prestamo.fecha_alta >= :fechaInicio'));
+  assert.ok(filters.some(([kind, expression]) => kind === 'andWhere' && expression === 'prestamo.fecha_alta <= :fechaFin'));
+});
+
+for (const rangeFilters of [
+  { fechaCancelacionDesde: '2026-09-01' },
+  { fechaCancelacionHasta: '2026-09-30' },
+]) test(`cancellation range supports ${Object.keys(rangeFilters)[0]} without the other bound`, async () => {
+  const { repository, filters } = setup(true);
+  await repository.listar({ pagina: 1, limite: 10, estados: ['CANCELADO'], ...rangeFilters });
+  assert.equal(filters.filter(([kind, expression]) => kind === 'andWhere' && String(expression).includes('prestamo_estado_historial')).length, 1);
+});
+
+test('cancellation filter DTO accepts from, until, both inclusive values and rejects invalid dates', async () => {
+  const { ValidationPipe } = require('@nestjs/common');
+  const { FiltrosPrestamosDto } = require('../dist/modules/prestamos/application/dto/filtros-prestamos.dto');
+  const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true });
+  const dto = await pipe.transform({ fechaCancelacionDesde: '2026-09-01', fechaCancelacionHasta: '2026-09-30' }, { type: 'query', metatype: FiltrosPrestamosDto });
+  assert.equal(dto.fechaCancelacionDesde, '2026-09-01');
+  assert.equal(dto.fechaCancelacionHasta, '2026-09-30');
+  await assert.rejects(() => pipe.transform({ fechaCancelacionDesde: '2026-09-31' }, { type: 'query', metatype: FiltrosPrestamosDto }));
+});
+
+test('cancelled listing maps transition date and actor without changing financial fields', async () => {
+  const entity = { id: 7, clienteId: 1, periodicidadPagoId: 1, formaPagoId: 1, formaDesembolsoId: null, fechaAlta: '2026-01-01', capital: 100, interes: 20, montoTotal: 120, montoDesembolsado: 100, cantidadPagos: 1, planPersonalizado: false, estado: 'CANCELADO', observaciones: null, fechaCreacion: new Date(), fechaActualizacion: new Date(), cliente: { id: 1, primerNombre: 'Ana', primerApellido: 'Pérez', identificacion: '1', direccion: null, telefono1: '8888' }, periodicidadPago: { id: 1, nombre: 'MENSUAL' }, formaPago: { id: 1, nombre: 'EFECTIVO' }, formaDesembolso: null };
+  const raw = [{ cancelacion_fecha: '2026-12-31', cancelacion_usuario_id: '3', cancelacion_usuario_nombre: 'Luis Mora' }];
+  const { repository } = setup(true, [entity], raw);
+  const result = await repository.listar({ pagina: 1, limite: 10, estados: ['CANCELADO'] });
+  assert.equal(result.datos[0].fechaCancelacion, '2026-12-31');
+  assert.deepEqual(result.datos[0].usuarioCancelacion, { id: 3, nombreCompleto: 'Luis Mora' });
+  assert.equal(result.datos[0].montoTotal, 120);
+});
+
+for (const rawDate of [new Date(2026, 8, 9), '2026-09-09 00:00:00']) test(`cancelled listing serializes ${rawDate instanceof Date ? 'Date' : 'SQL string'} as its calendar date`, async () => {
+  if (rawDate instanceof Date) assert.equal(String(rawDate).slice(0, 10), 'Wed Sep 09');
+  const entity = { id: 7, clienteId: 1, periodicidadPagoId: 1, formaPagoId: 1, formaDesembolsoId: null, fechaAlta: '2026-01-01', capital: 100, interes: 20, montoTotal: 120, montoDesembolsado: 100, cantidadPagos: 1, planPersonalizado: false, estado: 'CANCELADO', observaciones: null, fechaCreacion: new Date(), fechaActualizacion: new Date(), cliente: { id: 1, primerNombre: 'Ana', primerApellido: 'Pérez', identificacion: '1', direccion: null, telefono1: '8888' }, periodicidadPago: { id: 1, nombre: 'MENSUAL' }, formaPago: { id: 1, nombre: 'EFECTIVO' }, formaDesembolso: null };
+  const { repository } = setup(true, [entity], [{ cancelacion_fecha: rawDate }]);
+  const result = await repository.listar({ pagina: 1, limite: 10, estados: ['CANCELADO'] });
+  assert.equal(result.datos[0].fechaCancelacion, '2026-09-09');
 });
 
 test('address uses NULLS LAST and stable tie-break', async () => {

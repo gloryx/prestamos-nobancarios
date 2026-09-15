@@ -67,6 +67,15 @@ test('permite parcial exacta y conserva el programado', async () => {
   assert.equal(result.fecha.toISOString(), '2026-09-07T00:00:00.000Z');
 });
 
+test('preserves future dates for an exact payment after the original due date', async () => {
+  const source = new FakeDataSource([
+    { ...plan(1, 1, 100), fechaVencimiento: '2026-09-01' },
+    { ...plan(2, 2, 100), fechaVencimiento: '2026-09-08' },
+  ], [], { capital: 200, interes: 0 });
+  await useCase(source).execute(dto(1, 100, '2026-10-03'), 9);
+  assert.deepEqual(source.plans.map((item) => item.fechaVencimiento), ['2026-10-03', '2026-09-08']);
+});
+
 test('transfers a partial payment shortage once to the next operational installment', async () => {
   const source = new FakeDataSource([plan(4, 4, 100000), plan(5, 5, 100000), plan(6, 6, 100000)], [], { capital: 300000, interes: 0 });
   await useCase(source).execute(dto(4, 50000), 9);
@@ -129,7 +138,7 @@ test('redistributes overpayment only after completing the current installment', 
   assert.equal(several.plans.reduce((sum, item) => sum + item.montoProgramado, 0), 55000);
 });
 
-test('assigns the payment date to every affected installment and preserves unaffected dates', async () => {
+test('assigns the payment date only to the selected installment and preserves future dates', async () => {
   const source = new FakeDataSource([
     { ...plan(1, 1, 10000), fechaVencimiento: '2026-09-01' },
     { ...plan(2, 2, 10000), fechaVencimiento: '2026-09-08' },
@@ -138,13 +147,18 @@ test('assigns the payment date to every affected installment and preserves unaff
   ], [], { capital: 55000, interes: 0 });
   const result = await useCase(source).execute(dto(1, 25000, '2026-10-03'), 9);
   assert.equal(result.fecha.toISOString(), '2026-10-03T00:00:00.000Z');
-  assert.deepEqual(source.plans.map((item) => [item.montoProgramado, item.fechaVencimiento]), [[25000, '2026-10-03'], [10000, '2026-10-03'], [20000, '2026-09-22']]);
+  assert.deepEqual(source.plans.map((item) => [item.montoProgramado, item.fechaVencimiento]), [[25000, '2026-10-03'], [10000, '2026-09-15'], [20000, '2026-09-22']]);
 });
 
-test('redistribuye sobrepago en cascada y elimina solo cuotas futuras sin pagos', async () => {
-  const source = new FakeDataSource([plan(1, 1, 100), plan(2, 2, 30), plan(3, 3, 40), plan(4, 4, 50)], [payment(2, 2, 10)], { interes: 220 });
+test('redistribuye sobrepago, renumera y conserva la fecha del sobreviviente', async () => {
+  const source = new FakeDataSource([
+    { ...plan(1, 1, 100), fechaVencimiento: '2026-09-01' },
+    { ...plan(2, 2, 30), fechaVencimiento: '2026-09-08' },
+    { ...plan(3, 3, 40), fechaVencimiento: '2026-09-15' },
+    { ...plan(4, 4, 50), fechaVencimiento: '2026-09-22' },
+  ], [payment(2, 2, 10)], { interes: 220 });
   await useCase(source).execute(dto(1, 160), 9);
-  assert.deepEqual(source.plans.map((item) => [item.id, item.montoProgramado]), [[1, 160], [2, 30], [4, 30]]);
+  assert.deepEqual(source.plans.map((item) => [item.id, item.montoProgramado, item.fechaVencimiento]), [[1, 160, '2026-09-05'], [2, 30, '2026-09-08'], [4, 30, '2026-09-22']]);
 });
 
 test('rejects direct attempts to skip the first pending installment with a functional message', async () => {

@@ -3,12 +3,12 @@ import { EstadoPrestamo } from '../enums/estado-prestamo.enum';
 import { FiltrosIncobrablesDto } from '../../application/dto/filtros-incobrables.dto';
 import { EntityManager } from 'typeorm';
 
-export type OrdenarPrestamosPor = 'id' | 'cliente' | 'direccion' | 'fechaAlta' | 'capital' | 'saldoPendiente' | 'estado' | 'indicadorCobranza';
+export type OrdenarPrestamosPor = 'id' | 'cliente' | 'direccion' | 'fechaAlta' | 'fechaCancelacion' | 'capital' | 'saldoPendiente' | 'estado' | 'indicadorCobranza';
 export type DireccionOrden = 'ASC' | 'DESC';
-export interface FiltrosPrestamos { pagina: number; limite: number; buscar?: string; direccion?: string; estados?: EstadoPrestamo[]; fechaInicio?: string; fechaFin?: string; estado?: EstadoPrestamo; clienteId?: number; ordenarPor?: OrdenarPrestamosPor; direccionOrden?: DireccionOrden; candidateIds?: number[]; }
+export interface FiltrosPrestamos { pagina: number; limite: number; buscar?: string; direccion?: string; estados?: EstadoPrestamo[]; fechaInicio?: string; fechaFin?: string; fechaCancelacionDesde?: string; fechaCancelacionHasta?: string; estado?: EstadoPrestamo; clienteId?: number; ordenarPor?: OrdenarPrestamosPor; direccionOrden?: DireccionOrden; candidateIds?: number[]; }
 export interface PrestamoRelacion { id: number; nombre: string; identificacion?: string; nombreCompleto?: string; direccion?: string | null; telefono?: string | null; }
 export interface PrestamoConRelaciones extends Prestamo { cliente: PrestamoRelacion; periodicidadPago: PrestamoRelacion; formaPago: PrestamoRelacion; formaDesembolso: PrestamoRelacion | null; puedeAnular?: boolean; }
-export interface PrestamoListado extends PrestamoConRelaciones { capitalPendiente: number; saldoPendiente: number; }
+export interface PrestamoListado extends PrestamoConRelaciones { capitalPendiente: number; saldoPendiente: number; fechaCancelacion?: string | null; usuarioCancelacion?: { id: number; nombreCompleto: string } | null; }
 export interface PrestamosPaginados { datos: PrestamoListado[]; pagina: number; limite: number; total: number; totalPaginas: number; }
 export interface IncobrableListado extends PrestamoListado { fechaVencimiento?: string; saldoCuota?: number; fechaIncobrable?: string; observacionIncobrable?: string | null; diasEnEstado?: number; ultimaFechaPago?: string | null; puedePasarAIncobrable: boolean; puedeReactivar: boolean; }
 export interface IncobrablesPaginados { datos: IncobrableListado[]; pagina: number; limite: number; total: number; totalPaginas: number; }

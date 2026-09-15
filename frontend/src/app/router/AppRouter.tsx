@@ -21,6 +21,8 @@ import { RefinanciamientosPage } from "@/features/refinanciamientos/presentation
 import { RefinanciamientosReportePage } from "@/features/refinanciamientos/presentation/RefinanciamientosReportePage";
 import { GestionIncobrablesPage } from "@/features/prestamos/presentation/GestionIncobrablesPage";
 import { GestionAnulacionesPage } from "@/features/prestamos/presentation/GestionAnulacionesPage";
+import { SaldadosPage } from "@/features/prestamos/presentation/SaldadosPage";
+import { RentabilidadCanceladosPage } from "@/features/prestamos/presentation/RentabilidadCanceladosPage";
 
 export function AppRouter() {
   return (
@@ -45,9 +47,12 @@ export function AppRouter() {
               <Route path="clientes/analisis-financiero" element={<AnalisisFinancieroClientePage />} />
               <Route path="clientes/reporte" element={<PlaceholderPage />} />
               <Route path="prestamos" element={<PrestamosListPage />} />
+              <Route path="prestamos/saldados" element={<SaldadosPage />} />
               <Route path="prestamos/nuevo" element={<PrestamosPage />} />
               <Route path="prestamos/:id/editar" element={<PrestamosPage />} />
               <Route path="prestamos/seguimiento-cartera" element={<SeguimientoCarteraPage />} />
+              <Route path="prestamos/reporte" element={<RentabilidadCanceladosPage />} />
+              <Route path="finanzas/caja/cortes/rentabilidad-cancelados" element={<RentabilidadCanceladosPage />} />
               <Route path="pagos/registrar" element={<RegistrarPagoPage />} />
               <Route path="refinanciamientos" element={<RefinanciamientosPage />} />
               <Route path="refinanciamientos/nuevo" element={<NuevoRefinanciamientoPage />} />

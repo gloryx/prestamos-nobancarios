@@ -17,6 +17,9 @@ import { ObtenerCadenasClienteUseCase } from '../../application/use-cases/obtene
 import { CadenasClienteResponseDto } from '../dto/cadenas-cliente-response.dto';
 import { calcularDiasGanados } from '../../application/services/calcular-dias-ganados';
 import { RefinanciamientosReporteResponseDto } from '../dto/refinanciamientos-reporte-response.dto';
+import { FiltrosPrestamosElegiblesDto } from '../../application/dto/filtros-prestamos-elegibles.dto';
+import { ListarPrestamosElegiblesUseCase } from '../../application/use-cases/listar-prestamos-elegibles.use-case';
+import { PrestamosElegiblesPaginadosResponseDto } from '../dto/prestamos-elegibles-paginados-response.dto';
 const response = (v: RefinanciamientoConRelaciones): RefinanciamientoResponseDto => {
   const nuevo = v.prestamoNuevo!;
   const dineroNuevoDesembolsado = nuevo.montoDesembolsado;
@@ -30,7 +33,9 @@ const listadoResponse = (v: RefinanciamientoConRelaciones) => ({ ...response(v),
 @Controller('refinanciamientos')
 @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
 export class RefinanciamientosController {
-  constructor(private readonly crear: CrearRefinanciamientoUseCase, private readonly queries: RefinanciamientoQueries, private readonly preview: PrevisualizarRefinanciamientoUseCase, private readonly cadenasCliente: ObtenerCadenasClienteUseCase) {}
+  constructor(private readonly crear: CrearRefinanciamientoUseCase, private readonly queries: RefinanciamientoQueries, private readonly preview: PrevisualizarRefinanciamientoUseCase, private readonly cadenasCliente: ObtenerCadenasClienteUseCase, private readonly elegibles: ListarPrestamosElegiblesUseCase) {}
+  @Get('prestamos-elegibles') @ApiOperation({ summary: 'Listar préstamos elegibles para refinanciamiento', description: 'Busca y pagina server-side únicamente préstamos cuyo estado, interés, saldo refinanciable y origen no utilizado cumplen las reglas vigentes.' }) @ApiQuery({ name: 'pagina', required: false, type: Number }) @ApiQuery({ name: 'limite', required: false, type: Number }) @ApiQuery({ name: 'buscar', required: false, description: 'ID o número de préstamo, nombre, identificación, teléfono o dirección.' }) @ApiResponse({ status: 200, type: PrestamosElegiblesPaginadosResponseDto })
+  async listarElegibles(@Query() dto: FiltrosPrestamosElegiblesDto) { return this.elegibles.execute(dto); }
   @Get('prestamo/:prestamoId/preview') @ApiOperation({ summary: 'Previsualizar elegibilidad de refinanciamiento', description: 'Consulta la elegibilidad sin crear refinanciamiento, plan ni movimiento de Caja.' }) @ApiParam({ name: 'prestamoId', type: Number }) @ApiResponse({ status: 200, type: PrevisualizarRefinanciamientoResponseDto }) @ApiResponse({ status: 404, description: 'Préstamo no encontrado.' })
   async previsualizar(@Param('prestamoId', ParseIntPipe) id: number) { return this.preview.execute(id); }
   @Post() @ApiOperation({ summary: 'Crear un refinanciamiento', description: 'Refinancia el capital pendiente de un préstamo activo cuando el interés pactado ya fue cubierto, sin registrar un pago ficticio. El nuevo desembolso representa únicamente dinero nuevo entregado.' }) @ApiBody({ type: CrearRefinanciamientoDto, description: 'Ejemplo: préstamo de capital 100.000 e interés 20.000, con 30.000 pagados, dinero nuevo 40.000 e interés nuevo 25.000, produce capital nuevo 130.000, interés total 25.000, total 155.000 y desembolso real 40.000.' }) @ApiResponse({ status: 201, type: RefinanciamientoResponseDto }) @ApiResponse({ status: 400, description: 'Interés no cubierto, saldo, estado, catálogo o plan inválido.' }) @ApiResponse({ status: 404, description: 'Préstamo, periodicidad o forma de pago no encontrada.' }) @ApiResponse({ status: 409, description: 'El préstamo ya fue refinanciado.' })

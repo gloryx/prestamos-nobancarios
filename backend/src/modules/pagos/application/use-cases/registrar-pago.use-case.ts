@@ -114,8 +114,7 @@ export class RegistrarPagoUseCase {
         // PostgreSQL date columns are represented as calendar strings here. Keep
         // the selected payment date unchanged; do not derive it from a Date.
         planPago.fechaVencimiento = dto.fecha;
-        if (overpaymentCents > 0) for (const future of affectedFuturePlans) future.fechaVencimiento = dto.fecha;
-       if (canRenumber) {
+        if (canRenumber) {
          const temporaryBase = lockedPlans.reduce((maximum, plan) => Math.max(maximum, plan.numeroPago), 0) + 1_000_000;
          for (let index = 0; index < survivingFuturePlans.length; index += 1) {
            survivingFuturePlans[index].numeroPago = temporaryBase + index;

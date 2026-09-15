@@ -14,6 +14,7 @@ import { ResumirPrestamosUseCase } from '../../application/use-cases/resumir-pre
 import { ObtenerPrestamoPorIdUseCase } from '../../application/use-cases/obtener-prestamo-por-id.use-case';
 import { EstadoPrestamo } from '../../domain/enums/estado-prestamo.enum';
 import { PrestamoConRelaciones } from '../../domain/repositories/prestamo.repository';
+import { PrestamoDetalle } from '../../application/use-cases/obtener-prestamo-por-id.use-case';
 import { PrestamoResponseDto } from '../dto/prestamo-response.dto';
 import { PrestamosPaginadosResponseDto } from '../dto/prestamos-paginados-response.dto';
 import { authenticatedUserId, AuthenticatedRequest } from '../../../../common/authenticated-user';
@@ -26,13 +27,16 @@ import { AnularPrestamoUseCase } from '../../application/use-cases/anular-presta
 import { INDICADORES_COBRANZA } from '../../application/services/indicador-cobranza.service';
 import { FiltrosIncobrablesDto } from '../../application/dto/filtros-incobrables.dto';
 import { PrestamoIncobrableService } from '../../application/services/prestamo-incobrable.service';
+import { ReporteRentabilidadCanceladosUseCase } from '../../application/use-cases/reporte-rentabilidad-cancelados.use-case';
+import { ReporteRentabilidadCanceladosDto } from '../../application/dto/reporte-rentabilidad-cancelados.dto';
+import { RentabilidadCanceladosResponseDto } from '../dto/reporte-rentabilidad-cancelados-response.dto';
 
-const response = (value: PrestamoConRelaciones & { capitalPendiente?: number; saldoPendiente?: number }): PrestamoResponseDto => ({ ...value, id: value.id!, fechaAlta: value.fechaAlta.toISOString().slice(0, 10), puedeAnular: value.puedeAnular ?? false, cliente: { id: value.cliente.id, identificacion: value.cliente.identificacion!, nombreCompleto: value.cliente.nombre!, direccion: value.cliente.direccion ?? null, telefono: value.cliente.telefono ?? null } });
+export const response = (value: (PrestamoConRelaciones | PrestamoDetalle) & { capitalPendiente?: number; saldoPendiente?: number }): PrestamoResponseDto => ({ ...value, id: value.id!, fechaAlta: value.fechaAlta.toISOString().slice(0, 10), puedeAnular: value.puedeAnular ?? false, cliente: { id: value.cliente.id, identificacion: value.cliente.identificacion!, nombreCompleto: value.cliente.nombre!, direccion: value.cliente.direccion ?? null, telefono: value.cliente.telefono ?? null } } as PrestamoResponseDto);
 @ApiTags('Préstamos')
 @ApiBearerAuth()
 @Controller('prestamos')
 export class PrestamosController {
-  constructor(private readonly crear: CrearPrestamoUseCase, private readonly listarUseCase: ListarPrestamosUseCase, private readonly resumirUseCase: ResumirPrestamosUseCase, private readonly exportarExcelUseCase: ExportarPrestamosExcelUseCase, private readonly obtenerUseCase: ObtenerPrestamoPorIdUseCase, private readonly actualizarUseCase: ActualizarPrestamoUseCase, private readonly estadoUseCase: CambiarEstadoPrestamoUseCase, private readonly anularUseCase: AnularPrestamoUseCase, private readonly history: PrestamoEstadoHistorialService, private readonly planPagoPdf: PlanPagoPdfService, private readonly cobranza: IndicadorCobranzaService, private readonly incobrables: PrestamoIncobrableService) {}
+  constructor(private readonly crear: CrearPrestamoUseCase, private readonly listarUseCase: ListarPrestamosUseCase, private readonly resumirUseCase: ResumirPrestamosUseCase, private readonly exportarExcelUseCase: ExportarPrestamosExcelUseCase, private readonly obtenerUseCase: ObtenerPrestamoPorIdUseCase, private readonly actualizarUseCase: ActualizarPrestamoUseCase, private readonly estadoUseCase: CambiarEstadoPrestamoUseCase, private readonly anularUseCase: AnularPrestamoUseCase, private readonly history: PrestamoEstadoHistorialService, private readonly planPagoPdf: PlanPagoPdfService, private readonly cobranza: IndicadorCobranzaService, private readonly incobrables: PrestamoIncobrableService, private readonly rentabilidadCancelados: ReporteRentabilidadCanceladosUseCase) {}
   @Post()
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   @ApiOperation({ summary: 'Crear un préstamo', description: 'Registra un préstamo asociado a un cliente activo.' })
@@ -41,7 +45,15 @@ export class PrestamosController {
   async crearPrestamo(@Body() dto: CrearPrestamoDto, @Req() request: AuthenticatedRequest) { return response(await this.crear.execute(dto, authenticatedUserId(request))); }
   @Get('resumen')
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiQuery({ name: 'fechaCancelacionDesde', required: false, example: '2026-09-01', format: 'date', description: 'Fecha de cancelación real inicial inclusiva.' }) @ApiQuery({ name: 'fechaCancelacionHasta', required: false, example: '2026-09-30', format: 'date', description: 'Fecha de cancelación real final inclusiva.' })
   async resumen(@Query() dto: FiltrosPrestamosDto) { return this.resumirUseCase.execute(dto); }
+  @Get('reporte/rentabilidad-cancelados')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Reporte mensual de rentabilidad REAL de préstamos cancelados', description: 'GET /prestamos/reporte/rentabilidad-cancelados. Devuelve un agregado del mes indicado por anio y mes, usando la última transición real a CANCELADO. Ganancia realizada = SUM(pago.interesAplicado) únicamente para pagos REGISTRADO; no usa prestamo.interes. rentabilidadTotal = gananciaTotal / capitalTotal × 100. tasa30Dias = tasa REAL equivalente a 30 días, ponderada por capital y calculada como ganancia / capital × 30 / duración × 100. La duración es fechaCancelacion − fechaAlta en días calendario. Las duraciones no válidas se excluyen solo de métricas temporales.' })
+  @ApiQuery({ name: 'anio', required: true, type: Number, example: 2026, description: 'Año calendario del mes económico a consultar (2000–2100).' })
+  @ApiQuery({ name: 'mes', required: true, type: Number, example: 9, description: 'Mes económico de 1 a 12; no se permiten meses futuros.' })
+  @ApiResponse({ status: 200, description: 'Reporte agregado calculado con hechos persistidos; no incluye detalle individual.', type: RentabilidadCanceladosResponseDto })
+  async reporteRentabilidadCancelados(@Query() dto: ReporteRentabilidadCanceladosDto) { return this.rentabilidadCancelados.execute(dto); }
   @Get('export/excel')
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   async exportarExcel(@Query() dto: FiltrosPrestamosDto): Promise<StreamableFile> { const result = await this.exportarExcelUseCase.execute(dto); return new StreamableFile(result.buffer, { type: result.type, disposition: `attachment; filename="${result.filename}"` }); }
@@ -52,7 +64,7 @@ export class PrestamosController {
   @Get()
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   @ApiOperation({ summary: 'Listar préstamos', description: 'Obtiene préstamos con búsqueda, filtros y paginación.' })
-   @ApiQuery({ name: 'pagina', required: false, type: Number, example: 1, default: 1 }) @ApiQuery({ name: 'limite', required: false, type: Number, example: 10, default: 10, maximum: 100 }) @ApiQuery({ name: 'buscar', required: false, example: 'perez' }) @ApiQuery({ name: 'direccion', required: false, example: 'San José' }) @ApiQuery({ name: 'estados', required: false, example: 'ACTIVO,CANCELADO' }) @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-01-01', format: 'date' }) @ApiQuery({ name: 'fechaFin', required: false, example: '2026-12-31', format: 'date' }) @ApiQuery({ name: 'estado', required: false, enum: EstadoPrestamo, example: EstadoPrestamo.ACTIVO }) @ApiQuery({ name: 'clienteId', required: false, type: Number, example: 1 }) @ApiQuery({ name: 'indicadorCobranza', required: false, enum: INDICADORES_COBRANZA }) @ApiQuery({ name: 'ordenarPor', required: false, enum: ['id', 'cliente', 'direccion', 'fechaAlta', 'capital', 'saldoPendiente', 'estado', 'indicadorCobranza'] }) @ApiQuery({ name: 'direccionOrden', required: false, enum: ['ASC', 'DESC'] })
+   @ApiQuery({ name: 'pagina', required: false, type: Number, example: 1, default: 1 }) @ApiQuery({ name: 'limite', required: false, type: Number, example: 10, default: 10, maximum: 100 }) @ApiQuery({ name: 'buscar', required: false, example: 'perez' }) @ApiQuery({ name: 'direccion', required: false, example: 'San José' }) @ApiQuery({ name: 'estados', required: false, example: 'ACTIVO,CANCELADO' }) @ApiQuery({ name: 'fechaInicio', required: false, example: '2026-01-01', format: 'date' }) @ApiQuery({ name: 'fechaFin', required: false, example: '2026-12-31', format: 'date' }) @ApiQuery({ name: 'fechaCancelacionDesde', required: false, example: '2026-09-01', format: 'date', description: 'Fecha de cancelación real inicial inclusiva.' }) @ApiQuery({ name: 'fechaCancelacionHasta', required: false, example: '2026-09-30', format: 'date', description: 'Fecha de cancelación real final inclusiva; se considera todo el día.' }) @ApiQuery({ name: 'estado', required: false, enum: EstadoPrestamo, example: EstadoPrestamo.ACTIVO }) @ApiQuery({ name: 'clienteId', required: false, type: Number, example: 1 }) @ApiQuery({ name: 'indicadorCobranza', required: false, enum: INDICADORES_COBRANZA }) @ApiQuery({ name: 'ordenarPor', required: false, enum: ['id', 'cliente', 'direccion', 'fechaAlta', 'fechaCancelacion', 'capital', 'saldoPendiente', 'estado', 'indicadorCobranza'] }) @ApiQuery({ name: 'direccionOrden', required: false, enum: ['ASC', 'DESC'] })
   @ApiResponse({ status: 200, description: 'Listado obtenido correctamente.', type: PrestamosPaginadosResponseDto })
   async listar(@Query() dto: FiltrosPrestamosDto) { const result = await this.listarUseCase.execute(dto); const cobranza = await this.cobranza.calcular(result.datos); return { ...result, datos: result.datos.map((prestamo) => ({ ...response(prestamo), ...cobranza.get(prestamo.id!) })) }; }
   @Get('candidatos-incobrables')

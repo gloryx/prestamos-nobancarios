@@ -1,77 +1,79 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ArrowRightLeft,
-  Banknote,
-  CalendarClock,
-  CalendarDays,
-  FileText,
-  Link2,
-  RefreshCw,
-  Search,
-  SearchX,
-  TrendingUp,
-  UserRound,
-  WalletCards,
-  X,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowRightLeft, Banknote, CalendarClock, CalendarDays, Eye, ExternalLink, FileText, Link2, MoreHorizontal, RefreshCw, Search, SearchX, TrendingUp, UserRound, WalletCards, X } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { Cliente } from "@/features/clientes/domain/cliente.types";
 import { ClientePicker } from "./ClientePicker";
-import { listarRefinanciamientos } from "../application/refinanciamientos.use-cases";
-import type { RefinanciamientoListFilters, RefinanciamientoPage } from "../domain/refinanciamiento.types";
+import { PrestamoDetailModal } from "@/features/prestamos/presentation/PrestamosListPage";
+import { listarRefinanciamientos, obtenerDetalleRefinanciamiento, refinanciamientoErrorMessage } from "../application/refinanciamientos.use-cases";
+import type { RefinanciamientoListFilters, RefinanciamientoPage, RefinanciamientoResponse } from "../domain/refinanciamiento.types";
 import { AxiosRefinanciamientoRepository } from "../infrastructure/axios-refinanciamiento.repository";
 import { formatCRC } from "@/shared/utils/currency";
 import { Pagination } from "@/shared/components/Pagination";
 import "./refinanciamientos.css";
 
 const repository = new AxiosRefinanciamientoRepository();
-const dateLabel = (value: string) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
-const daysLabel = (value: number | null) => value === null ? "—" : `${value} ${value === 1 ? "día" : "días"}`;
+const dateLabel = (value: string | null | undefined) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
 const nombreCliente = (cliente: Cliente) => [cliente.primerNombre, cliente.segundoNombre, cliente.primerApellido, cliente.segundoApellido].filter(Boolean).join(" ");
+const isId = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value > 0;
+
+function DetailValue({ label, value }: { label: string; value: string }) {
+  return <div className="refinanciamiento-detail-value"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function RefinanciamientoDetailModal({ id, clientName, onClose }: { id: number; clientName?: string; onClose: () => void }) {
+  const [detail, setDetail] = useState<RefinanciamientoResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    void obtenerDetalleRefinanciamiento(repository, id).then((value) => { if (active) setDetail(value); }).catch((cause) => { if (active) setError(refinanciamientoErrorMessage(cause)); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [id]);
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [onClose]);
+  return <div className="refinanciamiento-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="refinanciamiento-detail-modal" role="dialog" aria-modal="true" aria-labelledby="refinanciamiento-detail-title">
+      <header className="refinanciamiento-detail-header"><div><p className="eyebrow">HISTÓRICO</p><h2 id="refinanciamiento-detail-title">Refinanciamiento #{id}</h2></div><button type="button" className="table-action" title="Cerrar detalle" aria-label="Cerrar detalle" onClick={onClose}><X size={18} /></button></header>
+      {loading && <p role="status">Cargando detalle...</p>}
+      {!loading && error && <p className="form-error" role="alert">{error}</p>}
+      {!loading && !error && detail && <>
+        <section className="refinanciamiento-detail-section"><h3>Hechos históricos de la operación</h3><div className="refinanciamiento-detail-grid">
+          <DetailValue label="Fecha" value={dateLabel(detail.fecha)} />{clientName && <DetailValue label="Cliente" value={clientName} />}<DetailValue label="Préstamo origen" value={`#${detail.prestamoOrigenId}`} /><DetailValue label="Préstamo nuevo" value={`#${detail.prestamoNuevoId}`} />
+          {detail.prestamoOrigen && typeof detail.prestamoOrigen === "object" && <><DetailValue label="Capital original" value={formatCRC(Number(detail.prestamoOrigen.capital ?? 0))} /><DetailValue label="Interés original" value={formatCRC(Number(detail.prestamoOrigen.interes ?? 0))} /><DetailValue label="Monto total original" value={formatCRC(Number(detail.prestamoOrigen.montoTotal ?? 0))} /><DetailValue label="Estado actual del origen" value={String(detail.prestamoOrigen.estado ?? "—")} /></>}
+          <DetailValue label="Capital pendiente trasladado" value={formatCRC(detail.saldoAnterior?.capitalPendiente ?? detail.capitalPendiente)} /><DetailValue label="Interés pendiente" value={detail.saldoAnterior?.interesPendiente == null && detail.interesPendiente == null ? "—" : formatCRC(detail.saldoAnterior?.interesPendiente ?? detail.interesPendiente ?? 0)} /><DetailValue label="Monto refinanciado" value={formatCRC(detail.saldoAnterior?.montoRefinanciado ?? detail.montoRefinanciado)} />
+          <DetailValue label="Fecha límite contractual" value={dateLabel(detail.fechaLimiteContractualOrigen)} /><DetailValue label="Días ganados" value={detail.diasGanados == null ? "—" : String(detail.diasGanados)} />
+        </div>{detail.observaciones && <p className="refinanciamiento-detail-notes"><strong>Observaciones:</strong> {detail.observaciones}</p>}</section>
+        <section className="refinanciamiento-detail-section current"><h3>Estado actual y nueva operación</h3><div className="refinanciamiento-detail-grid">
+          <DetailValue label="Dinero nuevo desembolsado" value={formatCRC(detail.nuevaOperacion?.dineroNuevoDesembolsado ?? 0)} /><DetailValue label="Interés nuevo" value={formatCRC(detail.nuevaOperacion?.interesNuevo ?? detail.interesNuevo)} /><DetailValue label="Capital total nuevo" value={formatCRC(detail.composicion?.capitalTotalNuevo ?? 0)} /><DetailValue label="Interés total nuevo" value={formatCRC(detail.composicion?.interesTotalNuevo ?? 0)} />
+          {detail.prestamoNuevo && typeof detail.prestamoNuevo === "object" && "estado" in detail.prestamoNuevo && <DetailValue label="Estado préstamo resultante" value={String(detail.prestamoNuevo.estado)} />}
+        </div></section>
+        {detail.planNuevo && detail.planNuevo.length > 0 && <section className="refinanciamiento-detail-section"><h3>Plan nuevo recibido</h3><div className="table-wrap"><table className="refinanciamiento-plan-table"><thead><tr><th>Cuota</th><th>Vencimiento</th><th>Programado</th><th>Pagado</th><th>Pendiente</th><th>Estado</th></tr></thead><tbody>{detail.planNuevo.map((row, index) => { const item = row as Record<string, unknown>; return <tr key={String(item.id ?? index)}><td>{String(item.numeroPago ?? "—")}</td><td>{dateLabel(typeof item.fechaVencimiento === "string" ? item.fechaVencimiento : null)}</td><td>{typeof item.montoProgramado === "number" ? formatCRC(item.montoProgramado) : "—"}</td><td>{typeof item.montoPagado === "number" ? formatCRC(item.montoPagado) : "—"}</td><td>{typeof item.montoPendiente === "number" ? formatCRC(item.montoPendiente) : "—"}</td><td>{String(item.estado ?? "—")}</td></tr>; })}</tbody></table></div></section>}
+      </>}
+      <footer className="refinanciamiento-detail-actions"><button type="button" className="secondary-button" onClick={onClose}>Cerrar</button></footer>
+    </section>
+  </div>;
+}
 
 export function RefinanciamientosPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [page, setPage] = useState<RefinanciamientoPage | null>(null);
-  const [pagina, setPagina] = useState(1);
-  const [limite, setLimite] = useState(10);
-  const [buscar, setBuscar] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [fechaDesde, setFechaDesde] = useState("");
-  const [fechaHasta, setFechaHasta] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const requestId = useRef(0);
+  const [pagina, setPagina] = useState(1); const [limite, setLimite] = useState(10); const [buscar, setBuscar] = useState(""); const [debounced, setDebounced] = useState(""); const [cliente, setCliente] = useState<Cliente | null>(null); const [fechaDesde, setFechaDesde] = useState(""); const [fechaHasta, setFechaHasta] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState(false); const [detailId, setDetailId] = useState<number | null>(null); const [loanId, setLoanId] = useState<number | null>(null); const [openActionMenu, setOpenActionMenu] = useState<number | null>(null); const [actionError] = useState(""); const [actionLoading] = useState<string | null>(null); const requestId = useRef(0);
   useEffect(() => { const timer = window.setTimeout(() => { setDebounced(buscar.trim()); setPagina(1); }, 350); return () => window.clearTimeout(timer); }, [buscar]);
-  const load = useCallback(async () => {
-    const id = ++requestId.current;
-    setLoading(true); setError(false);
-    const filters: RefinanciamientoListFilters = { pagina, limite };
-    if (debounced) filters.buscar = debounced;
-    if (cliente) filters.clienteId = cliente.id;
-    if (fechaDesde) filters.fechaDesde = fechaDesde;
-    if (fechaHasta) filters.fechaHasta = fechaHasta;
-    try { const result = await listarRefinanciamientos(repository, filters); if (id === requestId.current) setPage(result); }
-    catch { if (id === requestId.current) { setPage(null); setError(true); } }
-    finally { if (id === requestId.current) setLoading(false); }
-  }, [cliente, debounced, fechaDesde, fechaHasta, limite, pagina]);
+  useEffect(() => { const state = location.state; if (state && typeof state === "object" && isId((state as Record<string, unknown>).refinanciamientoId)) setDetailId((state as Record<string, unknown>).refinanciamientoId as number); }, [location.state]);
+  useEffect(() => { if (openActionMenu === null) return; const close = (event: KeyboardEvent) => { if (event.key === "Escape") setOpenActionMenu(null); }; document.addEventListener("keydown", close); return () => document.removeEventListener("keydown", close); }, [openActionMenu]);
+  const load = useCallback(async () => { const id = ++requestId.current; setLoading(true); setError(false); const filters: RefinanciamientoListFilters = { pagina, limite }; if (debounced) filters.buscar = debounced; if (cliente) filters.clienteId = cliente.id; if (fechaDesde) filters.fechaDesde = fechaDesde; if (fechaHasta) filters.fechaHasta = fechaHasta; try { const result = await listarRefinanciamientos(repository, filters); if (id === requestId.current) setPage(result); } catch { if (id === requestId.current) { setPage(null); setError(true); } } finally { if (id === requestId.current) setLoading(false); } }, [cliente, debounced, fechaDesde, fechaHasta, limite, pagina]);
   useEffect(() => { void load(); }, [load]);
-  const resetFilterPage = () => setPagina(1);
-  const clearClient = () => { setCliente(null); resetFilterPage(); };
-  return <section className="refinanciamientos-page">
-    <div className="page-heading"><div><p className="eyebrow">REFINANCIAMIENTOS</p><h1><RefreshCw size={24} aria-hidden="true" /> Refinanciamientos</h1><p className="muted">Consulta y analiza las operaciones de refinanciamiento registradas.</p></div></div>
-    <div className="panel refinanciamientos-filters">
-      <label><span className="filter-label"><Search size={15} aria-hidden="true" /> Buscar</span><input placeholder="Cliente o número de préstamo" value={buscar} onChange={(event) => setBuscar(event.target.value)} /></label>
-      <div className="refinanciamiento-client-filter"><span className="filter-label"><UserRound size={15} aria-hidden="true" /> Cliente</span>{cliente ? <div className="selected-refinanciamiento-client"><strong>{nombreCliente(cliente)}</strong><button type="button" className="table-action" title="Quitar cliente" aria-label="Quitar cliente" onClick={clearClient}><X size={15} aria-hidden="true" /></button></div> : <ClientePicker onSelect={(value) => { setCliente(value); resetFilterPage(); }} />}</div>
-      <label><span className="filter-label"><CalendarDays size={15} aria-hidden="true" /> Fecha desde</span><input type="date" value={fechaDesde} onChange={(event) => { setFechaDesde(event.target.value); resetFilterPage(); }} /></label>
-      <label><span className="filter-label"><CalendarDays size={15} aria-hidden="true" /> Fecha hasta</span><input type="date" value={fechaHasta} onChange={(event) => { setFechaHasta(event.target.value); resetFilterPage(); }} /></label>
-    </div>
-    {loading && <div className="panel state-box" role="status">Cargando refinanciamientos...</div>}
-    {!loading && error && <div className="panel refinanciamientos-error" role="alert"><p>No se pudo cargar el listado de refinanciamientos.</p><button type="button" className="secondary-button" onClick={() => void load()}><RefreshCw size={15} /> Reintentar</button></div>}
-    {!loading && !error && page && page.datos.length === 0 && <div className="panel state-box refinanciamientos-empty"><SearchX size={30} aria-hidden="true" /><span>No hay refinanciamientos que coincidan con los filtros seleccionados.</span></div>}
-    {!loading && !error && page && page.datos.length > 0 && <>
-       <div className="panel refinanciamientos-table-wrap"><div className="table-wrap"><table className="refinanciamientos-table"><thead><tr><th title="Fecha en que se registró la operación."><CalendarDays size={14} aria-hidden="true" /> Fecha</th><th className="client-primary"><UserRound size={14} aria-hidden="true" /> Cliente</th><th className="loan-id-origin" title="Identificador del préstamo cuyo saldo fue refinanciado."><FileText size={14} aria-hidden="true" /> Préstamo origen</th><th className="capital-transferred" title="Capital pendiente trasladado desde el préstamo anterior."><ArrowRightLeft size={14} aria-hidden="true" /> Capital trasladado</th><th className="new-money" title="Dinero nuevo entregado al cliente en esta refinanciación."><Banknote size={14} aria-hidden="true" /> Dinero nuevo</th><th title="Capital del nuevo préstamo."><WalletCards size={14} aria-hidden="true" /> Capital nuevo</th><th className="new-interest" title="Interés nuevo pactado para el préstamo."><TrendingUp size={14} aria-hidden="true" /> Interés nuevo</th><th className="days-earned" title="Días de anticipación con que se inició la nueva operación respecto al vencimiento previsto del préstamo anterior."><CalendarClock size={14} aria-hidden="true" /> Días ganados</th><th className="loan-id-new" title="Identificador del préstamo creado por la refinanciación."><FileText size={14} aria-hidden="true" /> Préstamo nuevo</th><th>Acción</th></tr></thead><tbody>{page.datos.map((item) => { const dineroNuevo = item.prestamoNuevo?.montoDesembolsado ?? item.nuevaOperacion?.dineroNuevoDesembolsado ?? 0; return <tr key={item.id}><td>{dateLabel(item.fecha)}</td><td className="client-primary">{item.cliente.nombreCompleto}</td><td className="loan-id-origin"><span className="loan-id-badge">#{item.prestamoOrigenId}</span></td><td className="capital-transferred">{formatCRC(item.capitalPendiente)}</td><td className="new-money">{formatCRC(dineroNuevo)}</td><td>{formatCRC(item.prestamoNuevo?.capital ?? 0)}</td><td className="new-interest">{formatCRC(item.interesNuevo)}</td><td className="days-earned">{daysLabel(item.diasGanados)}</td><td className="loan-id-new"><span className="loan-id-badge loan-id-badge-new">#{item.prestamoNuevoId}</span></td><td><button type="button" className="table-action" title='Ver cadena' aria-label="Ver cadena de refinanciamiento" onClick={() => navigate("/refinanciamientos/cadenas", { state: { clienteId: item.cliente.id, prestamoOrigenId: item.prestamoOrigenId, prestamoNuevoId: item.prestamoNuevoId } })}><Link2 size={16} aria-hidden="true" /></button></td></tr>; })}</tbody></table></div></div>
-      <Pagination pagina={page.pagina} totalPaginas={page.totalPaginas} total={page.total} limite={page.limite} opcionesLimite={[10, 20, 50]} onPageChange={setPagina} onLimitChange={(value) => { setLimite(value); setPagina(1); }} label="refinanciamientos" loading={loading} />
-    </>}
+  const viewLoan = (item: { prestamoOrigenId: number; prestamoNuevoId: number }, kind: "origin" | "new") => { setLoanId(kind === "origin" ? item.prestamoOrigenId : item.prestamoNuevoId); setOpenActionMenu(null); };
+  const rows = page?.datos ?? [];
+  return <section className="refinanciamientos-page"><div className="page-heading"><div><p className="eyebrow">REFINANCIAMIENTOS</p><h1><RefreshCw size={24} aria-hidden="true" /> Refinanciamientos</h1><p className="muted">Consulta y analiza las operaciones de refinanciamiento registradas.</p></div></div>
+    <div className="panel refinanciamientos-filters"><label><span className="filter-label"><Search size={15} aria-hidden="true" /> Buscar</span><input placeholder="Cliente o número de préstamo" value={buscar} onChange={(event) => setBuscar(event.target.value)} /></label><div className="refinanciamiento-client-filter"><span className="filter-label"><UserRound size={15} aria-hidden="true" /> Cliente</span>{cliente ? <div className="selected-refinanciamiento-client"><strong>{nombreCliente(cliente)}</strong><button type="button" className="table-action" title="Quitar cliente" aria-label="Quitar cliente" onClick={() => { setCliente(null); setPagina(1); }}><X size={15} /></button></div> : <ClientePicker onSelect={(value) => { setCliente(value); setPagina(1); }} />}</div><label><span className="filter-label"><CalendarDays size={15} aria-hidden="true" /> Fecha desde</span><input type="date" value={fechaDesde} onChange={(event) => { setFechaDesde(event.target.value); setPagina(1); }} /></label><label><span className="filter-label"><CalendarDays size={15} aria-hidden="true" /> Fecha hasta</span><input type="date" value={fechaHasta} onChange={(event) => { setFechaHasta(event.target.value); setPagina(1); }} /></label></div>
+    {actionError && <p className="form-error" role="alert">{actionError}</p>}{loading && <div className="panel state-box" role="status">Cargando refinanciamientos...</div>}{!loading && error && <div className="panel refinanciamientos-error" role="alert"><p>No se pudo cargar el listado de refinanciamientos.</p><button type="button" className="secondary-button" onClick={() => void load()}><RefreshCw size={15} /> Reintentar</button></div>}{!loading && !error && page && rows.length === 0 && <div className="panel state-box refinanciamientos-empty"><SearchX size={30} aria-hidden="true" /><span>No hay refinanciamientos que coincidan con los filtros seleccionados.</span></div>}
+    {!loading && !error && rows.length > 0 && <><div className="panel refinanciamientos-table-wrap"><div className="table-wrap"><table className="refinanciamientos-table"><thead><tr><th title="Fecha en que se registró la operación."><CalendarDays size={14} /> Fecha</th><th className="client-primary"><UserRound size={14} /> Cliente</th><th className="loan-id-origin" title="Identificador del préstamo cuyo saldo fue refinanciado."><FileText size={14} /> Préstamo origen</th><th className="capital-transferred"><ArrowRightLeft size={14} /> Capital trasladado</th><th className="new-money"><Banknote size={14} /> Dinero nuevo</th><th><WalletCards size={14} /> Capital nuevo</th><th className="new-interest"><TrendingUp size={14} /> Interés nuevo</th><th className="days-earned"><CalendarClock size={14} /> Días ganados</th><th className="loan-id-new"><FileText size={14} /> Préstamo nuevo</th><th>Acciones</th></tr></thead><tbody>{rows.map((item) => { const dineroNuevo = item.prestamoNuevo?.montoDesembolsado ?? item.nuevaOperacion?.dineroNuevoDesembolsado ?? 0; const originKey = `${item.id}-origin`; const newKey = `${item.id}-new`; return <tr key={item.id}><td>{dateLabel(item.fecha)}</td><td className="client-primary">{item.cliente.nombreCompleto}</td><td className="loan-id-origin"><span className="loan-id-badge">#{item.prestamoOrigenId}</span></td><td className="capital-transferred">{formatCRC(item.capitalPendiente)}</td><td className="new-money">{formatCRC(dineroNuevo)}</td><td>{formatCRC(item.prestamoNuevo?.capital ?? 0)}</td><td className="new-interest">{formatCRC(item.interesNuevo)}</td><td className="days-earned">{item.diasGanados === null ? "—" : `${item.diasGanados} ${item.diasGanados === 1 ? "día" : "días"}`}</td><td className="loan-id-new"><span className="loan-id-badge loan-id-badge-new">#{item.prestamoNuevoId}</span></td><td><div className="refinanciamientos-row-actions"><button type="button" className="table-action" title="Más acciones" aria-label={`Más acciones para refinanciamiento ${item.id}`} aria-haspopup="menu" aria-expanded={openActionMenu === item.id} onClick={() => setOpenActionMenu((current) => current === item.id ? null : item.id)}><MoreHorizontal size={16} /></button>{openActionMenu === item.id && <div className="refinanciamientos-row-menu" role="menu"><button type="button" role="menuitem" onClick={() => { setDetailId(item.id); setOpenActionMenu(null); }}><Eye size={15} /> Ver detalle</button><button type="button" role="menuitem" disabled={actionLoading === originKey || !isId(item.prestamoOrigenId)} onClick={() => void viewLoan(item, "origin")}><ExternalLink size={15} /> {actionLoading === originKey ? "Consultando..." : "Ver préstamo origen"}</button><button type="button" role="menuitem" disabled={actionLoading === newKey || !isId(item.prestamoNuevoId)} onClick={() => void viewLoan(item, "new")}><ExternalLink size={15} /> {actionLoading === newKey ? "Consultando..." : "Ver préstamo nuevo"}</button><button type="button" role="menuitem" onClick={() => { setOpenActionMenu(null); navigate("/refinanciamientos/cadenas", { state: { clienteId: item.cliente.id, prestamoOrigenId: item.prestamoOrigenId, prestamoNuevoId: item.prestamoNuevoId } }); }}><Link2 size={15} /> Ver cadena</button></div>}</div></td></tr>; })}</tbody></table></div></div><Pagination pagina={page?.pagina ?? pagina} totalPaginas={page?.totalPaginas ?? 0} total={page?.total ?? 0} limite={page?.limite ?? limite} opcionesLimite={[10, 20, 50]} onPageChange={setPagina} onLimitChange={(value) => { setLimite(value); setPagina(1); }} label="refinanciamientos" loading={loading} /></>}
+     {detailId !== null && <RefinanciamientoDetailModal id={detailId} clientName={rows.find((item) => item.id === detailId)?.cliente.nombreCompleto} onClose={() => setDetailId(null)} />}{loanId !== null && <PrestamoDetailModal prestamoId={loanId} onClose={() => setLoanId(null)} />}
   </section>;
 }

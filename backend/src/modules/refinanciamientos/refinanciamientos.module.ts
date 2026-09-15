@@ -13,5 +13,6 @@ import { PrevisualizarRefinanciamientoUseCase } from './application/use-cases/pr
 import { ObtenerCadenasClienteUseCase } from './application/use-cases/obtener-cadenas-cliente.use-case';
 import { PrestamoOrmEntity } from '../prestamos/infrastructure/persistence/typeorm/prestamo.orm-entity';
 import { ClienteOrmEntity } from '../clientes/infrastructure/persistence/typeorm/cliente.orm-entity';
-@Module({ imports: [PrestamosModule, PlanesPagoModule, MovimientosCajaModule, TypeOrmModule.forFeature([RefinanciamientoOrmEntity, PrestamoOrmEntity, ClienteOrmEntity])], controllers: [RefinanciamientosController], providers: [CrearRefinanciamientoUseCase, PrevisualizarRefinanciamientoUseCase, ObtenerCadenasClienteUseCase, RefinanciamientoQueries, { provide: REFINANCIAMIENTO_REPOSITORY, useClass: RefinanciamientoTypeOrmRepository }] })
+import { ListarPrestamosElegiblesUseCase } from './application/use-cases/listar-prestamos-elegibles.use-case';
+@Module({ imports: [PrestamosModule, PlanesPagoModule, MovimientosCajaModule, TypeOrmModule.forFeature([RefinanciamientoOrmEntity, PrestamoOrmEntity, ClienteOrmEntity])], controllers: [RefinanciamientosController], providers: [CrearRefinanciamientoUseCase, PrevisualizarRefinanciamientoUseCase, ListarPrestamosElegiblesUseCase, ObtenerCadenasClienteUseCase, RefinanciamientoQueries, { provide: REFINANCIAMIENTO_REPOSITORY, useClass: RefinanciamientoTypeOrmRepository }] })
 export class RefinanciamientosModule {}

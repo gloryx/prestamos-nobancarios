@@ -36,3 +36,14 @@ test('summary preserves aggregate values for multiple payments without duplicati
   const { repository } = repositoryWith({ total: '2', prestado: '300.00', ganancia: '30.00', recuperado: '250.00', pendiente: '80.00' });
   assert.deepEqual(await repository.resumen({ pagina: 4, limite: 1, estados: ['ACTIVO', 'CANCELADO'], buscar: 'Ana', direccion: 'Centro', fechaInicio: '2026-02-01', fechaFin: '2026-02-28' }), { total: 2, prestado: 300, ganancia: 30, recuperado: 250, pendiente: 80 });
 });
+
+test('summary applies the same cancellation-date universe as the paginated listing', async () => {
+  const { repository, calls } = repositoryWith({ total: '2', prestado: '300.00', ganancia: '30.00', recuperado: '250.00', pendiente: '80.00' });
+  const result = await repository.resumen({ pagina: 1, limite: 10, estados: ['CANCELADO'], buscar: 'Ana', fechaInicio: '2026-01-01', fechaFin: '2026-12-31', fechaCancelacionDesde: '2026-09-01', fechaCancelacionHasta: '2026-09-30' });
+  assert.deepEqual(result, { total: 2, prestado: 300, ganancia: 30, recuperado: 250, pendiente: 80 });
+  const dateFilters = calls.filter(([kind, expression]) => kind === 'andWhere' && String(expression).includes('prestamo_estado_historial'));
+  assert.equal(dateFilters.length, 2);
+  assert.match(String(dateFilters[1][1]), /INTERVAL '1 day'/);
+  assert.ok(calls.some(([kind, expression]) => kind === 'andWhere' && expression === 'prestamo.fecha_alta >= :fechaInicio'));
+  assert.ok(calls.some(([kind, expression]) => kind === 'andWhere' && expression === 'prestamo.fecha_alta <= :fechaFin'));
+});
