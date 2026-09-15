@@ -13,6 +13,7 @@ import { MovimientosCajaModule } from './modules/movimientos-caja/movimientos-ca
 import { AuthModule } from './modules/auth/auth.module';
 import { CierreFinancieroModule } from './modules/cierre-financiero/cierre-financiero.module';
 import { IngresosModule } from './modules/ingresos/ingresos.module';
+import { ReportesModule } from './modules/reportes/reportes.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { IngresosModule } from './modules/ingresos/ingresos.module';
     AuthModule,
     CierreFinancieroModule,
     IngresosModule,
+    ReportesModule,
   ],
 })
 export class AppModule {}

@@ -67,8 +67,8 @@ export type IncobrablesSortField = 'fechaVencimiento' | 'saldoPendiente' | 'clie
 export interface IncobrablesFilters { pagina: number; limite: number; buscar?: string; direccion?: string; fechaReferencia?: string; ordenarPor?: IncobrablesSortField; direccionOrden?: 'ASC' | 'DESC' }
 export interface PrestamosResumen { total: number; prestado: number; ganancia: number; recuperado: number; pendiente: number }
 export type EstadoCuota = 'PENDIENTE' | 'PAGADA'
-export interface PlanPago { id: number; prestamoId: number; numeroPago: number; fechaVencimiento: string; montoProgramado: number; fechaCreacion: string; montoPagado: number; montoPendiente: number; estado: EstadoCuota; fechasPago: string[]; protegida?: boolean; editable?: boolean; eliminable?: boolean }
+export interface PlanPago { id: number; prestamoId: number; numeroPago: number; fechaVencimiento: string; montoProgramado: number; fechaCreacion: string; montoPagado: number; montoPendiente: number; estado: EstadoCuota; fechasPago: string[]; protegida?: boolean; editable?: boolean; puedeEditarFecha?: boolean; puedeEditarMonto?: boolean; eliminable?: boolean }
 
-export interface PersonalizarPlanPagoCuotaInput { id?: number; fechaVencimiento: string; montoProgramado: number }
+export interface PersonalizarPlanPagoCuotaInput { id?: number; numeroPago?: number; fechaVencimiento: string; montoProgramado?: number }
 export interface PersonalizarPlanPagoInput { cuotas: PersonalizarPlanPagoCuotaInput[] }
 export interface PersonalizarPlanPagoResponse { saldoPendiente: number; totalPlanOperativoPendiente: number; cuotas: PlanPago[] }

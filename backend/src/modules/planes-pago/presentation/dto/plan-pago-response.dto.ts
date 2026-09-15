@@ -13,5 +13,7 @@ export class PlanPagoResponseDto {
   @ApiProperty({ example: ['2026-09-05'], type: [String] }) fechasPago: string[];
   @ApiProperty({ example: false }) protegida: boolean;
   @ApiProperty({ example: true }) editable: boolean;
+  @ApiProperty({ example: true }) puedeEditarFecha: boolean;
+  @ApiProperty({ example: true }) puedeEditarMonto: boolean;
   @ApiProperty({ example: true }) eliminable: boolean;
 }

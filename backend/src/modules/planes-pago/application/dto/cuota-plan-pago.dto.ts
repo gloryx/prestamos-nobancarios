@@ -10,6 +10,7 @@ export class CuotaPlanPagoDto {
 
 export class CuotaPlanPagoPersonalizacionDto {
   @ApiProperty({ required: false, example: 12 }) @Type(() => Number) @IsOptional() @IsInt() @IsPositive() id?: number;
+  @ApiProperty({ required: false, example: 3 }) @Type(() => Number) @IsOptional() @IsInt() @IsPositive() numeroPago?: number;
   @ApiProperty({ example: '2026-10-03', format: 'date' }) @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) fechaVencimiento: string;
-  @ApiProperty({ example: 24000.00 }) @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @IsPositive() montoProgramado: number;
+  @ApiProperty({ required: false, example: 24000.00 }) @Type(() => Number) @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @IsPositive() montoProgramado?: number;
 }

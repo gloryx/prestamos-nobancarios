@@ -1,0 +1,4 @@
+export interface FlujoMes { periodo: string; anio: number; mes: number; capitalColocado: number; pagosRecibidos: number; capitalRecuperado: number; gananciaRealizada: number; flujoNeto: number; diferenciaConciliacion: number; estadoDatos: 'OK' | 'ADVERTENCIA' }
+export interface FlujoTotal { capitalColocado: number; pagosRecibidos: number; capitalRecuperado: number; gananciaRealizada: number; flujoNeto: number; diferenciaConciliacion: number; estadoDatos: 'OK' | 'ADVERTENCIA'; porcentajeCapitalPagos: number | null; porcentajeInteresPagos: number | null }
+export interface FlujoPrestamosReport { desde: string; hasta: string; meses: FlujoMes[]; total: FlujoTotal; anuales: Record<string, FlujoTotal> }
+export interface FlujoPrestamosRepository { get(desde: string, hasta: string): Promise<FlujoPrestamosReport> }

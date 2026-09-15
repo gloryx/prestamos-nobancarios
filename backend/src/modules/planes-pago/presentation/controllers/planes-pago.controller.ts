@@ -15,8 +15,8 @@ import { AjustarCuotaPlanPagoDto } from '../../application/dto/ajustar-cuota-pla
 import { AjustarCuotaPlanPagoUseCase } from '../../application/use-cases/ajustar-cuota-plan-pago.use-case';
 import { PersonalizarPlanPagoResponseDto } from '../dto/personalizar-plan-pago-response.dto';
 
-type PlanResponseInput = PlanPago & { montoPagado?: number; montoPendiente?: number; estado?: 'PENDIENTE' | 'PAGADA'; fechasPago?: string[]; protegida?: boolean; editable?: boolean; eliminable?: boolean };
-const response = (plan: PlanResponseInput): PlanPagoResponseDto => ({ id: plan.id!, prestamoId: plan.prestamoId, numeroPago: plan.numeroPago, fechaVencimiento: plan.fechaVencimiento.toISOString().slice(0, 10), montoProgramado: plan.montoProgramado, fechaCreacion: plan.fechaCreacion, montoPagado: plan.montoPagado ?? 0, montoPendiente: plan.montoPendiente ?? plan.montoProgramado, estado: plan.estado ?? 'PENDIENTE', fechasPago: plan.fechasPago ?? [], protegida: plan.protegida ?? false, editable: plan.editable ?? false, eliminable: plan.eliminable ?? false });
+type PlanResponseInput = PlanPago & { montoPagado?: number; montoPendiente?: number; estado?: 'PENDIENTE' | 'PAGADA'; fechasPago?: string[]; protegida?: boolean; editable?: boolean; puedeEditarFecha?: boolean; puedeEditarMonto?: boolean; eliminable?: boolean };
+const response = (plan: PlanResponseInput): PlanPagoResponseDto => ({ id: plan.id!, prestamoId: plan.prestamoId, numeroPago: plan.numeroPago, fechaVencimiento: plan.fechaVencimiento.toISOString().slice(0, 10), montoProgramado: plan.montoProgramado, fechaCreacion: plan.fechaCreacion, montoPagado: plan.montoPagado ?? 0, montoPendiente: plan.montoPendiente ?? plan.montoProgramado, estado: plan.estado ?? 'PENDIENTE', fechasPago: plan.fechasPago ?? [], protegida: plan.protegida ?? false, editable: plan.editable ?? false, puedeEditarFecha: plan.puedeEditarFecha ?? false, puedeEditarMonto: plan.puedeEditarMonto ?? plan.editable ?? false, eliminable: plan.eliminable ?? false });
 const responses = (plans: PlanPago[]) => plans.map(response);
 
 @ApiTags('Planes de pago')

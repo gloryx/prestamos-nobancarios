@@ -1,0 +1,5 @@
+import { ApiProperty } from '@nestjs/swagger';
+
+class FlujoMesResponseDto { @ApiProperty() periodo!: string; @ApiProperty() anio!: number; @ApiProperty() mes!: number; @ApiProperty() capitalColocado!: number; @ApiProperty() pagosRecibidos!: number; @ApiProperty() capitalRecuperado!: number; @ApiProperty() gananciaRealizada!: number; @ApiProperty({ description: 'Pagos recibidos menos dinero nuevo desembolsado. No representa utilidad.' }) flujoNeto!: number; @ApiProperty() diferenciaConciliacion!: number; @ApiProperty({ enum: ['OK', 'ADVERTENCIA'] }) estadoDatos!: string; }
+class FlujoTotalResponseDto extends FlujoMesResponseDto { @ApiProperty({ nullable: true }) porcentajeCapitalPagos!: number | null; @ApiProperty({ nullable: true }) porcentajeInteresPagos!: number | null; }
+export class FlujoPrestamosResponseDto { @ApiProperty() desde!: string; @ApiProperty() hasta!: string; @ApiProperty({ type: [FlujoMesResponseDto] }) meses!: FlujoMesResponseDto[]; @ApiProperty({ type: FlujoTotalResponseDto }) total!: FlujoTotalResponseDto; @ApiProperty({ type: Object, additionalProperties: { type: 'object' } }) anuales!: Record<string, FlujoTotalResponseDto>; }

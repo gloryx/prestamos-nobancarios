@@ -42,9 +42,23 @@ const refRepository = new AxiosRefinanciamientoRepository();
 const paymentRepository = new AxiosFormaPagoRepository();
 const periodRepository = new AxiosPeriodicidadRepository();
 const money = (value: number | undefined) => formatCRC(Number(value ?? 0));
+const hasAtMostTwoDecimals = (value: number) =>
+  Math.abs(value * 100 - Math.round(value * 100)) <=
+  Number.EPSILON * Math.max(1, Math.abs(value * 100));
 const today = () => new Date().toISOString().slice(0, 10);
 const dateLabel = (value: string) =>
   value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
+const queryPrestamoId = (search: string) => {
+  const value = new URLSearchParams(search).get("prestamoId");
+  if (!value || !/^\d+$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+};
+type CustomInstallment = {
+  numeroPago: number;
+  fechaVencimiento: string;
+  montoProgramado: number | null;
+};
 
 function LoanModal({
   onSelect,
@@ -196,7 +210,7 @@ function LoanModal({
 export function NuevoRefinanciamientoPage() {
   const location = useLocation();
   const navigationState = location.state as unknown;
-  const navigationPrestamoId =
+  const legacyNavigationPrestamoId =
     typeof navigationState === "object" &&
     navigationState !== null &&
     "prestamoId" in navigationState &&
@@ -205,6 +219,9 @@ export function NuevoRefinanciamientoPage() {
     navigationState.prestamoId > 0
       ? navigationState.prestamoId
       : null;
+  const initialPrestamoId = useRef(
+    queryPrestamoId(location.search) ?? legacyNavigationPrestamoId,
+  );
   const { user } = useAuth();
   const navigate = useNavigate();
   const allowed = user?.rol === "ADMINISTRADOR" || user?.rol === "VENDEDOR";
@@ -231,8 +248,8 @@ export function NuevoRefinanciamientoPage() {
   const [cantidad, setCantidad] = useState("1");
   const [personalizado, setPersonalizado] = useState(false);
   const [observaciones, setObservaciones] = useState("");
-  const [cuotas, setCuotas] = useState([
-    { numeroPago: 1, fechaVencimiento: today(), montoProgramado: "0" },
+  const [cuotas, setCuotas] = useState<CustomInstallment[]>([
+    { numeroPago: 1, fechaVencimiento: today(), montoProgramado: 0 },
   ]);
   useEffect(() => {
     void Promise.all([
@@ -267,20 +284,30 @@ export function NuevoRefinanciamientoPage() {
     }
   }, []);
   useEffect(() => {
-    if (navigationPrestamoId === null) return;
+    const requestedPrestamoId = initialPrestamoId.current;
+    if (requestedPrestamoId === null) return;
     const requestId = ++previewRequestId.current;
-    void listarPrestamosActivosParaRefinanciar(refRepository, 1, String(navigationPrestamoId), 1)
+    setLoan(null);
+    setPreview(null);
+    setError("");
+    setPreviewLoading(true);
+    void listarPrestamosActivosParaRefinanciar(refRepository, 1, String(requestedPrestamoId), 1)
       .then((result) => {
-        const selected = result.datos.find((item) => item.id === navigationPrestamoId);
+        const selected = result.datos.find((item) => item.id === requestedPrestamoId);
         if (requestId !== previewRequestId.current) return;
         if (selected) void selectLoan(selected);
-        else setError("El préstamo seleccionado no es elegible para refinanciamiento.");
+        else {
+          setError(`El préstamo #${requestedPrestamoId} no está disponible para refinanciamiento.`);
+          setPreviewLoading(false);
+        }
       })
       .catch((cause) => {
-        if (requestId === previewRequestId.current)
+        if (requestId === previewRequestId.current) {
           setError(refinanciamientoErrorMessage(cause));
+          setPreviewLoading(false);
+        }
       });
-  }, [navigationPrestamoId, selectLoan]);
+  }, [selectLoan]);
   const reset = () => {
     previewRequestId.current += 1;
     setModal(false);
@@ -299,7 +326,7 @@ export function NuevoRefinanciamientoPage() {
     setPersonalizado(false);
     setObservaciones("");
     setCuotas([
-      { numeroPago: 1, fechaVencimiento: today(), montoProgramado: "0" },
+      { numeroPago: 1, fechaVencimiento: today(), montoProgramado: 0 },
     ]);
   };
   const amount = monto ?? 0;
@@ -311,8 +338,10 @@ export function NuevoRefinanciamientoPage() {
       cuotas.every(
         (item) =>
           item.fechaVencimiento &&
-          Number(item.montoProgramado) > 0 &&
-          /^\d+(\.\d{0,2})?$/.test(item.montoProgramado),
+          item.montoProgramado !== null &&
+          Number.isFinite(item.montoProgramado) &&
+          item.montoProgramado > 0 &&
+          hasAtMostTwoDecimals(item.montoProgramado),
       ));
   const canContinue = Boolean(
     loan &&
@@ -681,7 +710,7 @@ export function NuevoRefinanciamientoPage() {
                           cuotas[index] ?? {
                             numeroPago: index + 1,
                             fechaVencimiento: fecha,
-                            montoProgramado: "0",
+                            montoProgramado: 0,
                           },
                       ),
                     );
@@ -742,15 +771,15 @@ export function NuevoRefinanciamientoPage() {
                         )
                       }
                     />
-                    <input
+                    <CurrencyInput
                       aria-label={`Monto cuota ${item.numeroPago}`}
                       inputMode="decimal"
                       value={item.montoProgramado}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         setCuotas((current) =>
                           current.map((row, i) =>
                             i === index
-                              ? { ...row, montoProgramado: event.target.value }
+                              ? { ...row, montoProgramado: value }
                               : row,
                           ),
                         )

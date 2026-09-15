@@ -9,14 +9,23 @@ import { PlanPago } from '../../domain/entities/plan-pago';
 export type PlanPagoEditability = {
   protegida: boolean;
   editable: boolean;
+  puedeEditarFecha: boolean;
+  puedeEditarMonto: boolean;
   eliminable: boolean;
 };
 
-export const calculatePlanPagoFlags = (planNumero: number, protectedIds: Set<number>, planId: number, estado: EstadoPrestamo, lastProtectedNumber: number): PlanPagoEditability => {
+export const calculatePlanPagoFlags = (planNumero: number, protectedIds: Set<number>, planId: number, estado: EstadoPrestamo, lastProtectedNumber: number, lastOperationalNumber = planNumero): PlanPagoEditability => {
   const protegida = protectedIds.has(planId);
   const editable = estado === EstadoPrestamo.ACTIVO && !protegida && planNumero > lastProtectedNumber;
-  return { protegida, editable, eliminable: editable };
+  const puedeEditarFecha = estado === EstadoPrestamo.ACTIVO && (editable || planNumero === lastOperationalNumber);
+  return { protegida, editable, puedeEditarFecha, puedeEditarMonto: editable, eliminable: editable };
 };
+
+export const getLastProtectedNumber = (plans: Array<Pick<PlanPago, 'id' | 'numeroPago'>>, protectedIds: Set<number>): number =>
+  Math.max(0, ...plans.filter((plan) => protectedIds.has(plan.id!)).map((plan) => plan.numeroPago));
+
+export const getLastOperationalNumber = (plans: Array<Pick<PlanPago, 'id' | 'numeroPago'>>, protectedIds: Set<number>): number =>
+  Math.max(0, ...plans.map((plan) => plan.numeroPago));
 
 export const getProtectedPlanPagoIds = (pagos: PagoOrmEntity[]): Set<number> => new Set(pagos.filter((pago) => pago.planPagoId != null).map((pago) => pago.planPagoId!));
 
@@ -52,8 +61,8 @@ export class PlanPagoEditabilityService {
     return query.getMany();
   }
 
-  calcularFlags(planNumero: number, protectedIds: Set<number>, planId: number, estado: EstadoPrestamo, lastProtectedNumber: number): PlanPagoEditability {
-    return calculatePlanPagoFlags(planNumero, protectedIds, planId, estado, lastProtectedNumber);
+  calcularFlags(planNumero: number, protectedIds: Set<number>, planId: number, estado: EstadoPrestamo, lastProtectedNumber: number, lastOperationalNumber = planNumero): PlanPagoEditability {
+    return calculatePlanPagoFlags(planNumero, protectedIds, planId, estado, lastProtectedNumber, lastOperationalNumber);
   }
 
   protectedIds(pagos: PagoOrmEntity[]): Set<number> {

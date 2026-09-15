@@ -10,6 +10,8 @@ export class PersonalizarPlanPagoCuotaResponseDto {
   @ApiProperty() estado: string;
   @ApiProperty() protegida: boolean;
   @ApiProperty() editable: boolean;
+  @ApiProperty() puedeEditarFecha: boolean;
+  @ApiProperty() puedeEditarMonto: boolean;
   @ApiProperty() eliminable: boolean;
 }
 

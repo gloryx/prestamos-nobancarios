@@ -23,6 +23,7 @@ import { GestionIncobrablesPage } from "@/features/prestamos/presentation/Gestio
 import { GestionAnulacionesPage } from "@/features/prestamos/presentation/GestionAnulacionesPage";
 import { SaldadosPage } from "@/features/prestamos/presentation/SaldadosPage";
 import { RentabilidadCanceladosPage } from "@/features/prestamos/presentation/RentabilidadCanceladosPage";
+import { FlujoPrestamosPage } from "@/features/reportes/presentation/FlujoPrestamosPage";
 
 export function AppRouter() {
   return (
@@ -53,6 +54,7 @@ export function AppRouter() {
               <Route path="prestamos/seguimiento-cartera" element={<SeguimientoCarteraPage />} />
               <Route path="prestamos/reporte" element={<RentabilidadCanceladosPage />} />
               <Route path="finanzas/caja/cortes/rentabilidad-cancelados" element={<RentabilidadCanceladosPage />} />
+              <Route path="finanzas/reportes/flujo-prestamos" element={<FlujoPrestamosPage />} />
               <Route path="pagos/registrar" element={<RegistrarPagoPage />} />
               <Route path="refinanciamientos" element={<RefinanciamientosPage />} />
               <Route path="refinanciamientos/nuevo" element={<NuevoRefinanciamientoPage />} />

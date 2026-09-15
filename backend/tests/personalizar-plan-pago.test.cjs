@@ -85,9 +85,9 @@ test('annulled payments also protect their referenced installment', async () => 
 test('payments remain immutable and retain planPagoId', async () => { const payments = [payment(1, 1, 20)]; const store = new Store({ plans: [plan(1, 1, 100, dates[0]), plan(2, 2, 200, dates[1])], payments }); await assert400(execute(store, dto(item(dates[0], 120, 1), item(dates[1], 180, 2)))); assert.deepEqual(store.state.payments, payments); });
 test('registered balance excludes annulled payments and does not duplicate partial debt', async () => { const store = new Store({ plans: [plan(1, 1, 100, dates[0]), plan(2, 2, 200, dates[1])], payments: [payment(1, 1, 40), payment(2, 1, 10, EstadoPago.ANULADO)], loan: { montoTotal: 300 } }); const result = await execute(store, dto(item(dates[1], 260, 2))); assert.equal(result.saldoPendiente, 260); assert.equal(result.cuotas.length, 2); assert.equal(result.cuotas[0].montoPendiente, 0); });
 test('new dates are strictly after the original plan', async () => { await assert400(execute(basic(), dto(item('2026-09-19', 300))), 'Las nuevas cuotas deben tener fechas posteriores al plan original.'); });
-test('a date after the loan term is rejected when it breaks chronology', async () => { const store = new Store({ plans: [plan(1, 1, 300, dates[0])], loan: { fechaAlta: '2026-12-31' } }); await assert400(execute(store, dto(item('2027-01-02', 300)))); });
+test('a date before the loan start is rejected when it breaks chronology', async () => { const store = new Store({ plans: [plan(1, 1, 300, dates[0])], loan: { fechaAlta: '2026-12-31' } }); await assert400(execute(store, dto(item('2026-12-30', 300)))); });
 test('supports 3 to 5 installments', async () => { const store = basic(); await execute(store, dto(item(dates[0], 60, 1), item(dates[1], 60, 2), item(dates[2], 60, 3), item(dates[3], 60), item(dates[4], 60))); assert.equal(store.state.plans.length, 5); });
-test('supports 30 to 26 installments', async () => { const planDates = []; let cursor = new Date('2027-01-04T00:00:00.000Z'); while (planDates.length < 30) { if (cursor.getUTCDay() !== 0) planDates.push(cursor.toISOString().slice(0, 10)); cursor.setUTCDate(cursor.getUTCDate() + 1); } const store = new Store({ plans: planDates.map((date, index) => plan(index + 1, index + 1, 10, date)), loan: { montoTotal: 300 } }); await execute(store, dto(...planDates.slice(0, 26).map((date, index) => item(date, 300 / 26, index + 1)))); assert.equal(store.state.plans.length, 26); });
+test('supports 30 to 26 installments', async () => { const planDates = []; let cursor = new Date('2027-01-04T00:00:00.000Z'); while (planDates.length < 30) { if (cursor.getUTCDay() !== 0) planDates.push(cursor.toISOString().slice(0, 10)); cursor.setUTCDate(cursor.getUTCDate() + 1); } const store = new Store({ plans: planDates.map((date, index) => plan(index + 1, index + 1, 10, date)), loan: { montoTotal: 300 } }); const amounts = Array.from({ length: 26 }, (_, index) => index < 4 ? 11.53 : 11.54); await execute(store, dto(...planDates.slice(0, 26).map((date, index) => item(date, amounts[index], index + 1)))); assert.equal(store.state.plans.length, 26); });
 test('derives sequential numbers after protected installments', async () => { const store = new Store({ plans: [plan(1, 1, 100, dates[0]), plan(2, 2, 100, dates[1]), plan(3, 3, 100, dates[2])], payments: [payment(1, 1, 100)] }); await execute(store, dto(item(dates[1], 50, 2), item(dates[2], 150, 3))); assert.deepEqual(store.state.plans.map((value) => value.numeroPago), [1, 2, 3]); });
 test('rejects non-chronological dates', async () => { await assert400(execute(basic(), dto(item(dates[1], 100, 1), item(dates[0], 100, 2), item(dates[2], 100, 3)))); });
 test('rejects Sunday dates', async () => { await assert400(execute(basic(), dto(item('2026-09-06', 100, 1), item(dates[1], 100, 2), item(dates[2], 100, 3)))); });
@@ -95,6 +95,52 @@ test('rolls back every plan mutation on persistence failure', async () => { cons
 test('does not touch Caja', async () => { const store = new Store({ plans: [plan(1, 1, 300, dates[0])], caja: [{ id: 1, monto: 300 }] }); const before = clone(store.state.caja); await execute(store, existingProposal([300])); assert.deepEqual(store.state.caja, before); });
 test('uses one bulk query for payments and one for plans', async () => { const store = basic(); await execute(store, existingProposal([100, 100, 100])); assert.equal(store.queryCounts.payments, 1); assert.equal(store.queryCounts.plans, 1); });
 test('locks loan, plan, and payments', async () => { const store = basic(); await execute(store, existingProposal([100, 100, 100])); assert.deepEqual(store.locks.map((value) => value.mode), ['pessimistic_write', 'pessimistic_write', 'pessimistic_write']); });
-test('returns an enriched response', async () => { const store = new Store({ plans: [plan(1, 1, 100, dates[0]), plan(2, 2, 200, dates[1])], payments: [payment(1, 1, 40)] }); const result = await execute(store, dto(item(dates[1], 260, 2))); assert.deepEqual(Object.keys(result.cuotas[0]).sort(), ['editable', 'eliminable', 'estado', 'fechaVencimiento', 'id', 'montoPagado', 'montoPendiente', 'montoProgramado', 'numeroPago', 'protegida']); });
+test('returns separate date and amount capabilities', async () => { const store = new Store({ plans: [plan(1, 1, 100, dates[0]), plan(2, 2, 200, dates[1])], payments: [payment(1, 1, 40)] }); const result = await execute(store, dto(item(dates[1], 260, 2))); assert.equal(result.cuotas[1].puedeEditarFecha, true); assert.equal(result.cuotas[1].puedeEditarMonto, true); assert.equal(result.cuotas[0].puedeEditarFecha, false); });
 test('rejects repeated ids', async () => { await assert400(execute(basic(), dto(item(dates[0], 100, 1), item(dates[1], 100, 1), item(dates[2], 100, 3)))); });
 test('rejects ids from another loan', async () => { await assert400(execute(basic(), dto(item(dates[0], 300, 999))), 'La cuota no pertenece al préstamo.'); });
+
+test('A-I: last operational installment remains date-editable after protected installments', async () => {
+  const originalPayments = [payment(1, 1, 100), payment(2, 2, 100)];
+  const store = new Store({ plans: [plan(1, 1, 100, '2026-07-16'), plan(2, 2, 100, '2026-08-12'), plan(3, 3, 100, '2026-08-04')], payments: originalPayments, loan: { montoTotal: 300, fechaAlta: '2026-07-01' } });
+  const result = await execute(store, dto(item('2026-09-04', 100, 3)));
+  assert.equal(result.cuotas.find((value) => value.id === 3).fechaVencimiento, '2026-09-04');
+  assert.deepEqual(store.state.payments, originalPayments);
+  assert.deepEqual(store.state.plans.filter((value) => value.id < 3).map((value) => value.fechaVencimiento), ['2026-07-16', '2026-08-12']);
+});
+
+test('last operational installment is determined by numeroPago, not date', async () => {
+  const store = new Store({ plans: [plan(1, 1, 100, '2026-07-16'), plan(2, 2, 100, '2026-08-12'), plan(3, 3, 100, '2026-08-04')], payments: [payment(1, 1, 100), payment(2, 2, 100)], loan: { montoTotal: 300, fechaAlta: '2026-07-01' } });
+  await execute(store, dto(item('2026-09-04', 100, 3)));
+  assert.equal(store.state.plans.find((value) => value.id === 3).numeroPago, 3);
+});
+
+test('accepts the required 04/08 to 04/09 proposal', async () => {
+  const store = new Store({ plans: [plan(1, 1, 100, '2026-07-16'), plan(2, 2, 100, '2026-08-12'), plan(3, 3, 100, '2026-08-04')], payments: [payment(1, 1, 100), payment(2, 2, 100)], loan: { montoTotal: 300, fechaAlta: '2026-07-01' } });
+  await execute(store, dto(item('2026-09-04', 100, 3)));
+  assert.equal(store.state.plans.find((value) => value.id === 3).fechaVencimiento, '2026-09-04');
+});
+
+test('rejects a final proposal that remains out of chronological order', async () => {
+  const store = new Store({ plans: [plan(1, 1, 100, '2026-07-16'), plan(2, 2, 100, '2026-08-12'), plan(3, 3, 100, '2026-08-04')], payments: [payment(1, 1, 100), payment(2, 2, 100)], loan: { montoTotal: 300, fechaAlta: '2026-07-01' } });
+  await assert400(execute(store, dto(item('2026-08-04', 100, 3))), 'Las fechas de vencimiento deben estar en orden cronológico.');
+});
+
+test('allows date-only editing when the last installment has a payment', async () => {
+  const originalPayments = [payment(1, 1, 100), payment(2, 2, 100), payment(3, 3, 100)];
+  const store = new Store({ plans: [plan(1, 1, 100, '2026-07-16'), plan(2, 2, 100, '2026-08-12'), plan(3, 3, 100, '2026-08-04')], payments: originalPayments, caja: [{ id: 1, monto: 300 }], loan: { montoTotal: 300, fechaAlta: '2026-07-01' } });
+  await execute(store, dto({ id: 3, numeroPago: 3, fechaVencimiento: '2026-09-04' }));
+  assert.equal(store.state.plans.find((value) => value.id === 3).montoProgramado, 100);
+  assert.equal(store.state.plans.find((value) => value.id === 3).fechaVencimiento, '2026-09-04');
+  assert.deepEqual(store.state.payments, originalPayments);
+  assert.deepEqual(store.state.caja, [{ id: 1, monto: 300 }]);
+});
+
+test('rejects a protected last installment amount change in a date-only payload', async () => {
+  const store = new Store({ plans: [plan(1, 1, 100, '2026-07-16'), plan(2, 2, 100, '2026-08-12'), plan(3, 3, 100, '2026-08-04')], payments: [payment(1, 1, 100), payment(2, 2, 100), payment(3, 3, 100)], loan: { montoTotal: 300, fechaAlta: '2026-07-01' } });
+  await assert400(execute(store, dto({ id: 3, numeroPago: 3, fechaVencimiento: '2026-09-04', montoProgramado: 101 })), 'El monto de una cuota protegida no puede modificarse.');
+});
+
+test('rejects date-only editing for a protected row before the last operational row', async () => {
+  const store = new Store({ plans: [plan(1, 1, 100, '2026-07-16'), plan(2, 2, 100, '2026-08-04'), plan(3, 3, 100, '2026-08-12')], payments: [payment(1, 1, 100), payment(3, 3, 100)], loan: { montoTotal: 300, fechaAlta: '2026-07-01' } });
+  await assert400(execute(store, dto({ id: 2, numeroPago: 2, fechaVencimiento: '2026-08-05' })), 'Las cuotas con pagos históricos no pueden modificarse.');
+});

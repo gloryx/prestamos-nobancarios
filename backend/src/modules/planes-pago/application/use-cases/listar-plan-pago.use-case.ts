@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { PLAN_PAGO_REPOSITORY, PlanPagoRepository } from '../../domain/repositories/plan-pago.repository';
 import { PrestamoOrmEntity } from '../../../prestamos/infrastructure/persistence/typeorm/prestamo.orm-entity';
 import { EstadoPrestamo } from '../../../prestamos/domain/enums/estado-prestamo.enum';
-import { PlanPagoEditabilityService, getPlanPagoPendingCents } from '../services/plan-pago-editability.service';
+import { PlanPagoEditabilityService, getLastOperationalNumber, getLastProtectedNumber, getPlanPagoPendingCents } from '../services/plan-pago-editability.service';
 import { dateOnly } from '../services/date-only';
 
 @Injectable()
@@ -23,7 +23,9 @@ export class ListarPlanPagoUseCase {
       if (!dates.includes(date)) dates.push(date);
       datesByPlan.set(pago.planPagoId, dates);
     }
-    const lastProtectedNumber = planes.filter((plan) => protectedIds.has(plan.id!)).at(-1)?.numeroPago ?? 0;
-    return planes.sort((a, b) => a.numeroPago - b.numeroPago).map((plan) => { const montoPagado = (registeredTotals.get(plan.id!) ?? 0) / 100; const estaPagada = montoPagado > 0; const montoPendiente = getPlanPagoPendingCents(plan, registeredTotals) / 100; return { ...plan, montoPagado, montoPendiente, estado: estaPagada ? 'PAGADA' : 'PENDIENTE', fechasPago: datesByPlan.get(plan.id!) ?? [], ...this.editability.calcularFlags(plan.numeroPago, protectedIds, plan.id!, prestamo?.estado ?? EstadoPrestamo.ACTIVO, lastProtectedNumber) }; });
+    const orderedPlans = [...planes].sort((a, b) => a.numeroPago - b.numeroPago || (a.id ?? 0) - (b.id ?? 0));
+    const lastProtectedNumber = getLastProtectedNumber(orderedPlans, protectedIds);
+    const lastOperationalNumber = getLastOperationalNumber(orderedPlans, protectedIds);
+    return orderedPlans.map((plan) => { const montoPagado = (registeredTotals.get(plan.id!) ?? 0) / 100; const estaPagada = montoPagado > 0; const montoPendiente = getPlanPagoPendingCents(plan, registeredTotals) / 100; return { ...plan, montoPagado, montoPendiente, estado: estaPagada ? 'PAGADA' : 'PENDIENTE', fechasPago: datesByPlan.get(plan.id!) ?? [], ...this.editability.calcularFlags(plan.numeroPago, protectedIds, plan.id!, prestamo?.estado ?? EstadoPrestamo.ACTIVO, lastProtectedNumber, lastOperationalNumber) }; });
   }
 }
