@@ -28,6 +28,8 @@ import { AnalisisFinancieroPage } from "@/features/analisis-financiero/presentat
 import { EstadisticasClientesPage } from "@/features/clientes/presentation/EstadisticasClientesPage";
 import { ProyeccionGananciasPage } from "@/features/analisis-financiero/presentation/ProyeccionGananciasPage";
 import { CobrosDelDiaPage } from "@/features/pagos/presentation/CobrosDelDiaPage";
+import { HistorialPagosPage } from "@/features/pagos/presentation/HistorialPagosPage";
+import { DesempenoCobradoresPage } from "@/features/reportes/presentation/DesempenoCobradoresPage";
 
 export function AppRouter() {
   return (
@@ -63,6 +65,8 @@ export function AppRouter() {
               <Route path="finanzas/reportes/flujo-prestamos" element={<FlujoPrestamosPage />} />
               <Route path="pagos/registrar" element={<RegistrarPagoPage />} />
               <Route path="pagos" element={<CobrosDelDiaPage />} />
+              <Route path="pagos/historial" element={<HistorialPagosPage />} />
+              <Route path="reportes/pagos/desempeno-cobradores" element={<DesempenoCobradoresPage />} />
               <Route path="refinanciamientos" element={<RefinanciamientosPage />} />
               <Route path="refinanciamientos/nuevo" element={<NuevoRefinanciamientoPage />} />
               <Route path="refinanciamientos/cadenas" element={<CadenasRefinanciamientoPage />} />

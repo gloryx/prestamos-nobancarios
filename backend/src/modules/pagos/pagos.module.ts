@@ -24,6 +24,8 @@ import { ConsultarCobrosDelDiaUseCase } from './application/use-cases/consultar-
 import { COBROS_DEL_DIA_REPOSITORY } from './domain/repositories/cobros-del-dia.repository';
 import { CobrosDelDiaTypeOrmRepository } from './infrastructure/persistence/typeorm/cobros-del-dia.typeorm-repository';
 import { PlanPagoOrmEntity } from '../planes-pago/infrastructure/persistence/typeorm/plan-pago.orm-entity';
+import { ExportarPagosPdfUseCase } from './application/use-cases/exportar-pagos-pdf.use-case';
+import { PagosPdfService } from './infrastructure/pdf/pagos-pdf.service';
 
 @Module({ imports:  [
   FormasPagoModule,
@@ -33,5 +35,5 @@ import { PlanPagoOrmEntity } from '../planes-pago/infrastructure/persistence/typ
   MovimientosCajaModule,
   forwardRef(() => PlanesPagoModule),
   TypeOrmModule.forFeature([PagoOrmEntity, PagoAnulacionOrmEntity, PlanPagoOrmEntity]),
-], controllers: [PagosController], providers: [RegistrarPagoUseCase, ListarPagosUseCase, ObtenerPagoPorIdUseCase, ListarPagosPorPrestamoUseCase, ObtenerResumenPagoPrestamoUseCase, ObtenerEstadoPlanUseCase, AnularPagoUseCase, ConsultarCobrosDelDiaUseCase, { provide: PAGO_REPOSITORY, useClass: PagoTypeOrmRepository }, { provide: COBROS_DEL_DIA_REPOSITORY, useClass: CobrosDelDiaTypeOrmRepository }, { provide: PAGO_ANULACION_REPOSITORY, useClass: PagoAnulacionTypeOrmRepository }], exports: [PAGO_REPOSITORY] })
+ ], controllers: [PagosController], providers: [RegistrarPagoUseCase, ListarPagosUseCase, ExportarPagosPdfUseCase, PagosPdfService, ObtenerPagoPorIdUseCase, ListarPagosPorPrestamoUseCase, ObtenerResumenPagoPrestamoUseCase, ObtenerEstadoPlanUseCase, AnularPagoUseCase, ConsultarCobrosDelDiaUseCase, { provide: PAGO_REPOSITORY, useClass: PagoTypeOrmRepository }, { provide: COBROS_DEL_DIA_REPOSITORY, useClass: CobrosDelDiaTypeOrmRepository }, { provide: PAGO_ANULACION_REPOSITORY, useClass: PagoAnulacionTypeOrmRepository }], exports: [PAGO_REPOSITORY] })
 export class PagosModule {}

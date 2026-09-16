@@ -1,0 +1,4 @@
+export interface DesempenoCobrador { cobradorId: number | null; cobradorNombre: string; cantidadPagos: number; montoRecibido: number; capitalAplicado: number; interesAplicado: number; cantidadClientes: number; cantidadPrestamos: number; promedioPorPago: number; participacionMonto: number }
+export interface DesempenoCobradoresReport { fechaDesde: string; fechaHasta: string; totales: { cantidadPagos: number; totalRecibido: number; capitalAplicado: number; interesAplicado: number; cantidadCobradores: number }; cobradores: DesempenoCobrador[] }
+export type DesempenoCobradoresFilters = { fechaDesde: string; fechaHasta: string; cobradorId?: number; formaPagoId?: number }
+export interface DesempenoCobradoresRepository { get(filters: DesempenoCobradoresFilters): Promise<DesempenoCobradoresReport>; exportPdf(filters: DesempenoCobradoresFilters): Promise<{ blob: Blob; filename: string }> }

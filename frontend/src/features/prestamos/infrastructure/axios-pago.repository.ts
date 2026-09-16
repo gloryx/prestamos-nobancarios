@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { apiClient } from '@/core/api/client'
 import { PrestamoError } from '../domain/prestamo.error'
-import type { AnularPagoInput, Pago, PagoRegistrado, PagoResumen, RegistrarPagoInput } from '../domain/pago.types'
+import type { AnularPagoInput, Pago, PagoRegistrado, PagoResumen, PagosHistoryFilters, PagosPage, RegistrarPagoInput } from '../domain/pago.types'
 import type { PagoRepository } from '../domain/pago.repository'
 
 function rethrow(error: unknown): never {
@@ -20,6 +20,18 @@ export class AxiosPagoRepository implements PagoRepository {
   }
   async listByPrestamo(prestamoId: number): Promise<Pago[]> {
     try { return (await apiClient.get<Pago[]>(`/pagos/prestamo/${prestamoId}`)).data } catch (error) { return rethrow(error) }
+  }
+  async listPage(filters: PagosHistoryFilters): Promise<PagosPage> {
+    try { return (await apiClient.get<PagosPage>('/pagos', { params: Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== undefined && value !== '')) })).data } catch (error) { return rethrow(error) }
+  }
+  async exportPdf(filters: PagosHistoryFilters): Promise<{ blob: Blob; filename: string }> {
+    try {
+      const params = Object.fromEntries(Object.entries(filters).filter(([key, value]) => !['pagina', 'limite'].includes(key) && value !== undefined && value !== ''))
+      const response = await apiClient.get<Blob>('/pagos/exportar/pdf', { params, responseType: 'blob', timeout: 120000 })
+      const disposition = response.headers['content-disposition'] as string | undefined
+      const match = disposition?.match(/filename="?([^";]+)"?/i)
+      return { blob: response.data, filename: match?.[1] || `historial-pagos-${filters.fechaDesde || 'inicio'}-${filters.fechaHasta || 'fin'}.pdf` }
+    } catch (error) { return rethrow(error) }
   }
 
   async getSummaryByPrestamo(prestamoId: number): Promise<PagoResumen> {

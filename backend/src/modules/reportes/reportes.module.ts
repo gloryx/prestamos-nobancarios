@@ -10,5 +10,11 @@ import { EstadisticasClientesController } from './presentation/estadisticas-clie
 import { EstadisticasClientesUseCase } from './application/estadisticas-clientes.use-case';
 import { ESTADISTICAS_CLIENTES_REPOSITORY } from './domain/repositories/estadisticas-clientes.repository';
 import { EstadisticasClientesTypeOrmRepository } from './infrastructure/estadisticas-clientes.typeorm-repository';
-@Module({ imports: [TypeOrmModule.forFeature([PagoOrmEntity, MovimientoCajaOrmEntity])], controllers: [FlujoPrestamosController, EstadisticasClientesController], providers: [FlujoPrestamosUseCase, EstadisticasClientesUseCase, { provide: FLUJO_PRESTAMOS_REPOSITORY, useClass: FlujoPrestamosTypeOrmRepository }, { provide: ESTADISTICAS_CLIENTES_REPOSITORY, useClass: EstadisticasClientesTypeOrmRepository }] })
+import { DESEMPENO_COBRADORES_REPOSITORY } from './domain/repositories/desempeno-cobradores.repository';
+import { DesempenoCobradoresTypeOrmRepository } from './infrastructure/desempeno-cobradores.typeorm-repository';
+import { DesempenoCobradoresUseCase } from './application/desempeno-cobradores.use-case';
+import { DesempenoCobradoresController } from './presentation/desempeno-cobradores.controller';
+import { DesempenoCobradoresPdfService } from './infrastructure/desempeno-cobradores-pdf.service';
+import { ExportarDesempenoCobradoresPdfUseCase } from './application/exportar-desempeno-cobradores-pdf.use-case';
+@Module({ imports: [TypeOrmModule.forFeature([PagoOrmEntity, MovimientoCajaOrmEntity])], controllers: [FlujoPrestamosController, EstadisticasClientesController, DesempenoCobradoresController], providers: [FlujoPrestamosUseCase, EstadisticasClientesUseCase, DesempenoCobradoresUseCase, ExportarDesempenoCobradoresPdfUseCase, DesempenoCobradoresPdfService, { provide: FLUJO_PRESTAMOS_REPOSITORY, useClass: FlujoPrestamosTypeOrmRepository }, { provide: ESTADISTICAS_CLIENTES_REPOSITORY, useClass: EstadisticasClientesTypeOrmRepository }, { provide: DESEMPENO_COBRADORES_REPOSITORY, useClass: DesempenoCobradoresTypeOrmRepository }] })
 export class ReportesModule {}

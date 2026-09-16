@@ -17,7 +17,15 @@ export interface Pago {
   estado?: 'REGISTRADO' | 'ANULADO' | string
   puedeAnular?: boolean
   anulacion?: { motivo: string; observacion?: string | null; fecha?: string | null } | null
+  fechaVencimiento?: string | null
+  usuarioAnulacion?: { id: number; nombreCompleto: string } | null
+  cliente?: { id: number; identificacion?: string; nombreCompleto?: string; telefono1?: string | null; telefono2?: string | null } | null
+  prestamo?: { id: number; estado: string } | null
 }
+
+export interface PagosTotales { cantidadPagos: number; totalRecibido: number; capitalAplicado: number; interesAplicado: number }
+export interface PagosPage { datos: Pago[]; pagina: number; limite: number; total: number; totalPaginas: number; totales: PagosTotales }
+export interface PagosHistoryFilters { pagina: number; limite: number; fechaDesde?: string; fechaHasta?: string; buscar?: string; prestamoId?: number; estado?: 'REGISTRADO' | 'ANULADO' | 'TODOS'; formaPagoId?: number; cobradorId?: number }
 
 export interface AnularPagoInput {
   motivo: string
