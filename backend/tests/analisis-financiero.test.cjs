@@ -5,15 +5,15 @@ const { ObtenerAnalisisFinancieroUseCase } = require('../dist/modules/clientes/a
 const state = { ACTIVO: 'ACTIVO', CANCELADO: 'CANCELADO', REFINANCIADO: 'REFINANCIADO', INCOBRABLE: 'INCOBRABLE' };
 const client = { id: 7, identificacion: '7-000', primerNombre: 'ANA', segundoNombre: null, primerApellido: 'PEREZ', segundoApellido: null, telefono1: '111', telefono2: null };
 const loan = (id, estado, capital, interes, date = '2026-01-01', disbursed = capital) => ({ id, estado, fechaAlta: new Date(`${date}T00:00:00Z`), capital, interes, montoTotal: capital + interes, montoDesembolsado: disbursed, cantidadPagos: 1, periodicidad: 'MENSUAL' });
-const payment = (id, prestamoId, monto, interest, fecha = '2026-02-01') => ({ id, prestamoId, monto, capitalAplicado: monto - interest, interesAplicado: interest, fecha });
+const payment = (id, prestamoId, monto, interest, fecha = '2026-02-01', estado = 'REGISTRADO') => ({ id, prestamoId, monto, capitalAplicado: monto - interest, interesAplicado: interest, fecha, estado });
 
 function repository(loans, totals = [], payments = [], relations = [], calls = {}) {
   const count = (key, value = loans) => { calls[key] = (calls[key] ?? 0) + 1; return value; };
   return {
     listarPrestamos: async () => count('loans'),
     obtenerTotalesPagos: async () => count('totals', totals),
-    listarUltimosPagos: async () => count('latest', payments.length ? payments.filter((p) => p.prestamoId === 1) : []),
-    listarPagosOrdenados: async () => count('ordered', payments),
+    listarUltimosPagos: async () => count('latest', loans.flatMap((loan) => payments.filter((p) => p.prestamoId === loan.id && p.estado === 'REGISTRADO').sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id).slice(0, 1))),
+    listarPagosOrdenados: async () => count('ordered', payments.filter((p) => p.estado === 'REGISTRADO')),
     listarRefinanciamientos: async () => count('refinancing', relations),
     listarObligacionesVencidas: async () => count('overdue', []),
   };
@@ -90,9 +90,9 @@ test('keeps registered payment semantics, latest payment ordering and safe refin
   const result = await execute(loans, totals, payments, [{ id: 1, prestamoOrigenId: 1, prestamoNuevoId: 2, fecha: '2026-03-01', capitalPendiente: 99.7 }]);
   assert.equal(result.prestamos.find((p) => p.id === 1).ultimoPago.fecha, '2026-01-03');
   assert.equal(result.prestamos.find((p) => p.id === 1).ultimoPago.monto, 0.2);
-  assert.equal(result.prestamos.find((p) => p.id === 1).duracionDias, 59);
+   assert.equal(result.prestamos.find((p) => p.id === 1).duracionDias, 2);
   assert.equal(result.prestamos.find((p) => p.id === 1).tipoDuracion, 'FINALIZADO');
-  assert.equal(result.prestamos.find((p) => p.id === 2).tipoDuracion, 'TRANSCURRIDOS');
+   assert.equal(result.prestamos.find((p) => p.id === 2).tipoDuracion, 'INDISPONIBLE');
   assert.equal(result.resumen.pendienteVigente, 120);
 });
 
@@ -105,4 +105,61 @@ test('returns zeros without payment or relation queries when the client has no l
 
 test('rejects structurally inconsistent refinancing instead of inventing a successor', async () => {
   await assert.rejects(() => execute([loan(40, state.REFINANCIADO, 10, 1)], [], [], [], {}), /sin sucesor/);
+});
+
+test('calculates calendar-day duration from loan date to latest registered payment', async () => {
+  const loans = [
+    loan(101, state.ACTIVO, 10, 1, '2026-01-01'),
+    loan(102, state.ACTIVO, 10, 1, '2026-01-01'),
+    loan(103, state.ACTIVO, 10, 1, '2026-01-01'),
+    loan(104, state.ACTIVO, 10, 1, '2026-02-01'),
+    loan(105, state.ACTIVO, 10, 1, '2024-02-01'),
+    loan(106, state.ACTIVO, 10, 1, '2024-12-31'),
+    loan(107, state.ACTIVO, 10, 1, '2026-01-01'),
+    loan(108, state.ACTIVO, 10, 1, '2026-01-01'),
+  ];
+  const payments = [
+    payment(1, 101, 1, 0, '2026-01-01'),
+    payment(2, 102, 1, 0, '2026-01-02'),
+    payment(3, 103, 1, 0, '2026-02-01'),
+    payment(4, 104, 1, 0, '2026-03-01'),
+    payment(5, 105, 1, 0, '2024-03-01'),
+    payment(6, 106, 1, 0, '2025-01-01'),
+    payment(7, 107, 1, 0, '2026-01-02'),
+    payment(999, 107, 1, 0, '2025-12-31'),
+    payment(8, 108, 1, 0, '2026-02-01'),
+    payment(9, 108, 1, 0, '2026-03-01', 'ANULADO'),
+  ];
+  const result = await execute(loans, [], payments, []);
+  const duration = (id) => result.prestamos.find((p) => p.id === id).duracionDias;
+  assert.equal(duration(101), 0);
+  assert.equal(duration(102), 1);
+  assert.equal(duration(103), 31);
+  assert.equal(duration(104), 28);
+  assert.equal(duration(105), 29);
+  assert.equal(duration(106), 1);
+  assert.equal(duration(107), 1);
+  assert.equal(duration(108), 31);
+  assert.equal(result.prestamos.find((p) => p.id === 108).ultimoPago.fecha, '2026-02-01');
+});
+
+test('returns unavailable duration without payments and uses latest payment for every loan status', async () => {
+  const loans = [
+    loan(201, state.ACTIVO, 10, 1, '2026-01-01'),
+    loan(202, state.CANCELADO, 10, 1, '2026-01-01'),
+    loan(203, state.REFINANCIADO, 10, 1, '2026-01-01'),
+    loan(204, state.ACTIVO, 10, 1, '2026-01-01'),
+  ];
+  const payments = [
+    payment(20, 201, 1, 0, '2026-02-01'),
+    payment(21, 202, 1, 0, '2026-02-02'),
+    payment(22, 203, 1, 0, '2026-02-03'),
+  ];
+  const relations = [{ id: 20, prestamoOrigenId: 203, prestamoNuevoId: 204, fecha: '2026-12-31', capitalPendiente: 9 }];
+  const result = await execute(loans, [], payments, relations);
+  assert.equal(result.prestamos.find((p) => p.id === 201).duracionDias, 31);
+  assert.equal(result.prestamos.find((p) => p.id === 202).duracionDias, 32);
+  assert.equal(result.prestamos.find((p) => p.id === 203).duracionDias, 33);
+  assert.equal(result.prestamos.find((p) => p.id === 204).duracionDias, null);
+  assert.equal(result.prestamos.find((p) => p.id === 204).tipoDuracion, 'INDISPONIBLE');
 });

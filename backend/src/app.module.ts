@@ -14,6 +14,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CierreFinancieroModule } from './modules/cierre-financiero/cierre-financiero.module';
 import { IngresosModule } from './modules/ingresos/ingresos.module';
 import { ReportesModule } from './modules/reportes/reportes.module';
+import { AnalisisFinancieroModule } from './modules/analisis-financiero/analisis-financiero.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { ReportesModule } from './modules/reportes/reportes.module';
     CierreFinancieroModule,
     IngresosModule,
     ReportesModule,
+    AnalisisFinancieroModule,
   ],
 })
 export class AppModule {}

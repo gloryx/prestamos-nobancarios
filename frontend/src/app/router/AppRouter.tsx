@@ -24,6 +24,9 @@ import { GestionAnulacionesPage } from "@/features/prestamos/presentation/Gestio
 import { SaldadosPage } from "@/features/prestamos/presentation/SaldadosPage";
 import { RentabilidadCanceladosPage } from "@/features/prestamos/presentation/RentabilidadCanceladosPage";
 import { FlujoPrestamosPage } from "@/features/reportes/presentation/FlujoPrestamosPage";
+import { AnalisisFinancieroPage } from "@/features/analisis-financiero/presentation/AnalisisFinancieroPage";
+import { EstadisticasClientesPage } from "@/features/clientes/presentation/EstadisticasClientesPage";
+import { ProyeccionGananciasPage } from "@/features/analisis-financiero/presentation/ProyeccionGananciasPage";
 
 export function AppRouter() {
   return (
@@ -39,6 +42,8 @@ export function AppRouter() {
                 <Route path="configuracion/financiera" element={<ConfiguracionFinancieraPage />} />
                 <Route path="prestamos/gestion-incobrables" element={<GestionIncobrablesPage />} />
                 <Route path="prestamos/gestion-anulaciones" element={<GestionAnulacionesPage />} />
+                <Route path="finanzas/reportes/analisis-financiero" element={<AnalisisFinancieroPage />} />
+                <Route path="prestamos/proyeccion" element={<ProyeccionGananciasPage />} />
               </Route>
               <Route path="configuracion/formas-de-pago" element={<FormasPagoPage />} />
               <Route path="configuracion/periodicidades" element={<PeriodicidadesPage />} />
@@ -46,7 +51,7 @@ export function AppRouter() {
               <Route path="clientes/nuevo" element={<ClientesPage />} />
               <Route path="clientes/:id/editar" element={<ClientesPage />} />
               <Route path="clientes/analisis-financiero" element={<AnalisisFinancieroClientePage />} />
-              <Route path="clientes/reporte" element={<PlaceholderPage />} />
+              <Route path="clientes/reporte" element={<EstadisticasClientesPage />} />
               <Route path="prestamos" element={<PrestamosListPage />} />
               <Route path="prestamos/saldados" element={<SaldadosPage />} />
               <Route path="prestamos/nuevo" element={<PrestamosPage />} />

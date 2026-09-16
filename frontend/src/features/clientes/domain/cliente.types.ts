@@ -37,7 +37,7 @@ export interface AnalisisFinancieroPrestamo {
   totalPagado: number; capitalPagado: number; interesPagado: number; capitalPendiente: number
   interesPendiente: number; saldoPendiente: number; indicadorCobranza: string
   fechaLimiteContractual: string; ultimoPago: AnalisisFinancieroUltimoPago | null
-  duracionDias: number; tipoDuracion: 'FINALIZADO' | 'TRANSCURRIDOS'
+  duracionDias: number | null; tipoDuracion: 'FINALIZADO' | 'TRANSCURRIDOS' | 'INDISPONIBLE'
 }
 export interface AnalisisFinancieroResponse { cliente: AnalisisFinancieroCliente; resumen: AnalisisFinancieroResumen; prestamos: AnalisisFinancieroPrestamo[] }
 export type ClienteSortField = 'identificacion' | 'nombre' | 'direccion' | 'telefono' | 'estado'

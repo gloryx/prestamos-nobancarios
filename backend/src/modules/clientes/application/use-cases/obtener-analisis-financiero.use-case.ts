@@ -7,7 +7,13 @@ import { calcularIndicadorCobranza } from '../../../prestamos/application/servic
 
 const money = (value: number): number => Math.max(0, Math.round((value + Number.EPSILON) * 100) / 100);
 const today = (): string => fechaDateOnly(new Date());
-const daysBetween = (from: Date, to: string): number => Math.max(0, Math.floor((Date.parse(`${to}T00:00:00Z`) - from.getTime()) / 86400000));
+const calendarEpochDay = (value: Date | string): number => {
+  const [year, month, day] = value instanceof Date
+    ? [value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()]
+    : value.split('T')[0].split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+const daysBetween = (from: Date, to: string): number => calendarEpochDay(to) - calendarEpochDay(from);
 
 @Injectable()
 export class ObtenerAnalisisFinancieroUseCase {
@@ -74,11 +80,10 @@ export class ObtenerAnalisisFinancieroUseCase {
     const capitalPendiente = money(Math.max(p.capital - capitalPagado, 0)), interesPendiente = money(Math.max(p.interes - interesPagado, 0));
     const saldoPendiente = money(Math.max(p.montoTotal - totalPagado, 0));
     const fechaLimiteContractual = calcularFechaLimiteContractual(p.fechaAlta, p.periodicidad, p.cantidadPagos);
-    let duracionDias: number | null; let tipoDuracion: 'FINALIZADO' | 'TRANSCURRIDOS' | 'INDISPONIBLE';
-    if (p.estado === EstadoPrestamo.REFINANCIADO) { duracionDias = refinance ? daysBetween(p.fechaAlta, refinance.fecha) : null; tipoDuracion = refinance ? 'FINALIZADO' : 'INDISPONIBLE'; }
-    else if (p.estado === EstadoPrestamo.CANCELADO) { let capital = 0; let interes = 0; let event: string | undefined; for (const pago of ordered) { capital += pago.capitalAplicado; interes += pago.interesAplicado; if (capital >= p.capital && interes >= p.interes) { event = pago.fecha; break; } } duracionDias = daysBetween(p.fechaAlta, event ?? hoy); tipoDuracion = 'FINALIZADO'; }
-    else if (p.estado === EstadoPrestamo.ANULADO) { duracionDias = null; tipoDuracion = 'INDISPONIBLE'; }
-    else { duracionDias = daysBetween(p.fechaAlta, hoy); tipoDuracion = 'TRANSCURRIDOS'; }
+    const duracionDias = latest ? daysBetween(p.fechaAlta, latest.fecha) : null;
+    const tipoDuracion: 'FINALIZADO' | 'TRANSCURRIDOS' | 'INDISPONIBLE' = latest
+      ? (p.estado === EstadoPrestamo.REFINANCIADO || p.estado === EstadoPrestamo.CANCELADO ? 'FINALIZADO' : 'TRANSCURRIDOS')
+      : 'INDISPONIBLE';
     return { id: p.id, estado: p.estado, fechaAlta: fechaDateOnly(p.fechaAlta), capital: money(p.capital), interes: money(p.interes), montoTotal: money(p.montoTotal), totalPagado, capitalPagado, interesPagado, capitalPendiente: p.estado === EstadoPrestamo.ANULADO ? 0 : capitalPendiente, interesPendiente: p.estado === EstadoPrestamo.ANULADO ? 0 : interesPendiente, saldoPendiente: p.estado === EstadoPrestamo.ANULADO ? 0 : saldoPendiente, capitalTrasladadoHistorico: refinance ? money(refinance.capitalPendiente) : null, tipoSaldo: p.estado === EstadoPrestamo.REFINANCIADO ? 'TRASLADADO' : p.estado === EstadoPrestamo.ACTIVO ? 'VIGENTE' : p.estado, indicadorCobranza: p.estado === EstadoPrestamo.ANULADO ? undefined : p.estado === EstadoPrestamo.REFINANCIADO ? 'REFINANCIADO' : calcularIndicadorCobranza(saldoPendiente, fechaLimiteContractual, hoy, overdue), fechaLimiteContractual, ultimoPago: latest ? { fecha: latest.fecha, monto: money(latest.monto) } : null, duracionDias, tipoDuracion };
   }
 }
