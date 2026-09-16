@@ -6,6 +6,7 @@ import { useAuth } from '@/app/providers/auth-context'
 import { CurrencyInput } from '@/shared/components/forms/CurrencyInput'
 import { confirmAction } from '@/shared/utils/sweet-alert'
 import { formatCRC } from '@/shared/utils/currency'
+import { formatDateOnly, isSundayDateOnly, isValidDateOnly, todayInCostaRica } from '@/shared/utils/date'
 import { ajustarMontoCuota, abrirEstadoCuentaPdf, listarPlanPago, listarPrestamos, obtenerPrestamo, personalizarPlanPago } from '@/features/prestamos/application/prestamos.use-cases'
 import { anularPago, listarPagosDelPrestamo, obtenerResumenDelPrestamo, registrarPago } from '@/features/prestamos/application/pagos.use-cases'
 import { AxiosPrestamoRepository } from '@/features/prestamos/infrastructure/axios-prestamo.repository'
@@ -22,8 +23,8 @@ import type { UsuarioSelector } from '@/features/usuarios/domain/usuario.types'
 import './registrar-pago.css'
 
 const prestamoRepository = new AxiosPrestamoRepository(); const pagoRepository = new AxiosPagoRepository(); const formaRepository = new AxiosFormaPagoRepository(); const usuarioRepository = new AxiosUsuarioRepository()
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
-const dateLabel = (value: string | null | undefined) => value ? value.slice(0, 10).split('-').reverse().join('/') : '—'; const money = (value: number) => formatCRC(value)
+const today = todayInCostaRica
+const dateLabel = formatDateOnly; const money = (value: number) => formatCRC(value)
 const cobranzaLabel = (value: Prestamo['indicadorCobranza']) => !value ? '—' : value === 'AL_DIA' ? 'AL DÍA' : value.replace('_', ' ')
 type PaymentValidationErrors = Partial<Record<'loan' | 'installment' | 'date' | 'amount' | 'paymentMethod' | 'collector', string>>
 const hasAtMostTwoDecimals = (value: number) => Math.abs(value * 100 - Math.round(value * 100)) <= Number.EPSILON * Math.max(1, Math.abs(value * 100))
@@ -117,7 +118,7 @@ function AdjustmentModal({ item, onClose, onAdjusted }: { item: PlanPago; onClos
   const amountId = `payment-adjustment-amount-${item.id}`
   const dateId = `payment-adjustment-date-${item.id}`
   const dateErrorId = `${dateId}-error`
-  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(new Date(`${date}T00:00:00.000Z`).getTime()) && new Date(`${date}T00:00:00.000Z`).toISOString().slice(0, 10) === date
+  const validDate = isValidDateOnly(date)
   const dateError = !date ? 'Ingresa la fecha de la cuota.' : !validDate ? 'Ingresa una fecha válida.' : ''
   const valid = amount != null && amount > 0 && validDate
   useLocalModalAccessibility(true, onClose, Swal.isVisible())
@@ -138,11 +139,11 @@ function AdjustmentModal({ item, onClose, onAdjusted }: { item: PlanPago; onClos
 type EditablePlanRow = { id?: number; numeroPago?: number; fechaVencimiento: string; montoProgramado: number | null; editable: boolean; puedeEditarFecha: boolean; puedeEditarMonto: boolean; protected: boolean; original?: PlanPago }
 
 function isValidDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime()) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value
+  return isValidDateOnly(value)
 }
 
 function isSunday(value: string) {
-  return isValidDate(value) && new Date(`${value}T00:00:00.000Z`).getUTCDay() === 0
+  return isSundayDateOnly(value)
 }
 
 function PersonalizePlanModal({ loan, plan, summary, onClose, onSaved }: { loan: Prestamo; plan: PlanPago[]; summary: PagoResumen; onClose: () => void; onSaved: () => Promise<void> }) {

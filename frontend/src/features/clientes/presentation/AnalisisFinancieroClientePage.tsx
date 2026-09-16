@@ -8,12 +8,13 @@ import { AxiosClienteRepository } from '../infrastructure/axios-cliente.reposito
 import { AxiosPrestamoRepository } from '@/features/prestamos/infrastructure/axios-prestamo.repository'
 import { abrirEstadoCuentaPdf } from '@/features/prestamos/application/prestamos.use-cases'
 import { formatCRC } from '@/shared/utils/currency'
+import { formatDateOnly } from '@/shared/utils/date'
 import './analisis-financiero-cliente.css'
 
 const clienteRepository = new AxiosClienteRepository()
 const prestamoRepository = new AxiosPrestamoRepository()
 const nombreCliente = (c: Cliente) => [c.primerNombre, c.segundoNombre, c.primerApellido, c.segundoApellido].filter(Boolean).join(' ')
-const dateLabel = (value: string) => { const [year, month, day] = value.split('T')[0].split('-'); return year && month && day ? `${day}/${month}/${year}` : value }
+const dateLabel = formatDateOnly
 
 function ClientePicker({ onSelect }: { onSelect: (cliente: Cliente) => void }) {
   const [open, setOpen] = useState(false); const [page, setPage] = useState<ClientePage | null>(null)

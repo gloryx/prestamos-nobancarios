@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { BarChart3, RefreshCw } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { formatCRC } from '@/shared/utils/currency'
+import { formatDateOnly } from '@/shared/utils/date'
 import { obtenerProyeccion } from '../application/proyeccion.use-cases'
 import type { ProyeccionPeriodo, ProyeccionResponse } from '../domain/proyeccion.types'
 import { AxiosProyeccionRepository } from '../infrastructure/axios-proyeccion.repository'
 import './proyeccion-ganancias.css'
 
-const repository = new AxiosProyeccionRepository(); const date = (value: string | null) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CR') : '—'
+const repository = new AxiosProyeccionRepository(); const date = formatDateOnly
 export function ProyeccionGananciasPage() {
   const [periodo, setPeriodo] = useState<ProyeccionPeriodo>('1m'); const [report, setReport] = useState<ProyeccionResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [retryCount, setRetryCount] = useState(0); const requestId = useRef(0)
   useEffect(() => { const id = ++requestId.current; setLoading(true); setError(''); void obtenerProyeccion(repository, periodo).then((value) => { if (id === requestId.current) setReport(value) }).catch(() => { if (id === requestId.current) { setReport(null); setError('No se pudo cargar la proyección contractual.') } }).finally(() => { if (id === requestId.current) setLoading(false) }) }, [periodo, retryCount])

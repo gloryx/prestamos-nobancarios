@@ -7,17 +7,14 @@ import type { Prestamo, PrestamoFilters, PrestamoPage, PrestamoSortDirection, Pr
 import { AxiosPrestamoRepository } from '../infrastructure/axios-prestamo.repository'
 import { Pagination } from '@/shared/components/Pagination'
 import { formatCRC } from '@/shared/utils/currency'
+import { formatDateOnly } from '@/shared/utils/date'
 import './saldados.css'
 import './prestamos-list.css'
 
 const repository = new AxiosPrestamoRepository()
 const limitOptions = [10, 25, 50, 100]
 
-function displayDate(value: string | null | undefined) {
-  if (!value) return '—'
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : value
-}
+const displayDate = formatDateOnly
 
 function calendarDayNumber(value: string | null | undefined) {
   const match = value && /^(\d{4})-(\d{2})-(\d{2})/.exec(value)

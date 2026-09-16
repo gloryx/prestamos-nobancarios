@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { formatCRC } from "@/shared/utils/currency";
+import { formatDateOnly } from "@/shared/utils/date";
 import {
   abrirPlanPagoPdf,
   descargarPrestamosExcel,
@@ -43,11 +44,7 @@ const repository = new AxiosPrestamoRepository();
 const pagoRepository = new AxiosPagoRepository();
 const limitOptions = [10, 25, 50, 100];
 
-function displayDate(value: string | null | undefined) {
-  if (!value) return "—";
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
-}
+const displayDate = formatDateOnly;
 function cobranzaLabel(value: IndicadorCobranza | null | undefined) {
   return !value ? "—" : value === "AL_DIA" ? "AL DÍA" : value.replace("_", " ");
 }

@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import Swal from 'sweetalert2'
 import { Pagination } from '@/shared/components/Pagination'
 import { formatCRC } from '@/shared/utils/currency'
+import { formatDateOnly, todayInCostaRica } from '@/shared/utils/date'
 import { AxiosPrestamoRepository } from '../infrastructure/axios-prestamo.repository'
 import { cambiarEstadoPrestamo, listarCandidatosIncobrables, listarIncobrables, resumirPrestamos } from '../application/prestamos.use-cases'
 import type { IncobrableLoan, IncobrablesFilters, IncobrablesPage, PrestamoFilters, PrestamosResumen } from '../domain/prestamo.types'
@@ -12,8 +13,8 @@ import './prestamos-list.css'
 import './saldados.css'
 
 const repository = new AxiosPrestamoRepository()
-const today = () => new Date().toISOString().slice(0, 10)
-const date = (value?: string | null) => value ? value.slice(0, 10).split('-').reverse().join('/') : '—'
+const today = todayInCostaRica
+const date = formatDateOnly
 
 export function GestionIncobrablesPage() {
   const [tab, setTab] = useState<'vencidos' | 'incobrables'>('vencidos')
