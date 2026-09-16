@@ -27,6 +27,7 @@ import { FlujoPrestamosPage } from "@/features/reportes/presentation/FlujoPresta
 import { AnalisisFinancieroPage } from "@/features/analisis-financiero/presentation/AnalisisFinancieroPage";
 import { EstadisticasClientesPage } from "@/features/clientes/presentation/EstadisticasClientesPage";
 import { ProyeccionGananciasPage } from "@/features/analisis-financiero/presentation/ProyeccionGananciasPage";
+import { CobrosDelDiaPage } from "@/features/pagos/presentation/CobrosDelDiaPage";
 
 export function AppRouter() {
   return (
@@ -61,6 +62,7 @@ export function AppRouter() {
               <Route path="finanzas/caja/cortes/rentabilidad-cancelados" element={<RentabilidadCanceladosPage />} />
               <Route path="finanzas/reportes/flujo-prestamos" element={<FlujoPrestamosPage />} />
               <Route path="pagos/registrar" element={<RegistrarPagoPage />} />
+              <Route path="pagos" element={<CobrosDelDiaPage />} />
               <Route path="refinanciamientos" element={<RefinanciamientosPage />} />
               <Route path="refinanciamientos/nuevo" element={<NuevoRefinanciamientoPage />} />
               <Route path="refinanciamientos/cadenas" element={<CadenasRefinanciamientoPage />} />

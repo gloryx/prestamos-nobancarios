@@ -1,228 +1,74 @@
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  CalendarDays,
-  ChevronRight,
-  CircleDollarSign,
-  Download,
-  MoreHorizontal,
-  TrendingUp,
-} from "lucide-react";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import {
-  activity,
-  chartData,
-  financialSummary,
-  indicators,
-  monthlyResult,
-  movements,
-  overdue,
-  upcoming,
-} from "./dashboardData";
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertCircle, BarChart3, CircleDollarSign, Coins, HandCoins, RefreshCw, TrendingUp, Wallet } from 'lucide-react'
+import { useAuth } from '@/app/providers/auth-context'
+import { formatCRC } from '@/shared/utils/currency'
+import { todayInCostaRica } from '@/shared/utils/date'
+import { AxiosDashboardRepository } from './infrastructure/axios-dashboard.repository'
+import type { DashboardData } from './domain/dashboard.types'
+
+const repository = new AxiosDashboardRepository()
+const money = (value: number) => formatCRC(value)
+const signedMoney = (value: number) => value > 0 ? `+${money(value)}` : money(value)
+const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
 export function DashboardPage() {
-  return (
-    <div className="dashboard">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">MIÉRCOLES, 12 DE JUNIO DE 2024</p>
-          <h1>Buenos días, Administrador</h1>
-          <p className="muted">
-            Este es el resumen de tu operación financiera.
-          </p>
-        </div>
-        <button className="secondary-button">
-          <Download size={16} /> Exportar reporte
-        </button>
-      </div>
-      <div className="indicator-grid">
-        {indicators.map((item) => (
-          <div className={`indicator-card ${item.tone}`} key={item.label}>
-            <div className="indicator-top">
-              <span>{item.label}</span>
-              <CircleDollarSign size={19} />
-            </div>
-            <strong>{item.value}</strong>
-            <small>
-              <TrendingUp size={13} /> {item.change} <em>vs. mes anterior</em>
-            </small>
-          </div>
-        ))}
-      </div>
-      <section>
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">ANÁLISIS DEL MES ACTUAL</p>
-            <h2>Resumen de la operación</h2>
-          </div>
-          <button className="period-button">
-            <CalendarDays size={15} /> Este mes <ChevronRight size={14} />
-          </button>
-        </div>
-        <div className="analysis-grid">
-          <div className="panel summary-panel">
-            <PanelTitle title="RESUMEN FINANCIERO" />
-            <div className="summary-list">
-              {financialSummary.map(([label, value]) => (
-                <div className="summary-row" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="panel chart-panel">
-            <PanelTitle
-              title="ACTIVIDAD DEL MES"
-              subtitle="Pagos registrados por mes"
-            />
-            <div className="chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#8d99a8", fontSize: 11 }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "#f4f7f8" }}
-                    formatter={(value) => [`₡${value}M`, "Pagos"]}
-                  />
-                  <Bar
-                    dataKey="value"
-                    fill="var(--color-primary)"
-                    radius={[5, 5, 0, 0]}
-                    barSize={25}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          <div className="panel activity-panel">
-            <PanelTitle title="ACTIVIDAD DEL MES" />
-            <div className="activity-grid">
-              {activity.map((item) => (
-                <div className="activity-item" key={item.label}>
-                  <strong>{item.value}</strong>
-                  <span>{item.label}</span>
-                  <small>{item.detail}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="panel movements-panel">
-            <PanelTitle title="MOVIMIENTOS DEL MES" />
-            {movements.map((item) => (
-              <div className="movement-row" key={item.label}>
-                <span>
-                  {item.tone === "positive" ? (
-                    <ArrowDownRight />
-                  ) : (
-                    <ArrowUpRight />
-                  )}{" "}
-                  {item.label}
-                </span>
-                <strong className={item.tone}>{item.value}</strong>
-              </div>
-            ))}
-          </div>
-          <div className="panel result-panel">
-            <PanelTitle title="RESULTADO MENSUAL" />
-            <div className="result-list">
-              {monthlyResult.map(([label, value], index) => (
-                <div
-                  className={
-                    index === monthlyResult.length - 1 ? "result-total" : ""
-                  }
-                  key={label}
-                >
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-      <div className="lower-grid">
-        <DataTable
-          title="PRÓXIMOS COBROS"
-          columns={["Cliente", "Fecha", "Monto"]}
-          rows={upcoming.map((row) => [row.client, row.date, row.amount])}
-        />
-        <DataTable
-          title="CLIENTES ATRASADOS"
-          columns={["Cliente", "Días de atraso", "Saldo pendiente"]}
-          rows={overdue.map((row) => [row.client, row.days, row.amount])}
-          overdue
-        />
-      </div>
+  const { user } = useAuth()
+  const periodo = todayInCostaRica().slice(0, 7)
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const requestId = useRef(0)
+
+  const load = useCallback(() => {
+    const currentRequest = ++requestId.current
+    setLoading(true)
+    setError(null)
+    void repository.get(periodo).then((result) => {
+      if (currentRequest === requestId.current) setData(result)
+    }).catch(() => {
+      if (currentRequest === requestId.current) setError('No se pudo cargar el resumen del dashboard.')
+    }).finally(() => {
+      if (currentRequest === requestId.current) setLoading(false)
+    })
+  }, [periodo])
+
+  useEffect(() => {
+    load()
+    return () => { requestId.current += 1 }
+  }, [load])
+
+  const [year, month] = periodo.split('-')
+  const monthLabel = `${monthNames[Number(month) - 1]} ${year}`
+
+  return <main className="dashboard" aria-labelledby="dashboard-title">
+    <div className="page-heading">
+      <div><p className="eyebrow">{monthLabel.toUpperCase()}</p><h1 id="dashboard-title">Buenos días, {user?.nombreCompleto ?? 'usuario'}</h1><p className="muted">Resumen de la operación financiera con datos reales.</p></div>
     </div>
-  );
+    {loading && <div className="panel dashboard-state" role="status" aria-live="polite"><RefreshCw size={16} aria-hidden="true" /> Cargando resumen...</div>}
+    {!loading && error && <div className="panel dashboard-state dashboard-error" role="alert"><AlertCircle size={16} aria-hidden="true" /> <span>{error}</span><button className="secondary-button" type="button" onClick={load}><RefreshCw size={15} aria-hidden="true" /> Reintentar</button></div>}
+    {!loading && !error && data && <DashboardContent data={data} onRetry={load} />}
+  </main>
 }
 
-function PanelTitle({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="panel-title">
-      <div>
-        <h3>{title}</h3>
-        {subtitle && <p className="muted">{subtitle}</p>}
-      </div>
-      <MoreHorizontal size={18} aria-hidden="true" />
-    </div>
-  );
+function DashboardContent({ data, onRetry }: { data: DashboardData; onRetry: () => void }) {
+  const { flujo, cartera } = data
+  const metrics = [
+    cartera && ['Cartera actual', money(cartera.pendiente), 'ACTIVO e INCOBRABLE', Wallet],
+    flujo && ['Capital nuevo colocado', money(flujo.capitalColocado), 'Mes económico actual', Coins],
+    flujo && ['Pagos recibidos', money(flujo.pagosRecibidos), 'Pagos REGISTRADOS', HandCoins],
+    flujo && ['Capital recuperado', money(flujo.capitalRecuperado), 'Aplicado a capital', CircleDollarSign],
+    flujo && ['Ganancia realizada', money(flujo.gananciaRealizada), 'Interés aplicado en pagos', TrendingUp],
+    flujo && ['Flujo neto', signedMoney(flujo.flujoNeto), 'No representa utilidad', BarChart3],
+  ].filter(Boolean) as Array<[string, string, string, typeof Wallet]>
+  const hasMovement = flujo && (flujo.capitalColocado !== 0 || flujo.pagosRecibidos !== 0)
+
+  return <>
+    {data.errors.length > 0 && <div className="panel dashboard-state dashboard-partial" role="status"><AlertCircle size={16} aria-hidden="true" /><span>Datos parciales: {data.errors.join(' ')}</span><button className="secondary-button" type="button" onClick={onRetry}>Reintentar</button></div>}
+    {metrics.length > 0 && <section className="dashboard-metrics" aria-label="Indicadores del mes económico actual">
+      {metrics.map(([label, value, detail, Icon]) => <div className="indicator-card" key={label}><div className="indicator-top"><span>{label}</span><Icon size={19} aria-hidden="true" /></div><strong>{value}</strong><small>{detail}</small></div>)}
+    </section>}
+    {flujo && <section className="panel dashboard-financial" aria-labelledby="dashboard-financial-title"><div className="panel-title"><h2 id="dashboard-financial-title">Resumen financiero · {data.periodo}</h2></div><div className="dashboard-financial-grid"><Summary label="Capital nuevo colocado" value={money(flujo.capitalColocado)} /><Summary label="Pagos recibidos" value={money(flujo.pagosRecibidos)} /><Summary label="Capital recuperado" value={money(flujo.capitalRecuperado)} /><Summary label="Ganancia realizada" value={money(flujo.gananciaRealizada)} /><Summary label="Flujo neto" value={signedMoney(flujo.flujoNeto)} /></div><p className="dashboard-note">Flujo neto = pagos recibidos − capital nuevo colocado. No representa utilidad.</p>{!hasMovement && <p className="dashboard-empty" role="status">No hay movimientos financieros en el mes económico actual.</p>}</section>}
+  </>
 }
-function DataTable({
-  title,
-  columns,
-  rows,
-  overdue: isOverdue = false,
-}: {
-  title: string;
-  columns: string[];
-  rows: string[][];
-  overdue?: boolean;
-}) {
-  return (
-    <div className="panel table-panel">
-      <div className="panel-title">
-        <h3>{title}</h3>
-        <button className="text-button">
-          Ver todos <ChevronRight size={14} />
-        </button>
-      </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th key={column}>{column}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row[0]}>
-                {row.map((cell, index) => (
-                  <td
-                    className={
-                      isOverdue && index === 2
-                        ? "warning"
-                        : index > 0
-                          ? "amount"
-                          : ""
-                    }
-                    key={`${row[0]}-${cell}`}
-                  >
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+
+function Summary({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><strong>{value}</strong></div> }

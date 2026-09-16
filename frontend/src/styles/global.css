@@ -36,6 +36,22 @@ body { background: var(--color-background); color: var(--color-text); }
 .text-button:hover { color: var(--color-primary); }
 .sidebar-footer { color: var(--color-sidebar-text-muted); }
 
+.dashboard-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin: 28px 0 24px; }
+.dashboard-state { display: flex; align-items: center; gap: 8px; margin-top: 24px; color: var(--color-text-muted); font-size: 12px; }
+.dashboard-error { justify-content: space-between; color: #b34f4f; }
+.dashboard-error span { margin-right: auto; }
+.dashboard-financial { margin-top: 15px; }
+.dashboard-financial h2 { margin: 0; color: var(--color-text); font-size: 16px; }
+.dashboard-financial-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.dashboard-financial-grid > div { min-width: 0; padding: 12px; border-left: 3px solid var(--color-primary); background: var(--color-accent-soft); border-radius: 5px; }
+.dashboard-financial-grid span, .dashboard-financial-grid strong { display: block; }
+.dashboard-financial-grid span { color: var(--color-text-muted); font-size: 10px; }
+.dashboard-financial-grid strong { margin-top: 6px; color: var(--color-text); font-size: 15px; }
+.dashboard-note, .dashboard-empty { color: var(--color-text-muted); font-size: 11px; }
+.dashboard-note { margin: 18px 0 0; }.dashboard-empty { margin: 14px 0 0; }
+@media (max-width: 900px) { .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.dashboard-financial-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .dashboard-metrics { grid-template-columns: 1fr; }.dashboard-financial-grid { grid-template-columns: 1fr 1fr; }.dashboard-error { align-items: flex-start; flex-wrap: wrap; }.dashboard-error button { width: 100%; justify-content: center; } }
+
 .login-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--color-background); }
 .login-card { width: min(100%, 420px); padding: 38px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: 0 12px 35px color-mix(in srgb, var(--color-primary) 10%, transparent); }
 .login-brand { display: flex; align-items: center; gap: 10px; color: var(--color-primary); font-size: 20px; margin-bottom: 44px; }.login-brand span { color: var(--color-primary-hover); }

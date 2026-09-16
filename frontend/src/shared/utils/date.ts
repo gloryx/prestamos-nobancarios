@@ -22,3 +22,11 @@ export function todayInCostaRica(): string {
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find(part => part.type === type)?.value ?? ''
   return `${get('year')}-${get('month')}-${get('day')}`
 }
+
+export function addDaysDateOnly(value: string, days: number): string {
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day + days))
+  return [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()]
+    .map((part, index) => index === 0 ? String(part).padStart(4, '0') : String(part).padStart(2, '0'))
+    .join('-')
+}
