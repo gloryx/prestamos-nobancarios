@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 class RentabilidadCanceladosResumenDto {
-  @ApiProperty({ example: 12, description: 'Cantidad de préstamos cuya última transición real a CANCELADO ocurrió en el mes consultado.' }) prestamosCancelados!: number;
+  @ApiProperty({ example: 12, description: 'Cantidad de eventos históricos de transición a CANCELADO ocurridos en el mes consultado.' }) prestamosCancelados!: number;
   @ApiProperty({ example: 1800000, description: 'Suma de prestamo.capital de la población reportada.' }) capitalTotal!: number;
-  @ApiProperty({ example: 360000, description: 'Ganancia realizada: SUM(pago.interesAplicado) únicamente de pagos con estado REGISTRADO.' }) gananciaTotal!: number;
+  @ApiProperty({ example: 360000, description: 'Ganancia histórica por evento: SUM(pago.interesAplicado) de pagos vigentes en la fecha de cancelación.' }) gananciaTotal!: number;
   @ApiProperty({ example: 20, description: 'Rentabilidad realizada total: gananciaTotal / capitalTotal × 100.' }) rentabilidadTotal!: number;
   @ApiProperty({ example: 13.33, description: 'Tasa REAL equivalente a 30 días, ponderada por capital entre registros con duración válida: SUM(capital × tasaIndividual30) / SUM(capital), donde tasaIndividual30 = ganancia / capital × 30 / duración × 100.' }) tasa30Dias!: number;
 }

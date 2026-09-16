@@ -20,6 +20,10 @@ import { ListarPagosPorPrestamoUseCase } from './application/use-cases/listar-pa
 import { ObtenerResumenPagoPrestamoUseCase } from './application/use-cases/obtener-resumen-pago-prestamo.use-case';
 import { ObtenerEstadoPlanUseCase } from './application/use-cases/obtener-estado-plan.use-case';
 import { AnularPagoUseCase } from './application/use-cases/anular-pago.use-case';
+import { ConsultarCobrosDelDiaUseCase } from './application/use-cases/consultar-cobros-del-dia.use-case';
+import { COBROS_DEL_DIA_REPOSITORY } from './domain/repositories/cobros-del-dia.repository';
+import { CobrosDelDiaTypeOrmRepository } from './infrastructure/persistence/typeorm/cobros-del-dia.typeorm-repository';
+import { PlanPagoOrmEntity } from '../planes-pago/infrastructure/persistence/typeorm/plan-pago.orm-entity';
 
 @Module({ imports:  [
   FormasPagoModule,
@@ -28,6 +32,6 @@ import { AnularPagoUseCase } from './application/use-cases/anular-pago.use-case'
   UsuariosModule,
   MovimientosCajaModule,
   forwardRef(() => PlanesPagoModule),
-  TypeOrmModule.forFeature([PagoOrmEntity, PagoAnulacionOrmEntity]),
-], controllers: [PagosController], providers: [RegistrarPagoUseCase, ListarPagosUseCase, ObtenerPagoPorIdUseCase, ListarPagosPorPrestamoUseCase, ObtenerResumenPagoPrestamoUseCase, ObtenerEstadoPlanUseCase, AnularPagoUseCase, { provide: PAGO_REPOSITORY, useClass: PagoTypeOrmRepository }, { provide: PAGO_ANULACION_REPOSITORY, useClass: PagoAnulacionTypeOrmRepository }], exports: [PAGO_REPOSITORY] })
+  TypeOrmModule.forFeature([PagoOrmEntity, PagoAnulacionOrmEntity, PlanPagoOrmEntity]),
+], controllers: [PagosController], providers: [RegistrarPagoUseCase, ListarPagosUseCase, ObtenerPagoPorIdUseCase, ListarPagosPorPrestamoUseCase, ObtenerResumenPagoPrestamoUseCase, ObtenerEstadoPlanUseCase, AnularPagoUseCase, ConsultarCobrosDelDiaUseCase, { provide: PAGO_REPOSITORY, useClass: PagoTypeOrmRepository }, { provide: COBROS_DEL_DIA_REPOSITORY, useClass: CobrosDelDiaTypeOrmRepository }, { provide: PAGO_ANULACION_REPOSITORY, useClass: PagoAnulacionTypeOrmRepository }], exports: [PAGO_REPOSITORY] })
 export class PagosModule {}

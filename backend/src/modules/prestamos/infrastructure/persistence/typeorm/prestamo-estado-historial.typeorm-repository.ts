@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { PrestamoEstadoHistorial } from '../../../domain/entities/prestamo-estado-historial';
-import { PrestamoEstadoHistorialRepository } from '../../../domain/repositories/prestamo-estado-historial.repository';
+import { EstadoHistorico, PrestamoEstadoHistorialRepository } from '../../../domain/repositories/prestamo-estado-historial.repository';
 import { PrestamoEstadoHistorialMapper } from './prestamo-estado-historial.mapper';
 import { PrestamoEstadoHistorialOrmEntity } from './prestamo-estado-historial.orm-entity';
 
@@ -19,5 +19,15 @@ export class PrestamoEstadoHistorialTypeOrmRepository implements PrestamoEstadoH
   async estadoDelPrestamoEnFecha(manager: EntityManager, prestamoId: number, fecha: Date) {
     const row = await this.repo(manager).createQueryBuilder('h').where('h.prestamo_id = :prestamoId', { prestamoId }).andWhere('h.fecha <= :fecha', { fecha: fecha.toISOString().slice(0, 10) }).orderBy('h.fecha', 'DESC').addOrderBy('h.id', 'DESC').getOne();
     return row?.estadoNuevo ?? 'DESCONOCIDO';
+  }
+  async estadosDelPrestamoEnFecha(manager: EntityManager, prestamoIds: number[], fecha: Date) {
+    if (!prestamoIds.length) return new Map();
+    const rows = await this.repo(manager).createQueryBuilder('h')
+      .where('h.prestamo_id IN (:...prestamoIds)', { prestamoIds })
+      .andWhere('h.fecha <= :fecha', { fecha: fecha.toISOString().slice(0, 10) })
+      .orderBy('h.fecha', 'DESC').addOrderBy('h.id', 'DESC').getMany();
+    const states = new Map<number, EstadoHistorico>();
+    for (const row of rows) if (!states.has(row.prestamoId)) states.set(row.prestamoId, row.estadoNuevo);
+    return states;
   }
 }

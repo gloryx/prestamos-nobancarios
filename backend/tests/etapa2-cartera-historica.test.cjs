@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 
 const { calculateHistoricalPortfolio } = require('../dist/modules/cierre-financiero/application/financial-period.service');
 const { EstadoPrestamo } = require('../dist/modules/prestamos/domain/enums/estado-prestamo.enum');
+const { EstadoPago } = require('../dist/modules/pagos/domain/enums/estado-pago.enum');
 
 const loan = (id, fechaAlta, capital, estado = EstadoPrestamo.ACTIVO) => ({ id, fechaAlta, capital, estado });
-const payment = (prestamoId, fecha, capitalAplicado) => ({ prestamoId, fecha, capitalAplicado });
+const payment = (prestamoId, fecha, capitalAplicado, estado, anulacionFecha = null) => ({ prestamoId, fecha, capitalAplicado, estado, anulacionFecha });
 const refinancing = (prestamoOrigenId, prestamoNuevoId, fecha) => ({ prestamoOrigenId, prestamoNuevoId, fecha });
 const portfolio = (loans, payments, refinanciamientos, fechaCorte) =>
   calculateHistoricalPortfolio(loans, payments, refinanciamientos, fechaCorte);
@@ -17,6 +18,19 @@ test('includes capital when cancellation happened after the cutoff', () => {
 test('uses only payments dated on or before the cutoff', () => {
   assert.equal(portfolio([loan(1, '2026-01-01', 100)], [payment(1, '2026-02-01', 40)], [], '2026-01-31'), 100);
   assert.equal(portfolio([loan(1, '2026-01-01', 100)], [payment(1, '2026-01-31', 40)], [], '2026-01-31'), 60);
+});
+
+test('counts an annulled payment only when its explicit annulment happened after the cutoff', () => {
+  const after = payment(1, '2026-01-15', 40, EstadoPago.ANULADO, '2026-02-01');
+  const before = payment(1, '2026-01-15', 40, EstadoPago.ANULADO, '2026-01-31');
+  assert.equal(portfolio([loan(1, '2026-01-01', 100)], [after], [], '2026-01-31'), 60);
+  assert.equal(portfolio([loan(1, '2026-01-01', 100)], [before], [], '2026-01-31'), 100);
+});
+
+test('excludes an annulled loan at the cutoff but keeps one annulled afterward', () => {
+  assert.equal(portfolio([loan(1, '2026-01-01', 100, EstadoPrestamo.ANULADO)], [], [], '2026-01-31'), 100);
+  assert.equal(portfolio([{ ...loan(1, '2026-01-01', 100, EstadoPrestamo.ANULADO), estadoEnCorte: EstadoPrestamo.ANULADO }], [], [], '2026-01-31'), 0);
+  assert.equal(portfolio([{ ...loan(1, '2026-01-01', 100, EstadoPrestamo.ANULADO), estadoEnCorte: EstadoPrestamo.ACTIVO }], [], [], '2026-01-31'), 100);
 });
 
 test('keeps the origin before a later refinancing', () => {

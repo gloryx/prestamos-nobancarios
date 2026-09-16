@@ -25,3 +25,7 @@ export function calcularFechaLimiteContractual(fechaAlta: Date, periodicidad: st
   }
   return fechaDateOnly(date);
 }
+
+export function resolveContractualDeadline(persistedDeadline: string | null | undefined, fechaAlta: Date, periodicidad: string, cantidadPagos: number): string {
+  return persistedDeadline ?? calcularFechaLimiteContractual(fechaAlta, periodicidad, cantidadPagos);
+}

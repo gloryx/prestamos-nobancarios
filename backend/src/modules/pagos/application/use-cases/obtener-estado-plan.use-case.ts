@@ -3,8 +3,9 @@ import { PLAN_PAGO_REPOSITORY, PlanPagoRepository } from '../../../planes-pago/d
 import { PRESTAMO_REPOSITORY, PrestamoRepository } from '../../../prestamos/domain/repositories/prestamo.repository';
 import { PAGO_REPOSITORY, PagoRepository } from '../../domain/repositories/pago.repository';
 import { EstadoPlanQueryDto } from '../dto/estado-plan-query.dto';
+import { economicDateOnly } from '../../../../common/economic-date';
 
-const todayUtc = (): string => new Date().toISOString().slice(0, 10);
+const todayEconomic = (): string => economicDateOnly();
 const dateText = (date: Date): string => date.toISOString().slice(0, 10);
 const cents = (value: number): number => Math.round(value * 100);
 const isValidDate = (value: string): boolean => {
@@ -20,7 +21,7 @@ export class ObtenerEstadoPlanUseCase {
   async execute(prestamoId: number, query: EstadoPlanQueryDto = {}) {
     if (!(await this.prestamos.buscarPorId(prestamoId))) throw new NotFoundException('Préstamo no encontrado.');
     const plan = await this.planes.buscarPorPrestamoId(prestamoId); if (!plan.length) throw new NotFoundException('Plan de pago no encontrado.');
-    const asOf = query.fecha ?? todayUtc();
+    const asOf = query.fecha ?? todayEconomic();
     if (!isValidDate(asOf)) throw new BadRequestException('La fecha debe ser una fecha calendario válida en formato YYYY-MM-DD.');
     const orderedPlan = [...plan].sort((a, b) => a.numeroPago - b.numeroPago);
     const esperado = orderedPlan.filter((cuota) => dateText(cuota.fechaVencimiento) <= asOf).reduce((sum, cuota) => sum + cents(cuota.montoProgramado), 0);

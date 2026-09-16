@@ -1,4 +1,5 @@
 import type { ProyeccionFinancieraData, ProyeccionPlanRow } from '../domain/repositories/analisis-financiero.repository';
+import { economicDateOnly } from '../../../common/economic-date';
 
 export type ProyeccionPeriodo = '15d' | '1m' | '2m' | '3m' | 'cartera';
 type Cents = number;
@@ -36,7 +37,7 @@ function horizon(periodo: ProyeccionPeriodo, today: Date, maxActiveDate: string 
   return { from, to: dateOnly(addMonthsClamped(today, Number(periodo[0]))) };
 }
 
-export function buildProyeccion(data: ProyeccionFinancieraData, periodo: ProyeccionPeriodo, today = new Date()): ProyeccionResponse {
+export function buildProyeccion(data: ProyeccionFinancieraData, periodo: ProyeccionPeriodo, today = new Date(`${economicDateOnly()}T00:00:00Z`)): ProyeccionResponse {
   const active = data.prestamos.filter((loan) => loan.estado === 'ACTIVO');
   const bad = data.prestamos.filter((loan) => loan.estado === 'INCOBRABLE');
   const plans = new Map<number, ProyeccionPlanRow[]>();

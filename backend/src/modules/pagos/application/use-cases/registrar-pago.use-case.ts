@@ -111,10 +111,7 @@ export class RegistrarPagoUseCase {
        const futureWithPayments = lockedPlans.some((plan) => plan.numeroPago > planPago.numeroPago && hasPaymentsByPlan.has(plan.id));
        const canRenumber = !futureWithPayments;
        const survivingFuturePlans = futurePlans.filter((plan) => !plansToDelete.includes(plan));
-        // PostgreSQL date columns are represented as calendar strings here. Keep
-        // the selected payment date unchanged; do not derive it from a Date.
-        planPago.fechaVencimiento = dto.fecha;
-        if (canRenumber) {
+         if (canRenumber) {
          const temporaryBase = lockedPlans.reduce((maximum, plan) => Math.max(maximum, plan.numeroPago), 0) + 1_000_000;
          for (let index = 0; index < survivingFuturePlans.length; index += 1) {
            survivingFuturePlans[index].numeroPago = temporaryBase + index;

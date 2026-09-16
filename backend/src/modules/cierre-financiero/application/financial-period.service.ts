@@ -8,7 +8,9 @@ import { MovimientoCajaOrmEntity } from '../../movimientos-caja/infrastructure/p
 import { EstadoPrestamo } from '../../prestamos/domain/enums/estado-prestamo.enum';
 import { ConceptoMovimientoCaja } from '../../movimientos-caja/domain/enums/concepto-movimiento-caja.enum';
 import { TipoMovimientoCaja } from '../../movimientos-caja/domain/enums/tipo-movimiento-caja.enum';
+import { EstadoPago } from '../../pagos/domain/enums/estado-pago.enum';
 import { PrestamoEstadoHistorialService } from '../../prestamos/application/services/prestamo-estado-historial.service';
+import { isPaymentValidAt } from '../../../common/historical-payment';
 
 const money = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const validDate = (value: string) => {
@@ -22,16 +24,14 @@ const monthStart = (year: number, month: number) => `${year}-${String(month).pad
 const nextMonth = (year: number, month: number): [number, number] => month === 12 ? [year + 1, 1] : [year, month + 1];
 const zero = { carteraActiva: 0, carteraIncobrable: 0 };
 
-type HistoricalLoan = { id: number; fechaAlta: string; capital: number; estado?: EstadoPrestamo };
-type HistoricalPayment = { prestamoId: number; fecha: string; capitalAplicado: number };
+type HistoricalLoan = { id: number; fechaAlta: string; capital: number; estado?: EstadoPrestamo; estadoEnCorte?: EstadoPrestamo };
+type HistoricalPayment = { prestamoId: number; fecha: string; capitalAplicado: number; estado?: EstadoPago; anulacionFecha?: string | null };
 type HistoricalRefinancing = { prestamoOrigenId: number; prestamoNuevoId: number; fecha: string };
 
 /**
  * Reconstructs outstanding CAPITAL at a cutoff date from dated facts.
- * Loan status is intentionally not used: there is no reliable historical
- * transition timestamp for CANCELADO or INCOBRABLE. Active/incobrable buckets
- * therefore remain compatibility classifications, while the total is exact
- * for the facts currently stored.
+ * When available, estadoEnCorte is the historical status at the cutoff and is
+ * used to exclude loans annulled on or before that date.
  */
 export const calculateHistoricalPortfolio = (
   loans: HistoricalLoan[],
@@ -45,10 +45,11 @@ export const calculateHistoricalPortfolio = (
   );
   const paid = new Map<number, number>();
   for (const payment of payments) {
-    if (payment.fecha <= fechaCorte) paid.set(payment.prestamoId, (paid.get(payment.prestamoId) ?? 0) + payment.capitalAplicado);
+    const validAtCutoff = isPaymentValidAt(payment, fechaCorte);
+    if (payment.fecha <= fechaCorte && validAtCutoff) paid.set(payment.prestamoId, (paid.get(payment.prestamoId) ?? 0) + payment.capitalAplicado);
   }
   return money(existing
-    .filter(loan => !refinancedOrigins.has(loan.id))
+    .filter(loan => !refinancedOrigins.has(loan.id) && loan.estadoEnCorte !== EstadoPrestamo.ANULADO)
     .reduce((total, loan) => total + Math.max(0, loan.capital - (paid.get(loan.id) ?? 0)), 0));
 };
 
@@ -57,6 +58,16 @@ export const calculateExpectedPortfolio = (initial: number, originatedCapital: n
 
 export const calculateMonthlyResult = (interestCollected: number, netExpenses: number) =>
   money(interestCollected - netExpenses);
+
+export const calculateMonthlyDisbursements = (movements: Array<{ fecha: string; monto: number; concepto: ConceptoMovimientoCaja; tipo: TipoMovimientoCaja; movimientoReversado?: { concepto: ConceptoMovimientoCaja } | null }>, from: string, to: string) => {
+  const inPeriod = movements.filter(m => m.fecha >= from && m.fecha <= to);
+  const net = (concepto: ConceptoMovimientoCaja) => money(inPeriod.reduce((sum, movement) => {
+    if (movement.concepto === concepto && movement.tipo === TipoMovimientoCaja.SALIDA) return sum + movement.monto;
+    if (movement.concepto === ConceptoMovimientoCaja.REVERSO && movement.movimientoReversado?.concepto === concepto) return sum - movement.monto;
+    return sum;
+  }, 0));
+  return { loanOut: net(ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO), refinanceOut: net(ConceptoMovimientoCaja.DESEMBOLSO_REFINANCIAMIENTO) };
+};
 
 @Injectable()
 export class FinancialPeriodService {
@@ -75,16 +86,19 @@ export class FinancialPeriodService {
     const loans = await manager.getRepository(PrestamoOrmEntity).createQueryBuilder('p').where('p.fecha_alta <= :at', { at }).getMany();
     const refinanciamientos = await manager.getRepository(RefinanciamientoOrmEntity).createQueryBuilder('r').where('r.fecha <= :at', { at }).getMany();
     const ids = loans.map(p => p.id);
-    const payments = ids.length ? await manager.getRepository(PagoOrmEntity).createQueryBuilder('p').where('p.prestamo_id IN (:...ids)', { ids }).andWhere('p.estado = :state', { state: 'REGISTRADO' }).andWhere('p.fecha <= :at', { at }).getMany() : [];
+    const payments = ids.length ? await manager.getRepository(PagoOrmEntity).createQueryBuilder('p').leftJoinAndSelect('p.anulacion', 'anulacion').where('p.prestamo_id IN (:...ids)', { ids }).andWhere('(p.estado = :registered OR (p.estado = :annulled AND anulacion.fecha > :at))', { registered: EstadoPago.REGISTRADO, annulled: EstadoPago.ANULADO, at }).andWhere('p.fecha <= :at', { at }).getMany() : [];
     const paid = new Map<number, number>(); for (const p of payments) paid.set(p.prestamoId, (paid.get(p.prestamoId) ?? 0) + p.capitalAplicado);
-    const states = new Map<number, string>();
-    if (this.history) for (const loan of loans) states.set(loan.id, await this.history.estadoDelPrestamoEnFecha(manager, loan.id, new Date(`${at}T00:00:00.000Z`)));
+    const states = this.history
+      ? await this.history.estadosDelPrestamoEnFecha(manager, ids, new Date(`${at}T00:00:00.000Z`))
+      : new Map<number, string>();
     // Legacy loans without a transition are explicitly unknown and are omitted
     // from state buckets; the total remains reconstructed from dated facts.
     const bucket = (state: EstadoPrestamo) => money((this.history ? loans.filter(p => states.get(p.id) === state) : loans.filter(p => p.estado === state)).reduce((sum, p) => sum + Math.max(0, p.capital - (paid.get(p.id) ?? 0)), 0));
     const carteraActiva = bucket(EstadoPrestamo.ACTIVO); const carteraIncobrable = bucket(EstadoPrestamo.INCOBRABLE);
-    const carteraTotal = calculateHistoricalPortfolio(loans, payments, refinanciamientos, at);
-    return { carteraActiva, carteraIncobrable, carteraTotal, initial };
+    const historicalLoans = loans.map(loan => ({ id: loan.id, fechaAlta: loan.fechaAlta, capital: loan.capital, estado: loan.estado, estadoEnCorte: states.get(loan.id) as EstadoPrestamo | undefined }));
+    const historicalPayments = payments.map(payment => ({ prestamoId: payment.prestamoId, fecha: payment.fecha, capitalAplicado: payment.capitalAplicado, estado: payment.estado, anulacionFecha: payment.anulacion?.fecha ?? null }));
+    const carteraTotal = calculateHistoricalPortfolio(historicalLoans, historicalPayments, refinanciamientos, at);
+    return { carteraActiva, carteraIncobrable, carteraTotal, initial, states };
   }
 
   private async flows(manager: EntityManager, from: string, to: string, disponibleInicial: number) {
@@ -102,8 +116,9 @@ export class FinancialPeriodService {
       if (originalConcept && map[originalConcept]) add(map[originalConcept], sign * m.monto);
     }
     const refin = await manager.getRepository(RefinanciamientoOrmEntity).createQueryBuilder('r').where('r.fecha BETWEEN :from AND :to', { from, to }).getMany();
-    const loanOut = movements.filter(m => m.concepto === ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO).reduce((s, m) => s + m.monto, 0);
-    const refinanceOut = movements.filter(m => m.concepto === ConceptoMovimientoCaja.DESEMBOLSO_REFINANCIAMIENTO).reduce((s, m) => s + m.monto, 0);
+    const disbursements = calculateMonthlyDisbursements(movements.map(m => ({ ...m, fecha: String(m.fecha).slice(0, 10) })), from, to);
+    const loanOut = disbursements.loanOut;
+    const refinanceOut = disbursements.refinanceOut;
     const values = { disponibleInicial, entradas: money(entradas), salidas: money(salidas), capital, interest, paymentMismatch, loanOut: money(loanOut), refinanceOut: money(refinanceOut), refinanced: money(refin.reduce((s, r) => s + r.montoRefinanciado, 0)), indicators };
     return values;
   }
@@ -118,7 +133,10 @@ export class FinancialPeriodService {
     if (flows.paymentMismatch) errors.push('PAGOS_RECIBIDOS no coincide con CAPITAL_RECUPERADO + INTERESES_COBRADOS en uno o más pagos.');
     const newLoans = await manager.getRepository(PrestamoOrmEntity).createQueryBuilder('p').where('p.fecha_alta BETWEEN :from AND :to', { from, to }).getMany();
     const refinanciamientos = await manager.getRepository(RefinanciamientoOrmEntity).createQueryBuilder('r').where('r.fecha BETWEEN :from AND :to', { from, to }).getMany();
-    const originatedCapital = newLoans.reduce((s, p) => s + p.capital, 0);
+    const originatedCapital = newLoans.reduce((sum, loan) => {
+      const state = this.history ? portfolio.states.get(loan.id) : loan.estado;
+      return state === EstadoPrestamo.ANULADO ? 0 : loan.capital;
+    }, 0);
     const transferredRefinancingCapital = refinanciamientos.reduce((s, r) => s + r.capitalPendiente, 0);
     const expectedPortfolio = calculateExpectedPortfolio(prior.carteraInicial, originatedCapital, flows.capital, transferredRefinancingCapital);
     if (expectedPortfolio !== portfolio.carteraTotal) errors.push(`Control de cartera inconsistente: esperado ${expectedPortfolio}, final ${portfolio.carteraTotal}.`);

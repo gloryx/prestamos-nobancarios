@@ -8,12 +8,13 @@ import { PrestamoOrmEntity } from '../../infrastructure/persistence/typeorm/pres
 import { PrestamoEstadoHistorialService } from '../services/prestamo-estado-historial.service';
 import { FinancialPeriodService } from '../../../cierre-financiero/application/financial-period.service';
 import { PrestamoIncobrableService } from '../services/prestamo-incobrable.service';
+import { economicDateOnly } from '../../../../common/economic-date';
 @Injectable()
 export class CambiarEstadoPrestamoUseCase {
   constructor(@Inject(PRESTAMO_REPOSITORY) private readonly repository: PrestamoRepository, @InjectDataSource() private readonly dataSource: DataSource, private readonly history: PrestamoEstadoHistorialService, private readonly incobrables: PrestamoIncobrableService, @Optional() private readonly periods?: FinancialPeriodService) {}
   async execute(id: number, dto: CambiarEstadoPrestamoDto, actorUsuarioId?: number): Promise<PrestamoConRelaciones> {
     if (!actorUsuarioId) throw new BadRequestException('Se requiere una identidad autenticada para cambiar estados.');
-    const effectiveDate = dto.fecha ? new Date(`${dto.fecha.slice(0, 10)}T00:00:00.000Z`) : new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
+    const effectiveDate = dto.fecha ? new Date(`${dto.fecha.slice(0, 10)}T00:00:00.000Z`) : new Date(`${economicDateOnly()}T00:00:00.000Z`);
     const resultId = await this.dataSource.transaction(async manager => {
     if (this.periods) await this.periods.assertOpen(manager, effectiveDate);
     const prestamo = await manager.getRepository(PrestamoOrmEntity).createQueryBuilder('p').where('p.id = :id', { id }).setLock('pessimistic_write').getOne();

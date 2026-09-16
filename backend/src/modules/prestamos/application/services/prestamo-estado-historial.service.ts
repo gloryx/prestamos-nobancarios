@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { EstadoPrestamo } from '../../domain/enums/estado-prestamo.enum';
 import { PrestamoEstadoHistorial } from '../../domain/entities/prestamo-estado-historial';
-import { PRESTAMO_ESTADO_HISTORIAL_REPOSITORY, PrestamoEstadoHistorialRepository } from '../../domain/repositories/prestamo-estado-historial.repository';
+import { EstadoHistorico, PRESTAMO_ESTADO_HISTORIAL_REPOSITORY, PrestamoEstadoHistorialRepository } from '../../domain/repositories/prestamo-estado-historial.repository';
 
 @Injectable()
 export class PrestamoEstadoHistorialService {
@@ -12,4 +12,7 @@ export class PrestamoEstadoHistorialService {
   }
   listar(prestamoId: number) { return this.repository.listarPorPrestamo(prestamoId); }
   estadoDelPrestamoEnFecha(manager: EntityManager, prestamoId: number, fecha: Date) { return this.repository.estadoDelPrestamoEnFecha(manager, prestamoId, fecha); }
+  estadosDelPrestamoEnFecha(manager: EntityManager, prestamoIds: number[], fecha: Date): Promise<Map<number, EstadoHistorico>> {
+    return this.repository.estadosDelPrestamoEnFecha(manager, prestamoIds, fecha);
+  }
 }

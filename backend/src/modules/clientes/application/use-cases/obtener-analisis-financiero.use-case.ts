@@ -2,11 +2,12 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { CLIENTE_REPOSITORY, ClienteRepository } from '../../domain/repositories/cliente.repository';
 import { ANALISIS_FINANCIERO_REPOSITORY, AnalisisFinancieroRepository, AnalisisPago, AnalisisPrestamo, AnalisisRefinanciamiento } from '../../domain/repositories/analisis-financiero.repository';
 import { EstadoPrestamo } from '../../../prestamos/domain/enums/estado-prestamo.enum';
-import { calcularFechaLimiteContractual, fechaDateOnly } from '../../../planes-pago/domain/services/calendario-pago';
+import { fechaDateOnly, resolveContractualDeadline } from '../../../planes-pago/domain/services/calendario-pago';
+import { economicDateOnly } from '../../../../common/economic-date';
 import { calcularIndicadorCobranza } from '../../../prestamos/application/services/indicador-cobranza.service';
 
 const money = (value: number): number => Math.max(0, Math.round((value + Number.EPSILON) * 100) / 100);
-const today = (): string => fechaDateOnly(new Date());
+const today = (): string => economicDateOnly();
 const calendarEpochDay = (value: Date | string): number => {
   const [year, month, day] = value instanceof Date
     ? [value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()]
@@ -79,7 +80,7 @@ export class ObtenerAnalisisFinancieroUseCase {
     const totalPagado = money(t?.monto ?? 0), capitalPagado = money(t?.capital ?? 0), interesPagado = money(t?.interes ?? 0);
     const capitalPendiente = money(Math.max(p.capital - capitalPagado, 0)), interesPendiente = money(Math.max(p.interes - interesPagado, 0));
     const saldoPendiente = money(Math.max(p.montoTotal - totalPagado, 0));
-    const fechaLimiteContractual = calcularFechaLimiteContractual(p.fechaAlta, p.periodicidad, p.cantidadPagos);
+    const fechaLimiteContractual = resolveContractualDeadline(p.fechaLimiteContractual, p.fechaAlta, p.periodicidad, p.cantidadPagos);
     const duracionDias = latest ? daysBetween(p.fechaAlta, latest.fecha) : null;
     const tipoDuracion: 'FINALIZADO' | 'TRANSCURRIDOS' | 'INDISPONIBLE' = latest
       ? (p.estado === EstadoPrestamo.REFINANCIADO || p.estado === EstadoPrestamo.CANCELADO ? 'FINALIZADO' : 'TRANSCURRIDOS')

@@ -6,7 +6,7 @@ const { ConfiguracionFinancieraOrmEntity, CierreMensualOrmEntity, DetalleCorteMe
 const { getMetadataArgsStorage } = require('typeorm');
 const { validate } = require('class-validator');
 const { plainToInstance } = require('class-transformer');
-const { calculateExpectedPortfolio, calculateMonthlyResult } = require('../dist/modules/cierre-financiero/application/financial-period.service');
+const { calculateExpectedPortfolio, calculateMonthlyResult, calculateMonthlyDisbursements } = require('../dist/modules/cierre-financiero/application/financial-period.service');
 const { CrearPrestamoDto } = require('../dist/modules/prestamos/application/dto/crear-prestamo.dto');
 const { MovimientoCajaService } = require('../dist/modules/movimientos-caja/application/services/movimiento-caja.service');
 const { ConceptoMovimientoCaja } = require('../dist/modules/movimientos-caja/domain/enums/concepto-movimiento-caja.enum');
@@ -46,6 +46,26 @@ test('financial persistence protects snapshots and configuration singleton', () 
   assert.equal(relation.options.onDelete, 'RESTRICT');
   const index = getMetadataArgsStorage().indices.find(x => x.target === ConfiguracionFinancieraOrmEntity && x.name === 'UQ_configuracion_financiera_singleton');
   assert.equal(index.unique, true);
+});
+
+test('monthly disbursement reversal is recognized in the reversal month without rewriting the original month', () => {
+  const loan = { fecha: '2026-01-31', monto: 100, concepto: ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO, tipo: TipoMovimientoCaja.SALIDA };
+  const reversal = { fecha: '2026-02-02', monto: 100, concepto: ConceptoMovimientoCaja.REVERSO, tipo: TipoMovimientoCaja.ENTRADA, movimientoReversado: loan };
+  assert.deepEqual(calculateMonthlyDisbursements([loan, reversal], '2026-01-01', '2026-01-31'), { loanOut: 100, refinanceOut: 0 });
+  assert.deepEqual(calculateMonthlyDisbursements([loan, reversal], '2026-02-01', '2026-02-28'), { loanOut: -100, refinanceOut: 0 });
+});
+
+test('monthly disbursement reversal preserves refinancing concept and amount', () => {
+  const original = { fecha: '2026-01-31', monto: 80, concepto: ConceptoMovimientoCaja.DESEMBOLSO_REFINANCIAMIENTO, tipo: TipoMovimientoCaja.SALIDA };
+  const reversal = { fecha: '2026-02-01', monto: 80, concepto: ConceptoMovimientoCaja.REVERSO, tipo: TipoMovimientoCaja.ENTRADA, movimientoReversado: original };
+  assert.equal(calculateMonthlyDisbursements([original, reversal], '2026-02-01', '2026-02-28').refinanceOut, -80);
+});
+
+test('closed snapshot values are read-only facts even when a later calculation differs', () => {
+  const closed = { carteraTotal: 100, detalles: [{ concepto: ConceptoDetalleCorte.CARTERA_TOTAL_FINAL, monto: 100 }] };
+  const laterCalculation = { carteraTotal: 70 };
+  assert.equal(closed.detalles[0].monto, 100);
+  assert.notEqual(laterCalculation.carteraTotal, closed.detalles[0].monto);
 });
 
 test('financial calculations reconcile refinancing transfer exactly and keep withdrawals out of result', () => {

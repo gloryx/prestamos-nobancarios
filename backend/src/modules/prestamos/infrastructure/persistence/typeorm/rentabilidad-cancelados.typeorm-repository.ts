@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { RentabilidadCanceladosRepository, RentabilidadCanceladaFact } from '../../../domain/repositories/rentabilidad-cancelados.repository';
+import { sumHistoricalInterest } from '../../../../../common/historical-payment';
 
 const serializeDateOnly = (value: unknown): string => {
   if (value instanceof Date) {
@@ -20,20 +21,47 @@ export class RentabilidadCanceladosTypeOrmRepository implements RentabilidadCanc
 
   async listar(anio: number, mes: number): Promise<RentabilidadCanceladaFact[]> {
     const from = `${anio}-${String(mes).padStart(2, '0')}-01`;
-    const to = new Date(Date.UTC(anio, mes, 0)).toISOString().slice(0, 10);
-    const rows = await this.dataSource.createQueryBuilder()
+    const nextMonth = mes === 12 ? `${anio + 1}-01-01` : `${anio}-${String(mes + 1).padStart(2, '0')}-01`;
+    const events = await this.dataSource.createQueryBuilder()
       .from('prestamo', 'prestamo')
-      .innerJoin('prestamo_estado_historial', 'historial', "historial.prestamo_id = prestamo.id AND historial.estado_nuevo = :cancelado AND historial.id = (SELECT h2.id FROM prestamo_estado_historial h2 WHERE h2.prestamo_id = prestamo.id AND h2.estado_nuevo = :cancelado ORDER BY h2.fecha DESC, h2.id DESC LIMIT 1)")
-      .leftJoin('(SELECT pago.prestamo_id, SUM(pago.interes_aplicado) AS ganancia FROM pago pago WHERE pago.estado = :registrado GROUP BY pago.prestamo_id)', 'pagos', 'pagos.prestamo_id = prestamo.id')
+      .innerJoin('prestamo_estado_historial', 'historial', 'historial.prestamo_id = prestamo.id AND historial.estado_nuevo = :cancelado')
       .select('prestamo.capital', 'capital')
+      .addSelect('prestamo.id', 'prestamoId')
       .addSelect('prestamo.fecha_alta', 'fechaAlta')
       .addSelect('historial.fecha', 'fechaCancelacion')
-      .addSelect('COALESCE(pagos.ganancia, 0)', 'ganancia')
-      .where('prestamo.estado = :cancelado')
-      .andWhere('historial.fecha >= :from')
-      .andWhere('historial.fecha <= :to')
-      .setParameters({ cancelado: 'CANCELADO', registrado: 'REGISTRADO', from, to })
-       .getRawMany<Record<string, unknown>>();
-    return rows.map((row) => ({ capital: Number(row.capital ?? 0), ganancia: Number(row.ganancia ?? 0), fechaAlta: serializeDateOnly(row.fechaAlta), fechaCancelacion: serializeDateOnly(row.fechaCancelacion) }));
+      .addSelect('historial.id', 'historialId')
+      .where('historial.fecha >= :from')
+      .andWhere('historial.fecha < :nextMonth')
+      .setParameters({ cancelado: 'CANCELADO', from, nextMonth })
+      .getRawMany<Record<string, unknown>>();
+
+    if (!events.length) return [];
+
+    const ids = [...new Set(events.map(row => Number(row.prestamoId)))];
+    const payments = await this.dataSource.createQueryBuilder()
+      .from('pago', 'pago')
+      .leftJoin('pago_anulacion', 'anulacion', 'anulacion.pago_id = pago.id')
+      .select('pago.prestamo_id', 'prestamoId')
+      .addSelect('pago.fecha', 'fecha')
+      .addSelect('pago.estado', 'estado')
+      .addSelect('pago.interes_aplicado', 'interesAplicado')
+      .addSelect('anulacion.fecha', 'anulacionFecha')
+      .where('pago.prestamo_id IN (:...ids)', { ids })
+      .getRawMany<Record<string, unknown>>();
+
+    const byLoan = new Map<number, Array<{ fecha: string; estado: string; interesAplicado: number; anulacionFecha: string | null }>>();
+    for (const row of payments) {
+      const prestamoId = Number(row.prestamoId);
+      const payment = { fecha: serializeDateOnly(row.fecha), estado: String(row.estado ?? ''), interesAplicado: Number(row.interesAplicado ?? 0), anulacionFecha: serializeDateOnly(row.anulacionFecha) || null };
+      const list = byLoan.get(prestamoId) ?? [];
+      list.push(payment);
+      byLoan.set(prestamoId, list);
+    }
+
+    return events.map(row => {
+      const fechaCancelacion = serializeDateOnly(row.fechaCancelacion);
+      const ganancia = sumHistoricalInterest(byLoan.get(Number(row.prestamoId)) ?? [], fechaCancelacion);
+      return { capital: Number(row.capital ?? 0), ganancia, fechaAlta: serializeDateOnly(row.fechaAlta), fechaCancelacion };
+    });
   }
 }

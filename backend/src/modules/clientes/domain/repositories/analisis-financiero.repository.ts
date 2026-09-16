@@ -10,6 +10,7 @@ export interface AnalisisPrestamo {
   montoDesembolsado: number;
   cantidadPagos: number;
   periodicidad: string;
+  fechaLimiteContractual?: string;
 }
 
 export interface AnalisisPago {

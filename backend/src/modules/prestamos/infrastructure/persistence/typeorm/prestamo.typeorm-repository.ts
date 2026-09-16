@@ -8,6 +8,7 @@ import { PrestamoOrmEntity } from './prestamo.orm-entity';
 import { EstadoPrestamo } from '../../../domain/enums/estado-prestamo.enum';
 import { FiltrosIncobrablesDto, OrdenarIncobrablesPor } from '../../../application/dto/filtros-incobrables.dto';
 import { AnulacionListado, AnulacionesPaginadas, IncobrableListado, IncobrablesPaginados } from '../../../domain/repositories/prestamo.repository';
+import { economicDateOnly } from '../../../../../common/economic-date';
 
 const clientNameExpression = "UPPER(TRIM(CONCAT_WS(' ', cliente.primer_nombre, cliente.segundo_nombre, cliente.primer_apellido, cliente.segundo_apellido)))";
 const statePriorityExpression = "CASE prestamo.estado WHEN 'ACTIVO' THEN 1 WHEN 'INCOBRABLE' THEN 2 WHEN 'REFINANCIADO' THEN 3 WHEN 'CANCELADO' THEN 4 ELSE 5 END";
@@ -169,7 +170,7 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
       .groupBy('pago.prestamo_id')
       .getRawMany<{ prestamo_id: string; capital_pagado: string; total_pagado: string }>();
     const paidByLoan = new Map(totals.map((row) => [Number(row.prestamo_id), { capital: Number(row.capital_pagado ?? 0), total: Number(row.total_pagado ?? 0) }]));
-     return { datos: loans.map((loan) => { const paid = paidByLoan.get(loan.id!) ?? { capital: 0, total: 0 }; const operativo = loan.estado !== 'ANULADO'; return Object.assign(loan, { capitalPendiente: operativo ? Math.max(0, loan.capital - paid.capital) : 0, saldoPendiente: operativo ? Math.max(loan.montoTotal - paid.total, 0) : 0 }); }), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
+      return { datos: loans.map((loan) => { const paid = paidByLoan.get(loan.id!) ?? { capital: 0, total: 0 }; const operativo = loan.estado !== 'ANULADO'; return Object.assign(loan, { capitalPendiente: operativo ? Math.max(0, loan.capital - paid.capital) : 0, saldoPendiente: operativo ? Math.max(loan.montoTotal - paid.total, 0) : 0 }); }), pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
   }
   async resumen(filtros: FiltrosPrestamos): Promise<PrestamosResumen> {
     const pagos = this.repository.manager.createQueryBuilder().subQuery()
@@ -198,7 +199,7 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
   }
 
   private incobrableQuery(filtros: FiltrosIncobrablesDto, candidatos: boolean, manager?: EntityManager) {
-    const fecha = filtros.fechaReferencia ?? new Date().toISOString().slice(0, 10);
+    const fecha = filtros.fechaReferencia ?? economicDateOnly();
     const query = (manager?.getRepository(PrestamoOrmEntity) ?? this.repository).createQueryBuilder('prestamo').leftJoinAndSelect('prestamo.cliente', 'cliente').leftJoinAndSelect('prestamo.periodicidadPago', 'periodicidadPago').leftJoinAndSelect('prestamo.formaPago', 'formaPago').leftJoinAndSelect('prestamo.formaDesembolso', 'formaDesembolso');
     const paidLoan = '(SELECT COALESCE(SUM(p0.monto), 0) FROM pago p0 WHERE p0.prestamo_id = prestamo.id AND p0.estado = \'REGISTRADO\')';
     const paidPlan = '(SELECT COALESCE(SUM(p1.monto), 0) FROM pago p1 WHERE p1.plan_pago_id = pp.id AND p1.estado = \'REGISTRADO\')';
@@ -238,7 +239,7 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
       const paid = Number(row.total_pagado ?? 0);
       const item = Object.assign(loan, { capitalPendiente: Math.max(loan.capital - Number(row.capital_pagado ?? 0), 0), saldoPendiente: Math.max(loan.montoTotal - paid, 0) }) as IncobrableListado;
       if (candidatos) Object.assign(item, { fechaVencimiento: row.incobrable_fecha_vencimiento, saldoCuota: Number(row.incobrable_saldo_cuota ?? 0), puedePasarAIncobrable: true, puedeReactivar: false });
-      else { const date = row.incobrable_fecha ? String(row.incobrable_fecha).slice(0, 10) : undefined; Object.assign(item, { fechaIncobrable: date, observacionIncobrable: row.incobrable_observacion ?? null, diasEnEstado: date ? Math.max(0, Math.floor((Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86400000)) : 0, ultimaFechaPago: row.incobrable_ultimo_pago ? String(row.incobrable_ultimo_pago).slice(0, 10) : null, puedePasarAIncobrable: false, puedeReactivar: true }); }
+      else { const date = row.incobrable_fecha ? String(row.incobrable_fecha).slice(0, 10) : undefined; Object.assign(item, { fechaIncobrable: date, observacionIncobrable: row.incobrable_observacion ?? null, diasEnEstado: date ? Math.max(0, Math.floor((Date.parse(`${economicDateOnly()}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86400000)) : 0, ultimaFechaPago: row.incobrable_ultimo_pago ? String(row.incobrable_ultimo_pago).slice(0, 10) : null, puedePasarAIncobrable: false, puedeReactivar: true }); }
       return item;
     });
     return { datos, pagina: filtros.pagina, limite: filtros.limite, total, totalPaginas: Math.ceil(total / filtros.limite) };
