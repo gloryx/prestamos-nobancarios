@@ -15,6 +15,7 @@ import { TipoMovimientoCaja } from '../../../domain/enums/tipo-movimiento-caja.e
 @Index('UQ_movimiento_caja_refinanciamiento', ['refinanciamientoId'], { unique: true, where: '"concepto" = \'DESEMBOLSO_REFINANCIAMIENTO\' AND "refinanciamiento_id" IS NOT NULL' })
 @Index('UQ_movimiento_caja_prestamo', ['prestamoId'], { unique: true, where: '"concepto" = \'DESEMBOLSO_PRESTAMO\' AND "prestamo_id" IS NOT NULL' })
 @Index('UQ_movimiento_caja_reversado', ['movimientoReversadoId'], { unique: true, where: '"movimiento_reversado_id" IS NOT NULL' })
+@Index('UQ_movimiento_caja_idempotency', ['usuarioId', 'idempotencyKey'], { unique: true, where: '"idempotency_key" IS NOT NULL' })
 export class MovimientoCajaOrmEntity {
   @PrimaryGeneratedColumn() id!: number;
   @Column({ type: 'enum', enum: TipoMovimientoCaja, enumName: 'movimiento_caja_tipo_enum' }) tipo!: TipoMovimientoCaja;
@@ -34,6 +35,8 @@ export class MovimientoCajaOrmEntity {
   @ManyToOne(() => MovimientoCajaOrmEntity, { nullable: true, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'movimiento_reversado_id' }) movimientoReversado!: MovimientoCajaOrmEntity | null;
   @OneToMany(() => MovimientoCajaOrmEntity, value => value.movimientoReversado) reversiones!: MovimientoCajaOrmEntity[];
   @Column({ name: 'usuario_id', type: 'integer' }) usuarioId!: number;
+  @Column({ name: 'idempotency_key', type: 'varchar', length: 128, nullable: true }) idempotencyKey!: string | null;
+  @Column({ name: 'idempotency_fingerprint', type: 'text', nullable: true }) idempotencyFingerprint!: string | null;
   @ManyToOne(() => UsuarioOrmEntity, { nullable: false, onDelete: 'RESTRICT' }) @JoinColumn({ name: 'usuario_id' }) usuario!: UsuarioOrmEntity;
   @CreateDateColumn({ name: 'fecha_creacion', type: 'timestamp' }) fechaCreacion!: Date;
 }

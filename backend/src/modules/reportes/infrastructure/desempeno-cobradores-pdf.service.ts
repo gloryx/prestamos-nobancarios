@@ -24,21 +24,26 @@ const nowInCostaRica = (): string => {
   return `${values.day}/${values.month}/${values.year} ${values.hour}:${values.minute}`;
 };
 
+export type DesempenoCobradoresPdfFilterLabels = {
+  cobradorNombre?: string;
+  formaPagoNombre?: string;
+};
+
 @Injectable()
 export class DesempenoCobradoresPdfService {
-  generar(report: DesempenoCobradoresReport, query: DesempenoCobradoresQueryDto): Promise<Buffer> {
+  generar(report: DesempenoCobradoresReport, query: DesempenoCobradoresQueryDto, labels: DesempenoCobradoresPdfFilterLabels = {}): Promise<Buffer> {
     const document = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, bufferPages: true, info: { Title: 'Desempeño de cobradores' } });
     const chunks: Buffer[] = [];
     return new Promise((resolvePromise, reject) => {
       document.on('data', (chunk: Buffer) => chunks.push(chunk));
       document.on('end', () => resolvePromise(Buffer.concat(chunks)));
       document.on('error', reject);
-      this.render(document, report, query);
+      this.render(document, report, query, labels);
       document.end();
     });
   }
 
-  private render(document: PDFKit.PDFDocument, report: DesempenoCobradoresReport, query: DesempenoCobradoresQueryDto): void {
+  private render(document: PDFKit.PDFDocument, report: DesempenoCobradoresReport, query: DesempenoCobradoresQueryDto, labels: DesempenoCobradoresPdfFilterLabels): void {
     if (!existsSync(FONT_REGULAR) || !existsSync(FONT_BOLD)) throw new Error(`Unicode PDF fonts are not available at ${FONT_DIRECTORY}`);
     document.registerFont('Unicode', FONT_REGULAR);
     document.registerFont('Unicode-Bold', FONT_BOLD);
@@ -54,7 +59,7 @@ export class DesempenoCobradoresPdfService {
     const drawHeader = () => {
       document.font('Unicode-Bold').fontSize(15).fillColor('#172033').text('DESEMPEÑO DE COBRADORES', MARGIN, y, { width }); y += 20;
       document.font('Unicode').fontSize(8.5).fillColor('#374151').text(`Período: ${date(query.fechaDesde)} - ${date(query.fechaHasta)}  |  Generado: ${nowInCostaRica()} (Costa Rica)`, MARGIN, y, { width }); y += 13;
-      const filters = [`Cobrador: ${query.cobradorId ? `ID ${query.cobradorId}` : 'Todos'}`, `Forma de pago: ${query.formaPagoId ? `ID ${query.formaPagoId}` : 'Todas'}`];
+      const filters = [`Cobrador: ${query.cobradorId ? labels.cobradorNombre ?? `Cobrador ID ${query.cobradorId}` : 'Todos'}`, `Forma de pago: ${query.formaPagoId ? labels.formaPagoNombre ?? `Forma de pago ID ${query.formaPagoId}` : 'Todas'}`];
       document.text(filters.join('  |  '), MARGIN, y, { width }); y += 14;
       const blocks = [
         ['Pagos registrados', report.totales.cantidadPagos.toLocaleString('es-CR')],

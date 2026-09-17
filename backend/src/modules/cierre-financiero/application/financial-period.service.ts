@@ -11,6 +11,7 @@ import { TipoMovimientoCaja } from '../../movimientos-caja/domain/enums/tipo-mov
 import { EstadoPago } from '../../pagos/domain/enums/estado-pago.enum';
 import { PrestamoEstadoHistorialService } from '../../prestamos/application/services/prestamo-estado-historial.service';
 import { isPaymentValidAt } from '../../../common/historical-payment';
+import { economicDateOnly } from '../../../common/economic-date';
 
 const money = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const validDate = (value: string) => {
@@ -69,6 +70,50 @@ export const calculateMonthlyDisbursements = (movements: Array<{ fecha: string; 
   return { loanOut: net(ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO), refinanceOut: net(ConceptoMovimientoCaja.DESEMBOLSO_REFINANCIAMIENTO) };
 };
 
+export type CashMovementForCalculation = {
+  fecha: string | Date;
+  monto: number;
+  tipo: TipoMovimientoCaja;
+};
+
+export type AvailableCashInput = {
+  disponibleInicial: number;
+  fechaApertura: string;
+  fechaCierreAnterior?: string;
+  asOf: string | Date;
+  movements: CashMovementForCalculation[];
+};
+
+const dateOnly = (value: string | Date) => {
+  if (value instanceof Date) return economicDateOnly(value);
+  return value.slice(0, 10);
+};
+
+const nextDay = (date: string) => {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + 1);
+  return value.toISOString().slice(0, 10);
+};
+
+const cents = (amount: number) => Math.round((amount + Number.EPSILON) * 100);
+
+/** Reconstructs available Caja for the supplied inclusive economic range. */
+export const calculateAvailableCash = ({ disponibleInicial, fechaApertura, fechaCierreAnterior, asOf, movements }: AvailableCashInput) => {
+  const effectiveAsOf = dateOnly(asOf);
+  const from = fechaCierreAnterior ? nextDay(fechaCierreAnterior) : fechaApertura;
+  const balance = movements.reduce((total, movement) => {
+    const fecha = dateOnly(movement.fecha);
+    if (fecha < from || fecha > effectiveAsOf) return total;
+    const amount = cents(movement.monto);
+    return total + (movement.tipo === TipoMovimientoCaja.ENTRADA ? amount : -amount);
+  }, cents(disponibleInicial));
+  return balance / 100;
+};
+
+/** Calculates the current available Caja balance, excluding future movements. */
+export const calculateAvailableCashAsOfToday = (input: AvailableCashInput, today = economicDateOnly()) =>
+  calculateAvailableCash({ ...input, asOf: dateOnly(input.asOf) < today ? input.asOf : today });
+
 @Injectable()
 export class FinancialPeriodService {
   constructor(@Optional() private readonly history?: PrestamoEstadoHistorialService) {}
@@ -76,8 +121,9 @@ export class FinancialPeriodService {
   assertDate(value: string) { if (!validDate(value)) throw new BadRequestException('La fecha debe ser válida y tener formato YYYY-MM-DD.'); }
 
   async assertOpen(manager: EntityManager, date: Date) {
-    const value = date.toISOString().slice(0, 10); const config = await this.config(manager);
-    if (config && value < config.fechaApertura) throw new BadRequestException('La fecha económica es anterior a la apertura.');
+    const value = economicDateOnly(date); const config = await this.config(manager);
+    if (!config) throw new NotFoundException('Configuración financiera no encontrada.');
+    if (value < config.fechaApertura) throw new BadRequestException('La fecha económica es anterior a la apertura.');
     const closed = await manager.createQueryBuilder(CierreMensualOrmEntity, 'c').where('c.fecha_inicio <= :date AND c.fecha_fin >= :date', { date: value }).getOne();
     if (closed) throw new ConflictException('El período económico está cerrado.');
   }
@@ -101,7 +147,7 @@ export class FinancialPeriodService {
     return { carteraActiva, carteraIncobrable, carteraTotal, initial, states };
   }
 
-  private async flows(manager: EntityManager, from: string, to: string, disponibleInicial: number) {
+  private async flows(manager: EntityManager, from: string, to: string, disponibleInicial: number, fechaApertura: string, fechaCierreAnterior?: string) {
     const payments = await manager.getRepository(PagoOrmEntity).createQueryBuilder('p').where('p.estado = :state', { state: 'REGISTRADO' }).andWhere('p.fecha BETWEEN :from AND :to', { from, to }).getMany();
     const capital = money(payments.reduce((s, p) => s + p.capitalAplicado, 0)); const interest = money(payments.reduce((s, p) => s + p.interesAplicado, 0));
     const paymentMismatch = payments.some(p => money(p.monto) !== money(p.capitalAplicado + p.interesAplicado));
@@ -119,15 +165,16 @@ export class FinancialPeriodService {
     const disbursements = calculateMonthlyDisbursements(movements.map(m => ({ ...m, fecha: String(m.fecha).slice(0, 10) })), from, to);
     const loanOut = disbursements.loanOut;
     const refinanceOut = disbursements.refinanceOut;
-    const values = { disponibleInicial, entradas: money(entradas), salidas: money(salidas), capital, interest, paymentMismatch, loanOut: money(loanOut), refinanceOut: money(refinanceOut), refinanced: money(refin.reduce((s, r) => s + r.montoRefinanciado, 0)), indicators };
+    const disponibleFinal = calculateAvailableCash({ disponibleInicial, fechaApertura, fechaCierreAnterior, asOf: to, movements: movements.map(m => ({ fecha: m.fecha, monto: m.monto, tipo: m.tipo })) });
+    const values = { disponibleInicial, disponibleFinal, entradas: money(entradas), salidas: money(salidas), capital, interest, paymentMismatch, loanOut: money(loanOut), refinanceOut: money(refinanceOut), refinanced: money(refin.reduce((s, r) => s + r.montoRefinanciado, 0)), indicators };
     return values;
   }
 
-  async calculate(manager: EntityManager, from: string, to: string, initial?: { carteraInicial: number; carteraActivaInicial: number; carteraIncobrableInicial: number; disponibleInicial: number }) {
+  async calculate(manager: EntityManager, from: string, to: string, initial?: { carteraInicial: number; carteraActivaInicial: number; carteraIncobrableInicial: number; disponibleInicial: number; fechaApertura?: string; fechaCierreAnterior?: string }) {
     const config = await this.config(manager); const prior = initial ?? { carteraInicial: 0, carteraActivaInicial: 0, carteraIncobrableInicial: 0, disponibleInicial: config?.disponibleInicial ?? 0 };
     const portfolio = await this.portfolio(manager, to, { carteraActiva: prior.carteraActivaInicial, carteraIncobrable: prior.carteraIncobrableInicial });
-    const flows = await this.flows(manager, from, to, prior.disponibleInicial);
-    const disponibleFinal = money(flows.disponibleInicial + flows.entradas - flows.salidas);
+    const flows = await this.flows(manager, from, to, prior.disponibleInicial, initial?.fechaApertura ?? config?.fechaApertura ?? from, initial?.fechaCierreAnterior);
+    const disponibleFinal = flows.disponibleFinal;
     const pagosRecibidos = money(flows.capital + flows.interest); const errors: string[] = [];
     if (money(pagosRecibidos) !== money(flows.capital + flows.interest)) errors.push('PAGOS_RECIBIDOS debe ser CAPITAL_RECUPERADO + INTERESES_COBRADOS.');
     if (flows.paymentMismatch) errors.push('PAGOS_RECIBIDOS no coincide con CAPITAL_RECUPERADO + INTERESES_COBRADOS en uno o más pagos.');
@@ -160,7 +207,7 @@ export class FinancialPeriodService {
     if (year !== expected[0] || month !== expected[1]) throw new ConflictException('Los cierres deben respetar la secuencia mensual sin saltos.');
     const initial = last ? await manager.getRepository(DetalleCorteMensualOrmEntity).find({ where: { corteId: last.id } }) : [];
     const value = (concepto: ConceptoDetalleCorte, fallback: number) => initial.find(d => d.concepto === concepto)?.monto ?? fallback;
-    return { config, from, to, initial: { carteraInicial: value(ConceptoDetalleCorte.CARTERA_TOTAL_FINAL, config.carteraInicial), carteraActivaInicial: value(ConceptoDetalleCorte.CARTERA_ACTIVA_FINAL, config.carteraActivaInicial), carteraIncobrableInicial: value(ConceptoDetalleCorte.CARTERA_INCOBRABLE_FINAL, config.carteraIncobrableInicial), disponibleInicial: value(ConceptoDetalleCorte.DISPONIBLE_FINAL, config.disponibleInicial) } };
+    return { config, from, to, initial: { carteraInicial: value(ConceptoDetalleCorte.CARTERA_TOTAL_FINAL, config.carteraInicial), carteraActivaInicial: value(ConceptoDetalleCorte.CARTERA_ACTIVA_FINAL, config.carteraActivaInicial), carteraIncobrableInicial: value(ConceptoDetalleCorte.CARTERA_INCOBRABLE_FINAL, config.carteraIncobrableInicial), disponibleInicial: value(ConceptoDetalleCorte.DISPONIBLE_FINAL, config.disponibleInicial), fechaApertura: config.fechaApertura, fechaCierreAnterior: last?.fechaFin } };
   }
   async previewClose(manager: EntityManager, year: number, month: number) { const p = await this.period(manager, year, month); return this.calculate(manager, p.from, p.to, p.initial); }
   async close(manager: EntityManager, year: number, month: number, userId: number, observaciones?: string | null) {

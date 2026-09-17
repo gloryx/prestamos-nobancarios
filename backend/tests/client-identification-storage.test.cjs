@@ -29,7 +29,7 @@ test('uses an explicit production CORS whitelist and fails closed when absent', 
   assert.deepEqual(getCorsOptions({ NODE_ENV: 'production', CORS_ORIGINS: 'https://app.example.com, https://admin.example.com' }), {
     origin: ['https://app.example.com', 'https://admin.example.com'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
     credentials: false,
   })
   assert.throws(() => getCorsOptions({ NODE_ENV: 'production' }), /CORS_ORIGINS/)

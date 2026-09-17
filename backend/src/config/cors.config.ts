@@ -1,6 +1,6 @@
 const DEVELOPMENT_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 const CORS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'];
-const CORS_HEADERS = ['Authorization', 'Content-Type'];
+const CORS_HEADERS = ['Authorization', 'Content-Type', 'Idempotency-Key'];
 
 export function getCorsOptions(environment: NodeJS.ProcessEnv = process.env) {
   const configuredOrigins = environment.CORS_ORIGINS

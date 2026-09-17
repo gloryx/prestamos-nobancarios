@@ -20,6 +20,16 @@ const pdfReport = (rows) => ({ fechaDesde: '2026-09-01', fechaHasta: '2026-09-30
 const pageCount = (pdf) => (pdf.toString('latin1').match(/\/Type\s*\/Page\s*\/Parent\b/g) || []).length;
 const renderPdf = (rows) => new DesempenoCobradoresPdfService().generar(pdfReport(rows), { fechaDesde: '2026-09-01', fechaHasta: '2026-09-30' });
 
+test('PDF: resuelve nombres de filtros y usa fallback seguro si no existen', async () => {
+  const service = { generar: async (_report, _query, labels) => labels };
+  const useCase = new (require('../dist/modules/reportes/application/exportar-desempeno-cobradores-pdf.use-case').ExportarDesempenoCobradoresPdfUseCase)(
+    { execute: async () => pdfReport(['Alpha']) }, service,
+    { buscarPorId: async () => ({ nombreCompleto: 'Ana Pérez' }) },
+    { buscarPorId: async () => null },
+  );
+  assert.deepEqual(await useCase.execute({ fechaDesde: '2026-09-01', fechaHasta: '2026-09-30', cobradorId: 7, formaPagoId: 3 }), { cobradorNombre: 'Ana Pérez', formaPagoNombre: 'Forma de pago ID 3' });
+});
+
 test('PDF: una página física conserva el footer 1 de 1 sin crear página extra', async () => {
   const pdf = await renderPdf(['José ₡']);
   assert.equal(pageCount(pdf), 1);

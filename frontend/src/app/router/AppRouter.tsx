@@ -30,6 +30,9 @@ import { ProyeccionGananciasPage } from "@/features/analisis-financiero/presenta
 import { CobrosDelDiaPage } from "@/features/pagos/presentation/CobrosDelDiaPage";
 import { HistorialPagosPage } from "@/features/pagos/presentation/HistorialPagosPage";
 import { DesempenoCobradoresPage } from "@/features/reportes/presentation/DesempenoCobradoresPage";
+import { MovimientosCajaPage } from "@/features/movimientos-caja/presentation/MovimientosCajaPage";
+import { EstadoCajaPage } from "@/features/movimientos-caja/presentation/EstadoCajaPage";
+import { OperacionesCajaPage } from "@/features/movimientos-caja/presentation/OperacionesCajaPage";
 
 export function AppRouter() {
   return (
@@ -47,6 +50,9 @@ export function AppRouter() {
                 <Route path="prestamos/gestion-anulaciones" element={<GestionAnulacionesPage />} />
                 <Route path="finanzas/reportes/analisis-financiero" element={<AnalisisFinancieroPage />} />
                 <Route path="prestamos/proyeccion" element={<ProyeccionGananciasPage />} />
+                <Route path="finanzas/caja/movimientos" element={<MovimientosCajaPage />} />
+                <Route path="finanzas/caja/estado" element={<EstadoCajaPage />} />
+                <Route path="finanzas/caja/operaciones" element={<OperacionesCajaPage />} />
               </Route>
               <Route path="configuracion/formas-de-pago" element={<FormasPagoPage />} />
               <Route path="configuracion/periodicidades" element={<PeriodicidadesPage />} />

@@ -6,7 +6,7 @@ const { ConfiguracionFinancieraOrmEntity, CierreMensualOrmEntity, DetalleCorteMe
 const { getMetadataArgsStorage } = require('typeorm');
 const { validate } = require('class-validator');
 const { plainToInstance } = require('class-transformer');
-const { calculateExpectedPortfolio, calculateMonthlyResult, calculateMonthlyDisbursements } = require('../dist/modules/cierre-financiero/application/financial-period.service');
+const { calculateExpectedPortfolio, calculateMonthlyResult, calculateMonthlyDisbursements, calculateAvailableCash, calculateAvailableCashAsOfToday } = require('../dist/modules/cierre-financiero/application/financial-period.service');
 const { CrearPrestamoDto } = require('../dist/modules/prestamos/application/dto/crear-prestamo.dto');
 const { MovimientoCajaService } = require('../dist/modules/movimientos-caja/application/services/movimiento-caja.service');
 const { ConceptoMovimientoCaja } = require('../dist/modules/movimientos-caja/domain/enums/concepto-movimiento-caja.enum');
@@ -59,6 +59,81 @@ test('monthly disbursement reversal preserves refinancing concept and amount', (
   const original = { fecha: '2026-01-31', monto: 80, concepto: ConceptoMovimientoCaja.DESEMBOLSO_REFINANCIAMIENTO, tipo: TipoMovimientoCaja.SALIDA };
   const reversal = { fecha: '2026-02-01', monto: 80, concepto: ConceptoMovimientoCaja.REVERSO, tipo: TipoMovimientoCaja.ENTRADA, movimientoReversado: original };
   assert.equal(calculateMonthlyDisbursements([original, reversal], '2026-02-01', '2026-02-28').refinanceOut, -80);
+});
+
+test('available cash includes opening-day payment and excludes pre-opening movement', () => {
+  const movements = [
+    { fecha: '2026-08-31', monto: 100, tipo: TipoMovimientoCaja.ENTRADA },
+    { fecha: '2026-09-01', monto: 100, tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.PAGO_CLIENTE },
+  ];
+  assert.equal(calculateAvailableCash({ disponibleInicial: 0, fechaApertura: '2026-09-01', asOf: '2026-09-01', movements }), 100);
+});
+
+test('available cash includes opening-day disbursement as an outgoing amount', () => {
+  assert.equal(calculateAvailableCash({ disponibleInicial: 0, fechaApertura: '2026-09-01', asOf: '2026-09-01', movements: [{ fecha: '2026-09-01', monto: 500, tipo: TipoMovimientoCaja.SALIDA, concepto: ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO }] }), -500);
+});
+
+test('available cash applies opening-day aportes, retiros, and gastos by movement type', () => {
+  const movements = [
+    { fecha: '2026-09-01', monto: 50, tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.APORTE_CAPITAL },
+    { fecha: '2026-09-01', monto: 20, tipo: TipoMovimientoCaja.SALIDA, concepto: ConceptoMovimientoCaja.RETIRO },
+    { fecha: '2026-09-01', monto: 10, tipo: TipoMovimientoCaja.SALIDA, concepto: ConceptoMovimientoCaja.GASTO },
+  ];
+  assert.equal(calculateAvailableCash({ disponibleInicial: 0, fechaApertura: '2026-09-01', asOf: '2026-09-01', movements }), 20);
+});
+
+test('available cash includes payment and disbursement reversals on their own dates', () => {
+  const movements = [
+    { fecha: '2026-09-01', monto: 100, tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.PAGO_CLIENTE },
+    { fecha: '2026-09-02', monto: 100, tipo: TipoMovimientoCaja.SALIDA, concepto: ConceptoMovimientoCaja.REVERSO },
+    { fecha: '2026-09-01', monto: 500, tipo: TipoMovimientoCaja.SALIDA, concepto: ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO },
+    { fecha: '2026-09-02', monto: 500, tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.REVERSO },
+  ];
+  assert.equal(calculateAvailableCash({ disponibleInicial: 0, fechaApertura: '2026-09-01', asOf: '2026-09-02', movements }), 0);
+});
+
+test('available cash excludes future movements at the requested as-of date', () => {
+  assert.equal(calculateAvailableCash({ disponibleInicial: 1000, fechaApertura: '2026-09-01', asOf: '2026-09-10', movements: [{ fecha: '2026-09-11', monto: 500, tipo: TipoMovimientoCaja.ENTRADA }] }), 1000);
+});
+
+test('current available cash excludes movements after economic today while explicit ranges do not', () => {
+  const movements = [
+    { fecha: '2026-09-16', monto: 25, tipo: TipoMovimientoCaja.ENTRADA },
+    { fecha: '2026-09-17', monto: 75, tipo: TipoMovimientoCaja.ENTRADA },
+  ];
+  const input = { disponibleInicial: 100, fechaApertura: '2026-09-01', asOf: '2026-09-17', movements };
+  assert.equal(calculateAvailableCashAsOfToday(input, '2026-09-16'), 125);
+  assert.equal(calculateAvailableCash(input), 200);
+});
+
+test('available cash preserves cent precision', () => {
+  const movements = [
+    { fecha: '2026-09-01', monto: 1000.25, tipo: TipoMovimientoCaja.ENTRADA },
+    { fecha: '2026-09-01', monto: 200.10, tipo: TipoMovimientoCaja.ENTRADA },
+    { fecha: '2026-09-01', monto: 50.05, tipo: TipoMovimientoCaja.SALIDA },
+  ];
+  assert.equal(calculateAvailableCash({ disponibleInicial: 0, fechaApertura: '2026-09-01', asOf: '2026-09-01', movements }), 1150.3);
+});
+
+test('monthly continuation is non-overlapping and equivalent to opening calculation', () => {
+  const movements = [{ fecha: '2025-09-15', monto: 200000, tipo: TipoMovimientoCaja.SALIDA }];
+  const september = calculateAvailableCash({ disponibleInicial: 5500000, fechaApertura: '2025-09-01', asOf: '2025-09-30', movements });
+  const october = calculateAvailableCash({ disponibleInicial: september, fechaApertura: '2025-09-01', fechaCierreAnterior: '2025-09-30', asOf: '2025-10-31', movements });
+  const fromOpening = calculateAvailableCash({ disponibleInicial: 5500000, fechaApertura: '2025-09-01', asOf: '2025-10-31', movements });
+  assert.equal(september, 5300000);
+  assert.equal(october, 5300000);
+  assert.equal(october, fromOpening);
+});
+
+test('reversal after September close affects October continuation only', () => {
+  const movements = [
+    { fecha: '2025-09-20', monto: 500, tipo: TipoMovimientoCaja.SALIDA, concepto: ConceptoMovimientoCaja.DESEMBOLSO_PRESTAMO },
+    { fecha: '2025-10-02', monto: 500, tipo: TipoMovimientoCaja.ENTRADA, concepto: ConceptoMovimientoCaja.REVERSO },
+  ];
+  const september = calculateAvailableCash({ disponibleInicial: 5000, fechaApertura: '2025-09-01', asOf: '2025-09-30', movements });
+  const october = calculateAvailableCash({ disponibleInicial: september, fechaApertura: '2025-09-01', fechaCierreAnterior: '2025-09-30', asOf: '2025-10-31', movements });
+  assert.equal(september, 4500);
+  assert.equal(october, 5000);
 });
 
 test('closed snapshot values are read-only facts even when a later calculation differs', () => {
