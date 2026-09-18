@@ -33,6 +33,7 @@ import { DesempenoCobradoresPage } from "@/features/reportes/presentation/Desemp
 import { MovimientosCajaPage } from "@/features/movimientos-caja/presentation/MovimientosCajaPage";
 import { EstadoCajaPage } from "@/features/movimientos-caja/presentation/EstadoCajaPage";
 import { OperacionesCajaPage } from "@/features/movimientos-caja/presentation/OperacionesCajaPage";
+import { CierresMensualesPage } from "@/features/cierres-mensuales/presentation/CierresMensualesPage";
 
 export function AppRouter() {
   return (
@@ -53,6 +54,7 @@ export function AppRouter() {
                 <Route path="finanzas/caja/movimientos" element={<MovimientosCajaPage />} />
                 <Route path="finanzas/caja/estado" element={<EstadoCajaPage />} />
                 <Route path="finanzas/caja/operaciones" element={<OperacionesCajaPage />} />
+                <Route path="finanzas/cierres" element={<CierresMensualesPage />} />
               </Route>
               <Route path="configuracion/formas-de-pago" element={<FormasPagoPage />} />
               <Route path="configuracion/periodicidades" element={<PeriodicidadesPage />} />

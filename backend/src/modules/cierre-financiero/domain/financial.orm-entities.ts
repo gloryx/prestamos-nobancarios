@@ -40,6 +40,11 @@ export enum ConceptoDetalleCorte {
   AJUSTES_SALIDA = 'AJUSTES_SALIDA', ENTRADAS_CAJA = 'ENTRADAS_CAJA', SALIDAS_CAJA = 'SALIDAS_CAJA', RESULTADO_MES = 'RESULTADO_MES',
 }
 
+export enum EstadoDocumentalCorte {
+  PENDIENTE_CONFIRMACION = 'PENDIENTE_CONFIRMACION',
+  LISTO_PARA_CONFIRMAR = 'LISTO_PARA_CONFIRMAR',
+}
+
 @Entity('detalle_corte_mensual')
 @Unique('UQ_detalle_corte_mensual_concepto', ['corteId', 'concepto'])
 export class DetalleCorteMensualOrmEntity {

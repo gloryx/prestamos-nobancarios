@@ -182,11 +182,18 @@ test('estado uses immutable exact close snapshot without re-querying closed move
 
 test('estado rejects invalid, future, before-opening dates, and missing configuration', async () => {
   const { EstadoMovimientosCajaService } = require('../dist/modules/movimientos-caja/application/services/estado-movimientos-caja.service');
-  const { ConfiguracionFinancieraOrmEntity } = require('../dist/modules/cierre-financiero/domain/financial.orm-entities');
-  const db = config => ({ getRepository: () => ({ findOne: async () => config }) });
+  const { ConfiguracionFinancieraOrmEntity, CierreMensualOrmEntity } = require('../dist/modules/cierre-financiero/domain/financial.orm-entities');
+  const { economicDateOnly } = require('../dist/common/economic-date');
+  const today = economicDateOnly();
+  const todayParts = today.split('-').map(Number);
+  const tomorrow = new Date(Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2] + 1)).toISOString().slice(0, 10);
+  const db = config => ({ getRepository: entity => {
+    if (entity === ConfiguracionFinancieraOrmEntity) return { findOne: async () => config };
+    if (entity === CierreMensualOrmEntity) return { createQueryBuilder: () => ({ where() { return this; }, orderBy() { return this; }, getOne: async () => null }) };
+  } });
   const repo = { agregarEstado: async () => ({ rows: [], count: 0 }) };
   await assert.rejects(() => new EstadoMovimientosCajaService(db({ fechaApertura: '2026-09-01', disponibleInicial: 0 }), repo).obtener('2026-02-30'), /válida/);
-  await assert.rejects(() => new EstadoMovimientosCajaService(db({ fechaApertura: '2026-09-01', disponibleInicial: 0 }), repo).obtener('2026-09-17'), /posterior/);
+  await assert.rejects(() => new EstadoMovimientosCajaService(db({ fechaApertura: '2026-09-01', disponibleInicial: 0 }), repo).obtener(tomorrow), /posterior/);
   await assert.rejects(() => new EstadoMovimientosCajaService(db({ fechaApertura: '2026-09-01', disponibleInicial: 0 }), repo).obtener('2026-08-31'), /anterior/);
   await assert.rejects(() => new EstadoMovimientosCajaService(db(null), repo).obtener('2026-09-16'), /Configuración/);
   assert.equal(ConfiguracionFinancieraOrmEntity.name, 'ConfiguracionFinancieraOrmEntity');

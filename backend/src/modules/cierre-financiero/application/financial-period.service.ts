@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
-import { CierreMensualOrmEntity, ConfiguracionFinancieraOrmEntity, ConceptoDetalleCorte, DetalleCorteMensualOrmEntity } from '../domain/financial.orm-entities';
+import { CierreMensualOrmEntity, ConfiguracionFinancieraOrmEntity, ConceptoDetalleCorte, DetalleCorteMensualOrmEntity, EstadoDocumentalCorte } from '../domain/financial.orm-entities';
 import { PrestamoOrmEntity } from '../../prestamos/infrastructure/persistence/typeorm/prestamo.orm-entity';
 import { PagoOrmEntity } from '../../pagos/infrastructure/persistence/typeorm/pago.orm-entity';
 import { RefinanciamientoOrmEntity } from '../../refinanciamientos/infrastructure/persistence/typeorm/refinanciamiento.orm-entity';
@@ -24,6 +24,9 @@ const monthEnd = (year: number, month: number) => new Date(Date.UTC(year, month,
 const monthStart = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}-01`;
 const nextMonth = (year: number, month: number): [number, number] => month === 12 ? [year + 1, 1] : [year, month + 1];
 const zero = { carteraActiva: 0, carteraIncobrable: 0 };
+
+// Schema risk retained intentionally: ORM metadata and the initial migration may
+// differ; this stage does not reconcile them or introduce a migration.
 
 type HistoricalLoan = { id: number; fechaAlta: string; capital: number; estado?: EstadoPrestamo; estadoEnCorte?: EstadoPrestamo };
 type HistoricalPayment = { prestamoId: number; fecha: string; capitalAplicado: number; estado?: EstadoPago; anulacionFecha?: string | null };
@@ -119,6 +122,7 @@ export class FinancialPeriodService {
   constructor(@Optional() private readonly history?: PrestamoEstadoHistorialService) {}
   async config(manager: EntityManager) { return manager.getRepository(ConfiguracionFinancieraOrmEntity).findOne({ where: { singletonKey: 'FINANCIERA' } }); }
   assertDate(value: string) { if (!validDate(value)) throw new BadRequestException('La fecha debe ser válida y tener formato YYYY-MM-DD.'); }
+  assertOpeningDate(value: string) { this.assertDate(value); if (value > economicDateOnly()) throw new BadRequestException('La fecha de apertura no puede ser futura para la fecha económica de Costa Rica.'); }
 
   async assertOpen(manager: EntityManager, date: Date) {
     const value = economicDateOnly(date); const config = await this.config(manager);
@@ -199,20 +203,24 @@ export class FinancialPeriodService {
   }
 
   async openingSnapshot(manager: EntityManager, fecha: string) { this.assertDate(fecha); const p = await this.portfolio(manager, fecha); return { fechaApertura: fecha, carteraTotal: p.carteraTotal, carteraActiva: p.carteraActiva, carteraIncobrable: p.carteraIncobrable }; }
-  private async period(manager: EntityManager, year: number, month: number) {
+  private async period(manager: EntityManager, year: number, month: number, lock = false) {
     if (!Number.isInteger(year) || year < 1 || !Number.isInteger(month) || month < 1 || month > 12) throw new BadRequestException('El período mensual no es válido.');
     const config = await this.config(manager); if (!config) throw new NotFoundException('Configuración financiera no encontrada.');
     const first = monthStart(year, month); const from = first < config.fechaApertura ? config.fechaApertura : first; const to = monthEnd(year, month); if (from > to) throw new BadRequestException('El período es anterior a la apertura financiera.');
-    const last = await manager.getRepository(CierreMensualOrmEntity).createQueryBuilder('c').orderBy('c.fecha_fin', 'DESC').getOne(); const expected: [number, number] = last ? nextMonth(last.anio, last.mes) : [Number(config.fechaApertura.slice(0, 4)), Number(config.fechaApertura.slice(5, 7))];
+    const lastQuery = manager.getRepository(CierreMensualOrmEntity).createQueryBuilder('c').orderBy('c.fecha_fin', 'DESC').addOrderBy('c.id', 'DESC'); if (lock) lastQuery.setLock('pessimistic_write'); const last = await lastQuery.getOne(); const expected: [number, number] = last ? nextMonth(last.anio, last.mes) : [Number(config.fechaApertura.slice(0, 4)), Number(config.fechaApertura.slice(5, 7))];
     if (year !== expected[0] || month !== expected[1]) throw new ConflictException('Los cierres deben respetar la secuencia mensual sin saltos.');
     const initial = last ? await manager.getRepository(DetalleCorteMensualOrmEntity).find({ where: { corteId: last.id } }) : [];
     const value = (concepto: ConceptoDetalleCorte, fallback: number) => initial.find(d => d.concepto === concepto)?.monto ?? fallback;
     return { config, from, to, initial: { carteraInicial: value(ConceptoDetalleCorte.CARTERA_TOTAL_FINAL, config.carteraInicial), carteraActivaInicial: value(ConceptoDetalleCorte.CARTERA_ACTIVA_FINAL, config.carteraActivaInicial), carteraIncobrableInicial: value(ConceptoDetalleCorte.CARTERA_INCOBRABLE_FINAL, config.carteraIncobrableInicial), disponibleInicial: value(ConceptoDetalleCorte.DISPONIBLE_FINAL, config.disponibleInicial), fechaApertura: config.fechaApertura, fechaCierreAnterior: last?.fechaFin } };
   }
-  async previewClose(manager: EntityManager, year: number, month: number) { const p = await this.period(manager, year, month); return this.calculate(manager, p.from, p.to, p.initial); }
+  async previewClose(manager: EntityManager, year: number, month: number) { const p = await this.period(manager, year, month); const today = economicDateOnly(); // Keep the contractual month end and the established full-period calculation. Date-bounded queries naturally ignore facts that do not exist yet; the derived state prevents confirmation before that end date.
+    const snapshot = await this.calculate(manager, p.from, p.to, p.initial); const canConfirm = p.to <= today && snapshot.canClose; return { anio: year, mes: month, ...snapshot, estadoDocumental: canConfirm ? EstadoDocumentalCorte.LISTO_PARA_CONFIRMAR : EstadoDocumentalCorte.PENDIENTE_CONFIRMACION, puedeConfirmar: canConfirm, canClose: canConfirm }; }
   async close(manager: EntityManager, year: number, month: number, userId: number, observaciones?: string | null) {
     const config = await manager.getRepository(ConfiguracionFinancieraOrmEntity).createQueryBuilder('c').where('c.singleton_key = :key', { key: 'FINANCIERA' }).setLock('pessimistic_write').getOne(); if (!config) throw new NotFoundException('Configuración financiera no encontrada.');
-    const p = await this.period(manager, year, month); const snapshot = await this.calculate(manager, p.from, p.to, p.initial); if (!snapshot.canClose) throw new BadRequestException(snapshot.errors);
+    const p = await this.period(manager, year, month, true); if (p.to > economicDateOnly()) throw new ConflictException('El período aún no ha finalizado económicamente.');
+    const snapshot = await this.calculate(manager, p.from, p.to, p.initial); if (!snapshot.canClose) throw new BadRequestException(snapshot.errors);
+    const detailCount = Object.values(ConceptoDetalleCorte).length; if (snapshot.detalles.length !== detailCount || snapshot.detalles.some(d => !Number.isFinite(d.monto) || !Number.isInteger(cents(d.monto)))) throw new BadRequestException('El snapshot financiero no cumple las invariantes monetarias.');
+    if (cents(snapshot.pagosRecibidos) !== cents(snapshot.pagosCapital) + cents(snapshot.pagosInteres) || cents(snapshot.disponibleFinal) !== cents(snapshot.disponibleInicial) + cents(snapshot.cajaEntradas) - cents(snapshot.cajaSalidas)) throw new BadRequestException('El snapshot financiero no cumple las invariantes de pagos o disponible.');
     try { const close = await manager.getRepository(CierreMensualOrmEntity).save({ anio: year, mes: month, fechaInicio: snapshot.fechaInicio, fechaFin: snapshot.fechaFin, fechaCierre: new Date(), usuarioCierreId: userId, observaciones: observaciones?.trim() || null }); await manager.getRepository(DetalleCorteMensualOrmEntity).insert(snapshot.detalles.map(d => ({ corteId: close.id, concepto: d.concepto as ConceptoDetalleCorte, monto: d.monto }))); return { ...close, detalles: snapshot.detalles }; } catch (error) { if ((error as any)?.code === '23505') throw new ConflictException('El período ya fue cerrado concurrentemente.'); throw error; }
   }
 }

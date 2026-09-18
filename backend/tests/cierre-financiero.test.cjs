@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { FinancialPeriodService } = require('../dist/modules/cierre-financiero/application/financial-period.service');
 const { ConflictException, BadRequestException } = require('@nestjs/common');
 const { EstadoPrestamo } = require('../dist/modules/prestamos/domain/enums/estado-prestamo.enum');
+const { economicDateOnly } = require('../dist/common/economic-date');
 
 test('financial period policy rejects dates before opening and closed periods', async () => {
   const service = new FinancialPeriodService();
@@ -11,6 +12,16 @@ test('financial period policy rejects dates before opening and closed periods', 
   const manager = { getRepository: entity => entity.name.includes('Configuracion') ? configRepo : {}, createQueryBuilder: () => closedQuery };
   await assert.rejects(() => service.assertOpen(manager, new Date('2026-01-14T00:00:00Z')), BadRequestException);
   await assert.rejects(() => service.assertOpen(manager, new Date('2026-02-01T00:00:00Z')), ConflictException);
+});
+
+test('financial opening accepts Costa Rica economic today and rejects a future date', () => {
+  const service = new FinancialPeriodService();
+  const today = economicDateOnly();
+  const tomorrowDate = new Date(`${today}T00:00:00.000Z`);
+  tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
+  const tomorrow = tomorrowDate.toISOString().slice(0, 10);
+  assert.doesNotThrow(() => service.assertOpeningDate(today));
+  assert.throws(() => service.assertOpeningDate(tomorrow), BadRequestException);
 });
 
 test('financial calculations load cutoff loan states once and reuse the map', async () => {
