@@ -15,6 +15,7 @@ import { MovimientoCajaOrmEntity } from '../modules/movimientos-caja/infrastruct
 import { ConfiguracionFinancieraOrmEntity, CierreMensualOrmEntity, DetalleCorteMensualOrmEntity } from '../modules/cierre-financiero/domain/financial.orm-entities';
 import { FuenteIngresoOrmEntity } from '../modules/ingresos/infrastructure/persistence/typeorm/fuente-ingreso.orm-entity';
 import { IngresoOrmEntity } from '../modules/ingresos/infrastructure/persistence/typeorm/ingreso.orm-entity';
+import { PuestaMarchaFinancieraOrmEntity, PuestaMarchaFinancieraSaldoOrmEntity } from '../modules/cierre-financiero/infrastructure/persistence/typeorm/puesta-en-marcha.orm-entities';
 
 config();
 
@@ -35,7 +36,7 @@ export default new DataSource({
     UsuarioOrmEntity, ClienteOrmEntity, FormaPagoOrmEntity, PeriodicidadPagoOrmEntity,
     PrestamoOrmEntity, PrestamoEstadoHistorialOrmEntity, PlanPagoOrmEntity, PagoOrmEntity, PagoAnulacionOrmEntity,
     RefinanciamientoOrmEntity, MovimientoCajaOrmEntity, ConfiguracionFinancieraOrmEntity,
-    CierreMensualOrmEntity, DetalleCorteMensualOrmEntity, FuenteIngresoOrmEntity, IngresoOrmEntity,
+    CierreMensualOrmEntity, DetalleCorteMensualOrmEntity, PuestaMarchaFinancieraOrmEntity, PuestaMarchaFinancieraSaldoOrmEntity, FuenteIngresoOrmEntity, IngresoOrmEntity,
   ],
   migrations: [__dirname + '/migrations/*.{js,ts}'],
   synchronize: false,
