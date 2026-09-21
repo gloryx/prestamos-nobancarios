@@ -48,13 +48,6 @@ export function Sidebar({
               <span>impulsa tus metas</span>
             </small>
           </div>
-          <button
-            className="icon-button close-menu"
-            onClick={onClose}
-            aria-label="Close navigation"
-          >
-            <X size={19} />
-          </button>
         </div>
         <nav className="sidebar-navigation" aria-label="Main navigation">
           {visibleNavigation.map((item) =>
