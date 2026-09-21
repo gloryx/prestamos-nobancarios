@@ -9,7 +9,9 @@ import {
   listarClientes,
   resumirClientes,
   obtenerCliente,
+  obtenerTodosLosClientes,
 } from "../application/clientes.use-cases";
+import { generarClientesPdf } from "../application/clientes-pdf";
 import { clienteErrorMessage } from "../domain/cliente.error";
 import type {
   Cliente,
@@ -157,6 +159,7 @@ export function ClientesPage() {
   const [summary, setSummary] = useState<ClientesResumen | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState("");
+  const [exportingPdf, setExportingPdf] = useState(false);
   const listRequestId = useRef(0);
   const load = useCallback(async () => {
     const requestId = ++listRequestId.current;
@@ -303,6 +306,23 @@ export function ClientesPage() {
       setError(clienteErrorMessage(cause));
     }
   };
+  const exportPdf = async () => {
+    if (exportingPdf || loading || !page) return;
+    setExportingPdf(true);
+    setError("");
+    try {
+      const clientes = await obtenerTodosLosClientes(repository);
+      if (!clientes.length) {
+        setError("No hay clientes registrados para exportar.");
+        return;
+      }
+      generarClientesPdf(clientes);
+    } catch (cause) {
+      setError(clienteErrorMessage(cause));
+    } finally {
+      setExportingPdf(false);
+    }
+  };
   const toggleSort = (column: ClienteSortField) => {
     setSort((current) => current?.column === column
       ? { column, direction: current.direction === "ASC" ? "DESC" : "ASC" }
@@ -393,6 +413,9 @@ export function ClientesPage() {
         </select>
         <button className="secondary-button" onClick={() => void load()}>
           Buscar
+        </button>
+        <button className="secondary-button cliente-export-button" type="button" onClick={() => void exportPdf()} disabled={loading || exportingPdf || !page}>
+          <Download size={16} aria-hidden="true" /> {exportingPdf ? "Generando PDF..." : "Exportar PDF"}
         </button>
       </div>
       {error && (

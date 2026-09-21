@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown, Eye, RefreshCw } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Printer, RefreshCw } from 'lucide-react'
 import { PrestamoDetailModal } from './PrestamosListPage'
-import { listarPrestamos, resumirPrestamos } from '../application/prestamos.use-cases'
+import { abrirEstadoCuentaPdf, listarPrestamos, resumirPrestamos } from '../application/prestamos.use-cases'
 import { prestamoErrorMessage } from '../domain/prestamo.error'
 import type { Prestamo, PrestamoFilters, PrestamoPage, PrestamoSortDirection, PrestamoSortField, PrestamosResumen } from '../domain/prestamo.types'
 import { AxiosPrestamoRepository } from '../infrastructure/axios-prestamo.repository'
@@ -15,19 +15,6 @@ const repository = new AxiosPrestamoRepository()
 const limitOptions = [10, 25, 50, 100]
 
 const displayDate = formatDateOnly
-
-function calendarDayNumber(value: string | null | undefined) {
-  const match = value && /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
-  return match ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / 86400000 : null
-}
-
-function differenceLabel(cancelled: string | null | undefined, contractual: string | null | undefined) {
-  const actualDay = calendarDayNumber(cancelled)
-  const contractualDay = calendarDayNumber(contractual)
-  if (actualDay === null || contractualDay === null) return '—'
-  const difference = actualDay - contractualDay
-  return difference === 0 ? 'A tiempo' : difference < 0 ? `${Math.abs(difference)} días antes` : `${difference} días después`
-}
 
 export function SaldadosPage() {
   const [page, setPage] = useState<PrestamoPage | null>(null)
@@ -146,7 +133,7 @@ export function SaldadosPage() {
     {error && <div className="panel saldados-state" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={() => void loadList()}>Reintentar</button></div>}
     {!error && loading && !page && <div className="panel saldados-state">Cargando préstamos saldados...</div>}
     {!error && !loading && page && page.datos.length === 0 && <div className="panel saldados-state">No se encontraron préstamos saldados.</div>}
-     {page && page.datos.length > 0 && <div className="panel table-wrap saldados-table-wrap"><table className="saldados-table"><thead><tr><th>{sortButton('id', 'Nº')}</th><th>Cliente</th><th>Teléfono</th><th>{sortButton('fechaAlta', 'Fecha alta')}</th><th>Fecha estimada</th><th>{sortButton('fechaCancelacion', 'CANCELACIÓN REAL')}</th><th>Capital</th><th>Interés</th><th>Total</th><th>Diferencia</th><th>Acción</th></tr></thead><tbody>{page.datos.map((loan: Prestamo) => <tr key={loan.id}><td>#{loan.id}</td><td><strong>{loan.cliente.nombreCompleto}</strong></td><td>{loan.cliente.telefono || '—'}</td><td>{displayDate(loan.fechaAlta)}</td><td>{displayDate(loan.fechaLimiteContractual)}</td><td>{displayDate(loan.fechaCancelacion)}</td><td>{formatCRC(loan.capital)}</td><td>{formatCRC(loan.interes)}</td><td>{formatCRC(loan.montoTotal)}</td><td>{differenceLabel(loan.fechaCancelacion, loan.fechaLimiteContractual)}</td><td><button className="table-action" type="button" title="Ver préstamo" aria-label={`Ver préstamo ${loan.id}`} onClick={() => setSelected(loan.id)}><Eye size={16} /></button></td></tr>)}</tbody></table></div>}
+     {page && page.datos.length > 0 && <div className="panel table-wrap saldados-table-wrap"><table className="saldados-table"><thead><tr><th>{sortButton('id', 'Nº')}</th><th>Cliente</th><th>Teléfono</th><th>{sortButton('fechaAlta', 'Fecha alta')}</th><th>Fecha estimada</th><th>Capital</th><th>Interés</th><th>Total</th><th>Acción</th></tr></thead><tbody>{page.datos.map((loan: Prestamo) => <tr key={loan.id}><td>#{loan.id}</td><td><strong>{loan.cliente.nombreCompleto}</strong></td><td>{loan.cliente.telefono || '—'}</td><td>{displayDate(loan.fechaAlta)}</td><td>{displayDate(loan.fechaLimiteContractual)}</td><td>{formatCRC(loan.capital)}</td><td>{formatCRC(loan.interes)}</td><td>{formatCRC(loan.montoTotal)}</td><td><button className="table-action" type="button" title="Ver préstamo" aria-label={`Ver préstamo ${loan.id}`} onClick={() => setSelected(loan.id)}><Eye size={16} /></button><button className="table-action" type="button" title="Imprimir estado del préstamo" aria-label={`Imprimir estado del préstamo ${loan.id}`} onClick={() => { void abrirEstadoCuentaPdf(repository, loan.id).catch((cause: unknown) => setError(prestamoErrorMessage(cause))) }}><Printer size={16} /></button></td></tr>)}</tbody></table></div>}
     {page && <Pagination pagina={page.pagina} totalPaginas={page.totalPaginas} total={page.total} limite={page.limite} opcionesLimite={limitOptions} onPageChange={setPagina} onLimitChange={(value) => { setLimite(value); setPagina(1) }} label="préstamos saldados" loading={loading} />}
     {selected !== null && <PrestamoDetailModal prestamoId={selected} onClose={() => setSelected(null)} />}
   </section>

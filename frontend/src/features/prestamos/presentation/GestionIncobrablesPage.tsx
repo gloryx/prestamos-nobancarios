@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { Eye, Printer, RefreshCw } from 'lucide-react'
 import Swal from 'sweetalert2'
 import { Pagination } from '@/shared/components/Pagination'
 import { formatCRC } from '@/shared/utils/currency'
 import { formatDateOnly, todayInCostaRica } from '@/shared/utils/date'
 import { AxiosPrestamoRepository } from '../infrastructure/axios-prestamo.repository'
-import { cambiarEstadoPrestamo, listarCandidatosIncobrables, listarIncobrables, resumirPrestamos } from '../application/prestamos.use-cases'
+import { abrirEstadoCuentaPdf, cambiarEstadoPrestamo, listarCandidatosIncobrables, listarIncobrables, resumirPrestamos } from '../application/prestamos.use-cases'
+import { PrestamoDetailModal } from './PrestamosListPage'
 import type { IncobrableLoan, IncobrablesFilters, IncobrablesPage, PrestamoFilters, PrestamosResumen } from '../domain/prestamo.types'
 import { prestamoErrorMessage } from '../domain/prestamo.error'
 import './gestion-incobrables.css'
@@ -15,6 +16,17 @@ import './saldados.css'
 const repository = new AxiosPrestamoRepository()
 const today = todayInCostaRica
 const date = formatDateOnly
+const englishMonths: Record<string, string> = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }
+
+function formatUltimoPago(value: string | null | undefined): string {
+  if (!value) return '—'
+  const formattedIso = formatDateOnly(value)
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return formattedIso
+  const englishDate = /^(?:[A-Za-z]{3}\s+)?([A-Za-z]{3})\s+(\d{1,2}),?\s+(\d{4})/.exec(value)
+  if (!englishDate) return '—'
+  const month = englishMonths[englishDate[1]]
+  return month ? `${englishDate[2].padStart(2, '0')}/${month}/${englishDate[3]}` : '—'
+}
 
 export function GestionIncobrablesPage() {
   const [tab, setTab] = useState<'vencidos' | 'incobrables'>('vencidos')
@@ -28,6 +40,7 @@ export function GestionIncobrablesPage() {
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryBlocked, setSummaryBlocked] = useState(false)
   const [selected, setSelected] = useState<IncobrableLoan | null>(null)
+  const [selectedDetailId, setSelectedDetailId] = useState<number | null>(null)
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
@@ -66,9 +79,10 @@ export function GestionIncobrablesPage() {
      <div className="prestamos-financial-summary" aria-label="Resumen financiero de préstamos incobrables"><div><span>TOTAL</span><strong>{summary ? summary.total.toLocaleString('es-CR') : '—'}</strong></div><div><span>PRESTADO</span><strong>{summary ? formatCRC(summary.prestado) : '—'}</strong></div><div><span>GANANCIA</span><strong>{summary ? formatCRC(summary.ganancia) : '—'}</strong></div><div><span>PENDIENTE</span><strong>{summary ? formatCRC(summary.pendiente) : '—'}</strong></div>{summaryLoading && <small aria-live="polite">Cargando...</small>}</div>
      {summaryBlocked && <p className="form-note" role="status">El resumen financiero de vencidos no está disponible en el endpoint actual; no se calcula sobre la página visible.</p>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="panel table-wrap">{loading ? <div className="state-box">Cargando información...</div> : !page.datos.length ? <div className="state-box">No hay registros para mostrar.</div> : <table><thead><tr><th>Cliente</th><th>Saldo pendiente</th>{tab === 'vencidos' ? <><th>Vencimiento</th><th>Saldo cuota</th></> : <><th>Fecha incobrable</th><th>Días en estado</th><th>Último pago</th><th>Observación</th></>}<th>Acción</th></tr></thead><tbody>{page.datos.map((loan) => <tr key={loan.id}><td><strong>{loan.cliente.nombreCompleto}</strong><small>{loan.cliente.identificacion}</small></td><td>{formatCRC(loan.saldoPendiente)}</td>{tab === 'vencidos' ? <><td>{date(loan.fechaVencimiento)}</td><td>{formatCRC(loan.saldoCuota ?? 0)}</td></> : <><td>{date(loan.fechaIncobrable)}</td><td>{loan.diasEnEstado ?? 0}</td><td>{date(loan.ultimaFechaPago)}</td><td>{loan.observacionIncobrable || '—'}</td></>}<td><button className="primary-button" onClick={() => setSelected(loan)}>{tab === 'vencidos' ? 'Marcar incobrable' : 'Reactivar'}</button></td></tr>)}</tbody></table>}</div>
+     <div className="panel table-wrap">{loading ? <div className="state-box">Cargando información...</div> : !page.datos.length ? <div className="state-box">No hay registros para mostrar.</div> : <table><thead><tr><th>Cliente</th><th>Saldo pendiente</th>{tab === 'vencidos' ? <><th>Vencimiento</th><th>Saldo cuota</th></> : <th>Último pago</th>}<th>Acción</th></tr></thead><tbody>{page.datos.map((loan) => <tr key={loan.id}><td><strong>{loan.cliente.nombreCompleto}</strong><small>{loan.cliente.identificacion}</small></td><td>{formatCRC(loan.saldoPendiente)}</td>{tab === 'vencidos' ? <><td>{date(loan.fechaVencimiento)}</td><td>{formatCRC(loan.saldoCuota ?? 0)}</td></> : <td>{formatUltimoPago(loan.ultimaFechaPago)}</td>}<td>{tab === 'incobrables' && <><button className="table-action" type="button" title="Ver préstamo" aria-label={`Ver préstamo ${loan.id}`} onClick={() => setSelectedDetailId(loan.id)}><Eye size={16} /></button><button className="table-action" type="button" title="Imprimir estado del préstamo" aria-label={`Imprimir estado del préstamo ${loan.id}`} onClick={() => { void abrirEstadoCuentaPdf(repository, loan.id).catch((cause: unknown) => setError(prestamoErrorMessage(cause))) }}><Printer size={16} /></button></>}<button className="primary-button" type="button" onClick={() => setSelected(loan)}>{tab === 'vencidos' ? 'Marcar incobrable' : 'Reactivar'}</button></td></tr>)}</tbody></table>}</div>
     <Pagination pagina={page.pagina} totalPaginas={page.totalPaginas} total={page.total} limite={page.limite} opcionesLimite={[10, 25, 50, 100]} onPageChange={(pagina) => setFilters((current) => ({ ...current, pagina }))} onLimitChange={(limite) => setFilters((current) => ({ ...current, limite, pagina: 1 }))} label="préstamos" loading={loading} />
-    {selected && <IncobrableModal loan={selected} action={tab === 'vencidos' ? 'INCOBRABLE' : 'ACTIVO'} onClose={() => setSelected(null)} onSubmit={submit} />}
+     {selected && <IncobrableModal loan={selected} action={tab === 'vencidos' ? 'INCOBRABLE' : 'ACTIVO'} onClose={() => setSelected(null)} onSubmit={submit} />}
+     {selectedDetailId !== null && <PrestamoDetailModal prestamoId={selectedDetailId} onClose={() => setSelectedDetailId(null)} />}
   </section>
 }
 

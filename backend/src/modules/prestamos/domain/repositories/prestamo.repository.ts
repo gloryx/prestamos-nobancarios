@@ -24,6 +24,7 @@ export interface PrestamoRepository {
   listar(filtros: FiltrosPrestamos): Promise<PrestamosPaginados>;
   listarParaIndicador(filtros: FiltrosPrestamos): Promise<PrestamoConRelaciones[]>;
   resumen(filtros: FiltrosPrestamos): Promise<PrestamosResumen>;
+  carteraActivaCapitalPendiente(): Promise<number>;
   listarParaExportacion(filtros: FiltrosPrestamos): Promise<PrestamoParaExportacion[]>;
   listarCandidatosIncobrables(filtros: FiltrosIncobrablesDto): Promise<IncobrablesPaginados>;
   listarIncobrables(filtros: FiltrosIncobrablesDto): Promise<IncobrablesPaginados>;

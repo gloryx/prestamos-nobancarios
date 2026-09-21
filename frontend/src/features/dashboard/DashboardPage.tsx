@@ -53,7 +53,7 @@ export function DashboardPage() {
 function DashboardContent({ data, onRetry }: { data: DashboardData; onRetry: () => void }) {
   const { flujo, cartera } = data
   const metrics = [
-    cartera && ['Cartera actual', money(cartera.pendiente), 'ACTIVO e INCOBRABLE', Wallet],
+     cartera && ['Cartera actual', money(cartera.capitalPendiente), 'Préstamos ACTIVO · capital pendiente', Wallet],
     flujo && ['Capital nuevo colocado', money(flujo.capitalColocado), 'Mes económico actual', Coins],
     flujo && ['Pagos recibidos', money(flujo.pagosRecibidos), 'Pagos REGISTRADOS', HandCoins],
     flujo && ['Capital recuperado', money(flujo.capitalRecuperado), 'Aplicado a capital', CircleDollarSign],

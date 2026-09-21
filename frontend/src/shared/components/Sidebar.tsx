@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, LogOut, WalletMinimal, X } from "lucide-react";
+import { Banknote, ChevronDown, ChevronRight, LogOut, X } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/app/providers/auth-context";
@@ -36,13 +36,17 @@ export function Sidebar({
       <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">
-            <WalletMinimal size={22} />
+            <Banknote size={40} aria-hidden="true" />
           </div>
-          <div>
+          <div className="brand-copy">
             <strong>
-              Finan<span>za</span>
+              <span>PRÉSTAMOS</span>
+              <span>No Bancarios</span>
             </strong>
-            <small>Operación inteligente</small>
+            <small>
+              <span>Confianza que</span>
+              <span>impulsa tus metas</span>
+            </small>
           </div>
           <button
             className="icon-button close-menu"

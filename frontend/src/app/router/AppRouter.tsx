@@ -24,6 +24,7 @@ import { GestionAnulacionesPage } from "@/features/prestamos/presentation/Gestio
 import { SaldadosPage } from "@/features/prestamos/presentation/SaldadosPage";
 import { RentabilidadCanceladosPage } from "@/features/prestamos/presentation/RentabilidadCanceladosPage";
 import { FlujoPrestamosPage } from "@/features/reportes/presentation/FlujoPrestamosPage";
+import { FormaPagoReportPage } from "@/features/reportes/presentation/FormaPagoReportPage";
 import { AnalisisFinancieroPage } from "@/features/analisis-financiero/presentation/AnalisisFinancieroPage";
 import { EstadisticasClientesPage } from "@/features/clientes/presentation/EstadisticasClientesPage";
 import { ProyeccionGananciasPage } from "@/features/analisis-financiero/presentation/ProyeccionGananciasPage";
@@ -71,6 +72,7 @@ export function AppRouter() {
               <Route path="prestamos/reporte" element={<RentabilidadCanceladosPage />} />
               <Route path="finanzas/caja/cortes/rentabilidad-cancelados" element={<RentabilidadCanceladosPage />} />
               <Route path="finanzas/reportes/flujo-prestamos" element={<FlujoPrestamosPage />} />
+              <Route path="finanzas/reportes/forma-pago" element={<FormaPagoReportPage />} />
               <Route path="pagos/registrar" element={<RegistrarPagoPage />} />
               <Route path="pagos" element={<CobrosDelDiaPage />} />
               <Route path="pagos/historial" element={<HistorialPagosPage />} />

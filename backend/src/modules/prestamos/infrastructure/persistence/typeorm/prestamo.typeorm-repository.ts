@@ -189,6 +189,20 @@ export class PrestamoTypeOrmRepository implements PrestamoRepository {
     const raw = await query.getRawOne<{ total: string; prestado: string; ganancia: string; recuperado: string; pendiente: string }>();
     return { total: Number(raw?.total ?? 0), prestado: Number(raw?.prestado ?? 0), ganancia: Number(raw?.ganancia ?? 0), recuperado: Number(raw?.recuperado ?? 0), pendiente: Number(raw?.pendiente ?? 0) };
   }
+  async carteraActivaCapitalPendiente(): Promise<number> {
+    const pagos = this.repository.manager.createQueryBuilder().subQuery()
+      .select('pago.prestamo_id', 'prestamo_id')
+      .addSelect('SUM(pago.capital_aplicado)', 'capital_pagado')
+      .from('pago', 'pago')
+      .where("pago.estado = 'REGISTRADO'")
+      .groupBy('pago.prestamo_id');
+    const raw = await this.repository.createQueryBuilder('prestamo')
+      .leftJoin(`(${pagos.getQuery()})`, 'pagos', 'pagos.prestamo_id = prestamo.id')
+      .select('COALESCE(SUM(GREATEST(prestamo.capital - COALESCE(pagos.capital_pagado, 0), 0)), 0)', 'capital_pendiente')
+      .where('prestamo.estado = :estadoActivo', { estadoActivo: EstadoPrestamo.ACTIVO })
+      .getRawOne<{ capital_pendiente: string }>();
+    return Number(raw?.capital_pendiente ?? 0);
+  }
   async listarParaExportacion(filtros: FiltrosPrestamos): Promise<PrestamoParaExportacion[]> {
     const entities = await this.applyFilters(this.withRelations(), filtros).orderBy('prestamo.fecha_alta', 'DESC').addOrderBy('prestamo.id', 'DESC').getMany();
     if (!entities.length) return [];

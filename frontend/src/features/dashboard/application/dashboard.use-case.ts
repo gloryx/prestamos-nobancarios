@@ -1,15 +1,14 @@
 import type { FlujoPrestamosRepository } from '@/features/reportes/domain/flujo-prestamos.types'
-import type { PrestamoRepository } from '@/features/prestamos/domain/prestamo.repository'
-import type { DashboardData } from '../domain/dashboard.types'
+import type { DashboardData, DashboardPortfolio } from '../domain/dashboard.types'
 
 export function obtenerDashboard(
   periodo: string,
   flujoRepository: FlujoPrestamosRepository,
-  prestamoRepository: PrestamoRepository,
+  portfolioRepository: () => Promise<DashboardPortfolio>,
 ): Promise<DashboardData> {
   return Promise.allSettled([
     flujoRepository.get(periodo, periodo),
-    prestamoRepository.summary({ pagina: 1, limite: 1, estados: ['ACTIVO', 'INCOBRABLE'] }),
+    portfolioRepository(),
   ]).then(([flujoResult, carteraResult]) => {
     const errors: string[] = []
     let flujo: DashboardData['flujo'] = null

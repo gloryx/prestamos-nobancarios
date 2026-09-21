@@ -84,3 +84,29 @@ test('empty filtered page does not execute a payment aggregation', async () => {
   assert.deepEqual(result.datos, []);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'from' && call[1] === 'pago'), false);
 });
+
+test('active portfolio capital pending aggregates only active loans and registered capital', async () => {
+  const calls = [];
+  const subquery = {
+    select(...args) { calls.push(['subselect', ...args]); return this; },
+    addSelect(...args) { calls.push(['subaddSelect', ...args]); return this; },
+    from(...args) { calls.push(['from', ...args]); return this; },
+    where(...args) { calls.push(['subwhere', ...args]); return this; },
+    groupBy(...args) { calls.push(['groupBy', ...args]); return this; },
+    getQuery() { return 'SELECT pago.prestamo_id, SUM(pago.capital_aplicado) AS capital_pagado FROM pago pago GROUP BY pago.prestamo_id'; },
+  };
+  const query = {
+    leftJoin(...args) { calls.push(['leftJoin', ...args]); return this; },
+    select(...args) { calls.push(['select', ...args]); return this; },
+    where(...args) { calls.push(['where', ...args]); return this; },
+    async getRawOne() { return { capital_pendiente: '125.50' }; },
+  };
+  const repository = Object.create(PrestamoTypeOrmRepository.prototype);
+  repository.repository = { createQueryBuilder: () => query, manager: { createQueryBuilder: () => ({ subQuery: () => subquery }) } };
+
+  assert.equal(await repository.carteraActivaCapitalPendiente(), 125.5);
+  assert.ok(calls.some(([kind, value]) => kind === 'subaddSelect' && value === 'SUM(pago.capital_aplicado)'));
+  assert.ok(calls.some(([kind, value]) => kind === 'subwhere' && value === "pago.estado = 'REGISTRADO'"));
+  assert.ok(calls.some(([kind, value]) => kind === 'select' && String(value).includes('GREATEST')));
+  assert.deepEqual(calls.find(([kind]) => kind === 'where'), ['where', 'prestamo.estado = :estadoActivo', { estadoActivo: 'ACTIVO' }]);
+});

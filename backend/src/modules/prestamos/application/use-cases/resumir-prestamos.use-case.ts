@@ -9,4 +9,8 @@ export class ResumirPrestamosUseCase {
   execute(dto: FiltrosPrestamosDto): Promise<PrestamosResumen> {
     return this.repository.resumen(dto);
   }
+
+  executeCarteraActiva(): Promise<number> {
+    return this.repository.carteraActivaCapitalPendiente();
+  }
 }

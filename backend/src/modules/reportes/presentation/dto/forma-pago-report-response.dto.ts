@@ -1,0 +1,5 @@
+import { ApiProperty } from '@nestjs/swagger';
+
+class FormaPagoReportRowDto { @ApiProperty({ nullable: true, description: 'Catálogo ID; null para movimientos reales sin forma registrada.' }) formaPagoId!: number | null; @ApiProperty() formaPagoNombre!: string; @ApiProperty({ description: 'Cantidad de operaciones reales incluidas en el grupo.' }) cantidad!: number; @ApiProperty() monto!: number; }
+class FormaPagoReportSummaryDto { @ApiProperty() totalDesembolsado!: number; @ApiProperty() totalRecibido!: number; @ApiProperty() diferencia!: number; @ApiProperty() movimientosDesembolsoSinForma!: number; @ApiProperty() montoDesembolsoSinForma!: number; }
+export class FormaPagoReportResponseDto { @ApiProperty() fechaDesde!: string; @ApiProperty() fechaHasta!: string; @ApiProperty({ type: FormaPagoReportSummaryDto }) resumen!: FormaPagoReportSummaryDto; @ApiProperty({ type: [FormaPagoReportRowDto] }) desembolsos!: FormaPagoReportRowDto[]; @ApiProperty({ type: [FormaPagoReportRowDto] }) pagos!: FormaPagoReportRowDto[]; }

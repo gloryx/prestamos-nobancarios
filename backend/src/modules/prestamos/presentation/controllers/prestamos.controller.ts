@@ -30,6 +30,7 @@ import { PrestamoIncobrableService } from '../../application/services/prestamo-i
 import { ReporteRentabilidadCanceladosUseCase } from '../../application/use-cases/reporte-rentabilidad-cancelados.use-case';
 import { ReporteRentabilidadCanceladosDto } from '../../application/dto/reporte-rentabilidad-cancelados.dto';
 import { RentabilidadCanceladosResponseDto } from '../dto/reporte-rentabilidad-cancelados-response.dto';
+import { CarteraActivaResponseDto } from '../dto/cartera-activa-response.dto';
 
 export const response = (value: (PrestamoConRelaciones | PrestamoDetalle) & { capitalPendiente?: number; saldoPendiente?: number }): PrestamoResponseDto => ({ ...value, id: value.id!, fechaAlta: value.fechaAlta.toISOString().slice(0, 10), puedeAnular: value.puedeAnular ?? false, cliente: { id: value.cliente.id, identificacion: value.cliente.identificacion!, nombreCompleto: value.cliente.nombre!, direccion: value.cliente.direccion ?? null, telefono: value.cliente.telefono ?? null } } as PrestamoResponseDto);
 @ApiTags('Préstamos')
@@ -47,6 +48,11 @@ export class PrestamosController {
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
   @ApiQuery({ name: 'fechaCancelacionDesde', required: false, example: '2026-09-01', format: 'date', description: 'Fecha de cancelación real inicial inclusiva.' }) @ApiQuery({ name: 'fechaCancelacionHasta', required: false, example: '2026-09-30', format: 'date', description: 'Fecha de cancelación real final inclusiva.' })
   async resumen(@Query() dto: FiltrosPrestamosDto) { return this.resumirUseCase.execute(dto); }
+  @Get('resumen-cartera-activa')
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @ApiOperation({ summary: 'Obtener capital pendiente de la cartera activa', description: 'Calcula exclusivamente el capital pendiente de préstamos ACTIVO, descontando capital_aplicado de pagos REGISTRADO.' })
+  @ApiResponse({ status: 200, type: CarteraActivaResponseDto })
+  async resumenCarteraActiva() { return { capitalPendiente: await this.resumirUseCase.executeCarteraActiva() }; }
   @Get('reporte/rentabilidad-cancelados')
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
    @ApiOperation({ summary: 'Reporte mensual de rentabilidad REAL de cancelaciones', description: 'Representa eventos históricos de transición a CANCELADO ocurridos en el mes, aunque el préstamo tenga otro estado actualmente. La fecha de cancelación es la fecha del evento. Ganancia histórica = SUM(pago.interesAplicado) de pagos existentes a esa fecha y vigentes en ella: REGISTRADO cuenta; ANULADO cuenta solo si pago_anulacion.fecha es posterior. La igualdad de fechas excluye. rentabilidadTotal = gananciaTotal / capitalTotal × 100. tasa30Dias = ganancia / capital × 30 / días reales × 100, ponderada por capital.' })
