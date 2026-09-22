@@ -85,11 +85,13 @@ function ClienteDetailModal({
   imageUrl,
   onClose,
   onNewLoan,
+  canCreateLoan,
 }: {
   cliente: Cliente;
   imageUrl: string | null;
   onClose: () => void;
   onNewLoan: () => void;
+  canCreateLoan: boolean;
 }) {
   return (
     <div className="cliente-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -124,7 +126,7 @@ function ClienteDetailModal({
           </div>
         </div>
         <div className="cliente-detail-actions">
-          <button className="primary-button" type="button" onClick={onNewLoan}>Nuevo préstamo</button>
+           {canCreateLoan && <button className="primary-button" type="button" onClick={onNewLoan}>Nuevo préstamo</button>}
           <button className="secondary-button" type="button" onClick={onClose}>Cerrar</button>
         </div>
       </div>
@@ -139,6 +141,7 @@ function DetailItem({ label, value, className = "" }: { label: string; value: st
 export function ClientesPage() {
   const { user } = useAuth();
   const isAdmin = user?.rol === "ADMINISTRADOR";
+  const canManageClients = user?.rol === "ADMINISTRADOR" || user?.rol === "VENDEDOR";
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
@@ -186,7 +189,7 @@ export function ClientesPage() {
     if (!editing) void load();
   }, [editing, load]);
   useEffect(() => {
-    if (editing) return;
+    if (editing || !isAdmin) return;
     let cancelled = false;
     setSummaryLoading(true);
     setSummaryError("");
@@ -195,7 +198,7 @@ export function ClientesPage() {
       .catch(() => { if (!cancelled) setSummaryError("No se pudo cargar el resumen de clientes."); })
       .finally(() => { if (!cancelled) setSummaryLoading(false); });
     return () => { cancelled = true; };
-  }, [editing]);
+  }, [editing, isAdmin]);
   useEffect(() => {
     if (!id) {
       setDetail(undefined);
@@ -219,7 +222,12 @@ export function ClientesPage() {
         setDetail(value);
         try {
           const blob = await repository.getIdentificationImage(numericId);
-          if (!cancelled) setExistingImageUrl(URL.createObjectURL(blob));
+          const objectUrl = URL.createObjectURL(blob);
+          if (cancelled) {
+            URL.revokeObjectURL(objectUrl);
+            return;
+          }
+          setExistingImageUrl(objectUrl);
         } catch {
           /* A missing image is a valid edit state. */
         }
@@ -252,8 +260,13 @@ export function ClientesPage() {
     let imageUrl: string | null = null;
     void repository.getIdentificationImage(selectedClient.id)
       .then((blob) => {
-        imageUrl = URL.createObjectURL(blob);
-        if (!cancelled) setDetailImageUrl(imageUrl);
+        const objectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        imageUrl = objectUrl;
+        setDetailImageUrl(objectUrl);
       })
       .catch(() => {
         /* A missing image is a valid detail state. */
@@ -370,16 +383,16 @@ export function ClientesPage() {
           <h1>Clientes</h1>
           <p className="muted">Consultá y administrá la cartera de clientes.</p>
         </div>
-        <Link className="primary-button" to="/clientes/nuevo">
-          <Plus size={16} /> Nuevo cliente
-        </Link>
+         {canManageClients && <Link className="primary-button" to="/clientes/nuevo">
+           <Plus size={16} /> Nuevo cliente
+         </Link>}
       </div>
-      <div className="cliente-summary" aria-live="polite">
+       {isAdmin && <div className="cliente-summary" aria-live="polite">
         {([['Total de clientes', summary?.total], ['Masculino', summary?.masculino], ['Femenino', summary?.femenino], ['Con préstamo activo', summary?.conPrestamoActivo]] as const).map(([label, value]) => (
           <div key={label}><span>{label}</span><strong>{summaryLoading ? "—" : value ?? "—"}</strong></div>
         ))}
-      </div>
-      {summaryError && <p className="form-note cliente-summary-error" role="alert">{summaryError}</p>}
+       </div>}
+       {isAdmin && summaryError && <p className="form-note cliente-summary-error" role="alert">{summaryError}</p>}
       <div className="panel cliente-filters">
         <input
           value={buscar}
@@ -467,22 +480,24 @@ export function ClientesPage() {
                       </span>
                     </td>
                     <td>
-                      <Link
-                        className="table-action"
-                        to={`/clientes/${cliente.id}/editar`}
-                        aria-label={`Editar cliente ${cliente.identificacion}`}
-                      >
-                        <Pencil size={15} />
-                      </Link>
-                      <button
-                        className="table-action"
-                        type="button"
-                        onClick={() => navigate("/prestamos/nuevo", { state: { selectedClient: cliente } })}
-                        title="Nuevo préstamo"
-                        aria-label="Nuevo préstamo para este cliente"
-                      >
-                        <CreditCard size={15} />
-                      </button>
+                       {canManageClients && <>
+                         <Link
+                           className="table-action"
+                           to={`/clientes/${cliente.id}/editar`}
+                           aria-label={`Editar cliente ${cliente.identificacion}`}
+                         >
+                           <Pencil size={15} />
+                         </Link>
+                         <button
+                           className="table-action"
+                           type="button"
+                           onClick={() => navigate("/prestamos/nuevo", { state: { selectedClient: cliente } })}
+                           title="Nuevo préstamo"
+                           aria-label="Nuevo préstamo para este cliente"
+                         >
+                           <CreditCard size={15} />
+                         </button>
+                       </>}
                       <button
                         className="table-action"
                         type="button"
@@ -522,13 +537,15 @@ export function ClientesPage() {
         <ClienteDetailModal
           cliente={selectedClient}
           imageUrl={detailImageUrl}
-          onClose={() => setSelectedClient(null)}
-          onNewLoan={() => {
+           onClose={() => setSelectedClient(null)}
+           canCreateLoan={canManageClients}
+           onNewLoan={() => {
+             if (!canManageClients) return;
             const clienteActual = selectedClient;
             setSelectedClient(null);
             navigate("/prestamos/nuevo", { state: { selectedClient: clienteActual } });
           }}
-        />
+          />
       )}
     </section>
   );

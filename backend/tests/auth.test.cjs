@@ -110,6 +110,14 @@ test('roles guard authorizes only the role from request.user', () => {
   assert.throws(() => guard.canActivate(context('VENDEDOR')), /permisos/);
 });
 
+test('COBRADOR is an enum role and is permitted on an operational probe', () => {
+  assert.equal(RolUsuario.COBRADOR, 'COBRADOR');
+  const reflector = { getAllAndOverride: () => [RolUsuario.ADMINISTRADOR, RolUsuario.COBRADOR] };
+  const guard = new RolesGuard(reflector);
+  const context = role => ({ getHandler: () => {}, getClass: () => {}, switchToHttp: () => ({ getRequest: () => ({ user: { rol: role } }) }) });
+  assert.equal(guard.canActivate(context(RolUsuario.COBRADOR)), true);
+});
+
 test('global JwtAuthGuard keeps login public and protects /auth/me over HTTP', async t => {
   process.env.JWT_SECRET = 'integration-secret';
   process.env.JWT_EXPIRES_IN = '2h';
@@ -152,7 +160,7 @@ test('HTTP auth rejects missing, invalid, expired, and inactive tokens', async t
   assert.equal((await request(app, 'GET', '/auth/me', undefined, valid)).status, 401);
 });
 
-test('HTTP role guard permits ADMINISTRADOR and denies VENDEDOR', async t => {
+test('HTTP role guard permits ADMINISTRADOR and denies COBRADOR and VENDEDOR on an admin probe', async t => {
   process.env.JWT_SECRET = 'integration-secret';
   process.env.JWT_EXPIRES_IN = '2h';
   const current = user({ id: 3, rol: RolUsuario.ADMINISTRADOR });
@@ -162,8 +170,12 @@ test('HTTP role guard permits ADMINISTRADOR and denies VENDEDOR', async t => {
   const jwt = app.get(JwtService);
   const token = await jwt.signAsync({ sub: current.id });
   assert.equal((await request(app, 'GET', '/admin-probe', undefined, token)).status, 200);
+  current.rol = RolUsuario.COBRADOR;
+  assert.equal((await request(app, 'GET', '/admin-probe', undefined, token)).status, 403);
+  assert.equal((await request(app, 'GET', '/operational-probe', undefined, token)).status, 200);
   current.rol = RolUsuario.VENDEDOR;
   assert.equal((await request(app, 'GET', '/admin-probe', undefined, token)).status, 403);
+  assert.equal((await request(app, 'GET', '/operational-probe', undefined, token)).status, 403);
 });
 
 test('P8 HTTP payment endpoint rejects missing JWT before invoking persistence', async t => {
@@ -183,10 +195,15 @@ Controller('admin-probe')(AdminProbeController);
 Get()(AdminProbeController.prototype, 'probe', Object.getOwnPropertyDescriptor(AdminProbeController.prototype, 'probe'));
 Roles(RolUsuario.ADMINISTRADOR)(AdminProbeController.prototype, 'probe', Object.getOwnPropertyDescriptor(AdminProbeController.prototype, 'probe'));
 
+class OperationalProbeController { probe() { return { ok: true }; } }
+Controller('operational-probe')(OperationalProbeController);
+Get()(OperationalProbeController.prototype, 'probe', Object.getOwnPropertyDescriptor(OperationalProbeController.prototype, 'probe'));
+Roles(RolUsuario.ADMINISTRADOR, RolUsuario.COBRADOR)(OperationalProbeController.prototype, 'probe', Object.getOwnPropertyDescriptor(OperationalProbeController.prototype, 'probe'));
+
 async function createHttpApp(repository) {
   class TestUsuariosModule {}
   Module({ providers: [{ provide: USUARIO_REPOSITORY, useValue: repository }], exports: [USUARIO_REPOSITORY] })(TestUsuariosModule);
-  const moduleRef = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule], controllers: [AdminProbeController] })
+  const moduleRef = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule], controllers: [AdminProbeController, OperationalProbeController] })
     .overrideModule(UsuariosModule)
     .useModule(TestUsuariosModule)
     .compile();

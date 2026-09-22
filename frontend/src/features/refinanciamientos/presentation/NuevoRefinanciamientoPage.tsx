@@ -224,7 +224,7 @@ export function NuevoRefinanciamientoPage() {
   );
   const { user } = useAuth();
   const navigate = useNavigate();
-  const allowed = user?.rol === "ADMINISTRADOR" || user?.rol === "VENDEDOR";
+  const allowed = user?.rol === "ADMINISTRADOR" || user?.rol === "VENDEDOR" || user?.rol === "COBRADOR";
   const [step, setStep] = useState(1);
   const [loan, setLoan] = useState<PrestamoElegible | null>(null);
   const [preview, setPreview] = useState<RefinanciamientoPreview | null>(null);

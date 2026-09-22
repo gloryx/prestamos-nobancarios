@@ -50,7 +50,7 @@ export class ClientesController {
   async crearCliente(@Body() dto: CrearClienteDto, @UploadedFile() file?: IdentificationFile) { normalizeMultipartDto(dto); const { urlIdentificacion: _ignoredUrl, ...clientDto } = dto; const operation = file ? await this.storage.prepareUpload(dto.identificacion, file) : undefined; try { const result = response(await this.crear.execute({ ...clientDto, urlIdentificacion: operation?.url })); await operation?.commit(); return result; } catch (error) { await operation?.rollback(); throw error; } }
 
   @Get()
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({ summary: 'Listar clientes', description: 'Obtiene los clientes registrados con búsqueda, filtros y paginación.' })
   @ApiQuery({ name: 'pagina', required: false, type: Number, example: 1, default: 1, minimum: 1, description: 'Número de página.' }) @ApiQuery({ name: 'limite', required: false, type: Number, example: 10, default: 10, minimum: 1, maximum: 100, description: 'Cantidad de registros por página.' })
   @ApiQuery({ name: 'buscar', required: false, example: 'perez' }) @ApiQuery({ name: 'direccion', required: false, example: 'San José' }) @ApiQuery({ name: 'activo', required: false, example: true, type: Boolean }) @ApiQuery({ name: 'ordenarPor', required: false, enum: ['identificacion', 'nombre', 'direccion', 'telefono', 'estado'] }) @ApiQuery({ name: 'direccionOrden', required: false, enum: ['ASC', 'DESC'] })
@@ -58,12 +58,12 @@ export class ClientesController {
   async listar(@Query() dto: FiltrosClientesDto) { const result = await this.listarUseCase.execute(dto); return { ...result, datos: result.datos.map(response) }; }
 
   @Get('resumen')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiOperation({ summary: 'Obtener el resumen de clientes' })
   async resumen() { return this.resumirUseCase.execute(); }
 
   @Get(':id/analisis-financiero')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiOperation({ summary: 'Obtener el análisis financiero de un cliente', description: 'Obtiene el resumen y todos los préstamos del cliente con pagos reales y duración calculada.' })
   @ApiParam({ name: 'id', description: 'Identificador del cliente', example: 1 })
   @ApiResponse({ status: 200, description: 'Análisis financiero obtenido correctamente.', type: AnalisisFinancieroResponseDto })
@@ -71,7 +71,7 @@ export class ClientesController {
   async analisisFinanciero(@Param('id', ParseIntPipe) id: number) { return this.analisisUseCase.execute(id); }
 
   @Get(':id/ficha-pdf')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({ summary: 'Descargar la ficha PDF de un cliente' })
   @ApiParam({ name: 'id', description: 'Identificador del cliente', example: 1 })
   @ApiResponse({ status: 200, description: 'Ficha PDF generada correctamente.', content: { 'application/pdf': {} } })
@@ -83,13 +83,13 @@ export class ClientesController {
   }
 
   @Get(':id')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({ summary: 'Obtener un cliente', description: 'Obtiene un cliente por su identificador.' }) @ApiParam({ name: 'id', description: 'Identificador del cliente', example: 1 })
   @ApiResponse({ status: 200, description: 'Cliente obtenido correctamente.', type: ClienteResponseDto }) @ApiResponse({ status: 404, description: 'Cliente no encontrado.', example: { statusCode: 404, message: 'Cliente no encontrado.', error: 'Not Found' } })
   async obtener(@Param('id', ParseIntPipe) id: number) { return response(await this.obtenerUseCase.execute(id)); }
 
   @Get(':id/identificacion-imagen')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({ summary: 'Obtener la imagen de identificación de un cliente' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Imagen de identificación no disponible.' })

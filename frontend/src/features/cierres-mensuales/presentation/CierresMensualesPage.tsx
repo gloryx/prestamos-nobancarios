@@ -19,10 +19,11 @@ export function CierresMensualesPage() {
   const [year, setYear] = useState(Number(today.slice(0, 4))); const [month, setMonth] = useState(Number(today.slice(5, 7)))
   const [preview, setPreview] = useState<ClosingPreview | null>(null); const [history, setHistory] = useState<ClosingSnapshot[]>([])
   const [selected, setSelected] = useState<ClosingSnapshot | null>(null); const [loadingPreview, setLoadingPreview] = useState(true); const [loadingHistory, setLoadingHistory] = useState(true)
-  const [error, setError] = useState(''); const [previewStatus, setPreviewStatus] = useState<number | undefined>(); const [observations, setObservations] = useState(''); const [confirming, setConfirming] = useState(false); const requestSequence = useRef(0)
+  const [error, setError] = useState(''); const [previewStatus, setPreviewStatus] = useState<number | undefined>(); const [observations, setObservations] = useState(''); const [confirming, setConfirming] = useState(false); const requestSequence = useRef(0); const historyRequestSequence = useRef(0); const isMounted = useRef(false)
 
-  const loadHistory = useCallback(async () => { setLoadingHistory(true); try { setHistory(await listClosingSnapshots(repository)); setError('') } catch (reason) { setError(cierreMensualError(reason)) } finally { setLoadingHistory(false) } }, [])
+  const loadHistory = useCallback(async () => { if (!isMounted.current) return; const request = ++historyRequestSequence.current; const isCurrentRequest = () => isMounted.current && request === historyRequestSequence.current; setLoadingHistory(true); try { const result = await listClosingSnapshots(repository); if (isCurrentRequest()) { setHistory(result); setError('') } } catch (reason) { if (isCurrentRequest()) setError(cierreMensualError(reason)) } finally { if (isCurrentRequest()) setLoadingHistory(false) } }, [])
   const loadPreview = useCallback(async () => { const request = ++requestSequence.current; setLoadingPreview(true); setError(''); setPreviewStatus(undefined); try { const result = await previewClosing(repository, year, month); if (request === requestSequence.current) setPreview(result) } catch (reason) { if (request === requestSequence.current) { setPreview(null); setPreviewStatus(cierreMensualStatus(reason)); setError(cierreMensualError(reason)) } } finally { if (request === requestSequence.current) setLoadingPreview(false) } }, [month, year])
+  useEffect(() => { isMounted.current = true; return () => { isMounted.current = false } }, [])
   useEffect(() => { void loadPreview() }, [loadPreview]); useEffect(() => { void loadHistory() }, [loadHistory])
 
   const confirm = async () => {

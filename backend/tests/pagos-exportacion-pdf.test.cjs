@@ -16,7 +16,7 @@ test('D: combined filters use the same shared applyFilters method', () => { asse
 test('E: rows without PlanPago render as a dash and never require a fabricated installment', () => assert.match(fs.readFileSync(path.join(__dirname, '../src/modules/pagos/infrastructure/pdf/pagos-pdf.service.ts'), 'utf8'), /pago\.numeroPago == null \? '—'/));
 test('F: export order is payment date DESC then id DESC', () => assert.match(repositorySource, /listarParaExportacion[\s\S]*orderBy\('pago\.fecha', 'DESC'\)\.addOrderBy\('pago\.id', 'DESC'\)/));
 test('G: export has no silent listing limit or pagination', () => { const method = repositorySource.match(/async listarParaExportacion[\s\S]*?\n   }/)[0]; assert.match(method, /getMany\(\)/); assert.doesNotMatch(method, /skip\(|take\(/); });
-test('H: export remains under the same controller role matrix', () => { assert.match(controllerSource, /@Controller\('pagos'\)/); assert.match(controllerSource, /@Roles\(RolUsuario\.ADMINISTRADOR, RolUsuario\.VENDEDOR\)/); });
+test('H: export remains restricted to administrators', () => { assert.match(controllerSource, /@Controller\('pagos'\)/); assert.match(controllerSource, /@Get\('exportar\/pdf'\) @Roles\(RolUsuario\.ADMINISTRADOR\)/); });
 test('I: PDF endpoint declares the PDF content type and attachment contract', () => { assert.match(controllerSource, /@Get\('exportar\/pdf'\)/); assert.match(controllerSource, /'Content-Type': 'application\/pdf'/); assert.match(controllerSource, /historial-pagos-\$\{desde\}-\$\{hasta\}\.pdf/); });
 test('J: no-filter export defaults the table and totals to REGISTRADO', async () => {
   assert.match(dtoSource, /estado: EstadoPago \| 'TODOS' = EstadoPago\.REGISTRADO/);

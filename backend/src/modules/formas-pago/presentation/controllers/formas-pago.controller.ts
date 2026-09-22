@@ -85,7 +85,7 @@ export class FormasPagoController {
   }
 
   @Get()
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({
     summary: 'Listar formas de pago',
     description: 'Obtiene todas las formas de pago registradas, incluyendo activas e inactivas.',
@@ -107,7 +107,7 @@ export class FormasPagoController {
   }
 
   @Get('administracion')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiOperation({ summary: 'Listar formas de pago para administración con paginación' })
   @ApiQuery({ name: 'pagina', required: false, type: Number, default: 1 })
   @ApiQuery({ name: 'limite', required: false, type: Number, default: 10, maximum: 100 })
@@ -117,7 +117,7 @@ export class FormasPagoController {
   }
 
   @Get(':id')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({
     summary: 'Obtener una forma de pago',
     description: 'Obtiene una forma de pago registrada por su identificador.',

@@ -40,7 +40,7 @@ export class PeriodicidadesPagoController {
   }
 
   @Get()
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({ summary: 'Listar periodicidades de pago', description: 'Obtiene todas las periodicidades de pago registradas, incluyendo activas e inactivas.' })
   @ApiResponse({ status: 200, description: 'Listado de periodicidades de pago obtenido correctamente.', type: PeriodicidadPagoResponseDto, isArray: true, example: [{ id: 1, nombre: 'Diario', activo: true }, { id: 2, nombre: 'Semanal', activo: true }, { id: 3, nombre: 'Quincenal', activo: true }, { id: 4, nombre: 'Mensual', activo: true }] })
   listar() {
@@ -48,7 +48,7 @@ export class PeriodicidadesPagoController {
   }
 
   @Get('administracion')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiOperation({ summary: 'Listar periodicidades de pago para administración con paginación' })
   @ApiQuery({ name: 'pagina', required: false, type: Number, default: 1 })
   @ApiQuery({ name: 'limite', required: false, type: Number, default: 10, maximum: 100 })
@@ -58,7 +58,7 @@ export class PeriodicidadesPagoController {
   }
 
   @Get(':id')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({ summary: 'Obtener una periodicidad de pago', description: 'Obtiene una periodicidad de pago por su identificador.' })
   @ApiParam({ name: 'id', description: 'Identificador de la periodicidad de pago', example: 1 })
   @ApiResponse({ status: 200, description: 'Periodicidad de pago obtenida correctamente.', type: PeriodicidadPagoResponseDto, example: { id: 1, nombre: 'Semanal', activo: true } })

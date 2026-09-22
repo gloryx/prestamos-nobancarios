@@ -8,11 +8,12 @@ import { ActualizarFuenteIngresoUseCase, CambiarEstadoFuenteIngresoUseCase, Crea
 @ApiTags('Fuentes de ingreso')
 @ApiBearerAuth()
 @Controller('fuentes-ingreso')
+@Roles(RolUsuario.ADMINISTRADOR)
 export class FuentesIngresoController {
   constructor(private crear: CrearFuenteIngresoUseCase, private listar: ListarFuentesIngresoUseCase, private obtener: ObtenerFuenteIngresoUseCase, private actualizar: ActualizarFuenteIngresoUseCase, private estado: CambiarEstadoFuenteIngresoUseCase) {}
   @Post() @Roles(RolUsuario.ADMINISTRADOR) @ApiBody({ type: CrearFuenteIngresoDto }) crearFuente(@Body() dto: CrearFuenteIngresoDto) { return this.crear.execute(dto.nombre); }
-  @Get() @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) listarFuentes(@Query() dto: FiltrosFuentesIngresoDto) { return this.listar.execute(dto.activo); }
-  @Get(':id') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) obtenerFuente(@Param('id', ParseIntPipe) id: number) { return this.obtener.execute(id); }
+  @Get() @Roles(RolUsuario.ADMINISTRADOR) listarFuentes(@Query() dto: FiltrosFuentesIngresoDto) { return this.listar.execute(dto.activo); }
+  @Get(':id') @Roles(RolUsuario.ADMINISTRADOR) obtenerFuente(@Param('id', ParseIntPipe) id: number) { return this.obtener.execute(id); }
   @Put(':id') @Roles(RolUsuario.ADMINISTRADOR) @ApiBody({ type: ActualizarFuenteIngresoDto }) actualizarFuente(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarFuenteIngresoDto) { return this.actualizar.execute(id, dto.nombre); }
   @Patch(':id/estado') @Roles(RolUsuario.ADMINISTRADOR) @ApiBody({ type: CambiarEstadoFuenteIngresoDto }) cambiarEstado(@Param('id', ParseIntPipe) id: number, @Body() dto: CambiarEstadoFuenteIngresoDto) { return this.estado.execute(id, dto.activo); }
 }

@@ -1,10 +1,10 @@
-import { Banknote, ChevronDown, ChevronRight, LogOut, X } from "lucide-react";
+import { Banknote, ChevronDown, ChevronRight, LogOut } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/app/providers/auth-context";
 import {
   isGroup,
-  navigation,
+  navigationForRole,
   type NavGroup,
   type NavItem,
 } from "@/config/navigation";
@@ -23,7 +23,7 @@ export function Sidebar({
     .slice(0, 2)
     .join("")
     .toUpperCase();
-  const visibleNavigation = user?.rol === 'VENDEDOR' ? navigation.map((item) => item.label === 'FINANZAS' && isGroup(item) ? { ...item, items: item.items.filter((child) => child.label !== 'Análisis financiero') } : item.label === 'Préstamos' && isGroup(item) ? { ...item, items: item.items.filter((child) => child.label !== 'Gestión de incobrables') } : item.label === 'Configuración' && isGroup(item) ? { ...item, items: item.items.filter((child) => child.label === 'Formas de pago' || child.label === 'Periodicidades') } : item) : navigation;
+  const visibleNavigation = user ? navigationForRole(user.rol) : [];
   const [expanded, setExpanded] = useState<string | null>("Clientes");
   const toggle = (key: string) =>
     setExpanded((current) => (current === key ? null : key));

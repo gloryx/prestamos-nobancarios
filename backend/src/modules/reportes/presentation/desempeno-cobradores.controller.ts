@@ -11,7 +11,7 @@ import { ExportarDesempenoCobradoresPdfUseCase } from '../application/exportar-d
 @ApiTags('Reportes')
 @ApiBearerAuth()
 @Controller('reportes')
-@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+@Roles(RolUsuario.ADMINISTRADOR)
 export class DesempenoCobradoresController {
   constructor(private readonly useCase: DesempenoCobradoresUseCase, private readonly exportPdf: ExportarDesempenoCobradoresPdfUseCase) {}
 

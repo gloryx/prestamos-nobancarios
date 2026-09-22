@@ -9,7 +9,7 @@ import { EstadisticasClientesResponseDto } from './dto/estadisticas-clientes-res
 @ApiTags('Reportes')
 @ApiBearerAuth()
 @Controller('reportes')
-@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+@Roles(RolUsuario.ADMINISTRADOR)
 export class EstadisticasClientesController {
   constructor(private readonly useCase: EstadisticasClientesUseCase) {}
 

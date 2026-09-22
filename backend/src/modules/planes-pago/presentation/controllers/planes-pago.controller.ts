@@ -30,9 +30,9 @@ export class PlanesPagoController {
   async crearPersonalizado(@Param('prestamoId', ParseIntPipe) id: number, @Body() dto: PlanPagoPersonalizadoDto) { return responses(await this.personalizado.execute(id, dto)); }
   @Put('prestamo/:prestamoId/personalizar') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Personalizar la parte futura editable del plan' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiBody({ type: PersonalizarPlanPagoDto }) @ApiResponse({ status: 200, type: PersonalizarPlanPagoResponseDto })
   async personalizarPlan(@Param('prestamoId', ParseIntPipe) id: number, @Body() dto: PersonalizarPlanPagoDto) { return this.personalizar.execute(id, dto); }
-  @Get('prestamo/:prestamoId') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Listar plan de un préstamo' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiResponse({ status: 200, type: [PlanPagoResponseDto] })
+  @Get('prestamo/:prestamoId') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR) @ApiOperation({ summary: 'Listar plan de un préstamo' }) @ApiParam({ name: 'prestamoId', example: 10 }) @ApiResponse({ status: 200, type: [PlanPagoResponseDto] })
   async listarPlan(@Param('prestamoId', ParseIntPipe) id: number) { return responses(await this.listar.execute(id)); }
-  @Get(':id') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR) @ApiOperation({ summary: 'Obtener una cuota' }) @ApiParam({ name: 'id', example: 1 }) @ApiResponse({ status: 200, type: PlanPagoResponseDto }) @ApiResponse({ status: 404, description: 'Cuota del plan de pago no encontrada.' })
+  @Get(':id') @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR) @ApiOperation({ summary: 'Obtener una cuota' }) @ApiParam({ name: 'id', example: 1 }) @ApiResponse({ status: 200, type: PlanPagoResponseDto }) @ApiResponse({ status: 404, description: 'Cuota del plan de pago no encontrada.' })
   async obtenerCuota(@Param('id', ParseIntPipe) id: number) {
     const cuota = await this.obtener.execute(id);
     const enriched = (await this.listar.execute(cuota.prestamoId)).find((item) => item.id === id);

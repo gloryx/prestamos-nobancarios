@@ -133,12 +133,17 @@ const contextFor = rol => ({ getHandler: () => {}, getClass: () => {}, switchToH
 
 test('enforces the ETAPA 1 ADMINISTRADOR/VENDEDOR controller matrix', () => {
   const vendorAllowed = [
-    [ClientesController, 'crearCliente'], [ClientesController, 'actualizar'],
-    [ClientesController, 'obtenerImagen'],
-    [PrestamosController, 'crearPrestamo'], [PrestamosController, 'actualizar'],
-    [PagosController, 'crear'], [RefinanciamientosController, 'crearRefinanciamiento'],
-    [PeriodicidadesPagoController, 'listar'], [PeriodicidadesPagoController, 'obtener'],
-    [FormasPagoController, 'listar'], [FormasPagoController, 'obtener'],
+    [ClientesController, 'crearCliente', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR]],
+    [ClientesController, 'actualizar', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR]],
+    [ClientesController, 'obtenerImagen', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR]],
+    [PrestamosController, 'crearPrestamo', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR]],
+    [PrestamosController, 'actualizar', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR]],
+    [PagosController, 'crear', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR]],
+    [RefinanciamientosController, 'crearRefinanciamiento', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR]],
+    [PeriodicidadesPagoController, 'listar', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR]],
+    [PeriodicidadesPagoController, 'obtener', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR]],
+    [FormasPagoController, 'listar', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR]],
+    [FormasPagoController, 'obtener', [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR]],
   ];
   const vendorBlocked = [
     [UsuariosController, 'listar'], [PeriodicidadesPagoController, 'crear'], [PeriodicidadesPagoController, 'actualizar'],
@@ -148,11 +153,12 @@ test('enforces the ETAPA 1 ADMINISTRADOR/VENDEDOR controller matrix', () => {
     [FuentesIngresoController, 'crearFuente'], [FuentesIngresoController, 'actualizarFuente'],
     [IngresosController, 'crearIngreso'], [IngresosController, 'actualizarIngreso'],
   ];
-  for (const [controller, method] of vendorAllowed) {
+  for (const [controller, method, expectedRoles] of vendorAllowed) {
     const allowed = effectiveRoles(controller, method);
-    assert.deepEqual(allowed, [RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR], `${controller.name}.${method}`);
+    assert.deepEqual(allowed, expectedRoles, `${controller.name}.${method}`);
     assert.equal(guardFor(allowed).canActivate(contextFor(RolUsuario.ADMINISTRADOR)), true);
     assert.equal(guardFor(allowed).canActivate(contextFor(RolUsuario.VENDEDOR)), true);
+    if (expectedRoles.includes(RolUsuario.COBRADOR)) assert.equal(guardFor(allowed).canActivate(contextFor(RolUsuario.COBRADOR)), true);
   }
   for (const [controller, method] of vendorBlocked) {
     const allowed = effectiveRoles(controller, method);

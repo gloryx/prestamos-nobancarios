@@ -24,18 +24,16 @@ export class ConsultarCobrosDelDiaUseCase {
     if (dates.some((date) => !validDate(date))) throw new BadRequestException('Dates must be valid YYYY-MM-DD values.');
     if (query.fechaDesde && query.fechaHasta && query.fechaDesde > query.fechaHasta) throw new BadRequestException('fechaDesde must be before or equal to fechaHasta.');
 
-    const filas = await this.repository.consultar(query);
+    const result = await this.repository.consultar(query);
     return {
       fecha: query.fecha ?? null,
       fechaDesde: query.fechaDesde ?? query.fecha ?? null,
       fechaHasta: query.fechaHasta ?? query.fecha ?? null,
-      filas,
+      porCobrar: result.porCobrar,
+      pagaron: result.pagaron,
       totales: {
-        cantidadProgramados: filas.length,
-        cantidadPagados: filas.filter((row) => row.estado === 'PAGADO').length,
-        cantidadPendientes: filas.filter((row) => row.estado === 'PENDIENTE').length,
-        montoProgramado: sumMoney(filas.map((row) => row.montoProgramado)),
-        montoRecibido: sumMoney(filas.map((row) => row.montoPagado)),
+        porCobrar: { cantidad: result.porCobrar.length, monto: sumMoney(result.porCobrar.map((row) => row.saldoPendiente)) },
+        pagaron: { cantidad: result.pagaron.length, monto: sumMoney(result.pagaron.map((row) => row.monto)) },
       },
     };
   }

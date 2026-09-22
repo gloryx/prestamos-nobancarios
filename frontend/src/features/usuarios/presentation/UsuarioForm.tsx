@@ -10,7 +10,7 @@ const schema = (isEditing: boolean) => z.object({
   nombreCompleto: z.string().trim().min(1, 'El nombre es obligatorio.').max(200, 'Máximo 200 caracteres.'),
   telefono: z.string().max(30, 'Máximo 30 caracteres.'),
   correo: z.union([z.literal(''), z.string().email('Ingresá un correo válido.').max(150, 'Máximo 150 caracteres.')]),
-  rol: z.enum(['ADMINISTRADOR', 'VENDEDOR']),
+  rol: z.enum(['ADMINISTRADOR', 'VENDEDOR', 'COBRADOR']),
   password: isEditing
     ? z.union([z.literal(''), z.string().min(8, 'Mínimo 8 caracteres.').max(200, 'Máximo 200 caracteres.')])
     : z.string().min(8, 'Mínimo 8 caracteres.').max(200, 'Máximo 200 caracteres.'),
@@ -47,7 +47,7 @@ export function UsuarioForm({ usuario, onCancel, onSubmit }: { usuario?: Usuario
       <label>Nombre completo<input {...register('nombreCompleto')} aria-invalid={!!errors.nombreCompleto} />{errors.nombreCompleto && <small className="field-error">{errors.nombreCompleto.message}</small>}</label>
       <label>Teléfono<input {...register('telefono')} />{errors.telefono && <small className="field-error">{errors.telefono.message}</small>}</label>
       <label>Correo electrónico<input type="email" {...register('correo')} />{errors.correo && <small className="field-error">{errors.correo.message}</small>}</label>
-      <label>Rol<select {...register('rol')}><option value="VENDEDOR">Vendedor</option><option value="ADMINISTRADOR">Administrador</option></select></label>
+       <label>Rol<select {...register('rol')}><option value="VENDEDOR">Vendedor</option><option value="ADMINISTRADOR">Administrador</option><option value="COBRADOR">Cobrador</option></select></label>
       {!usuario && <label>Contraseña<div className="password-field"><input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...register('password')} /><button type="button" className="password-toggle" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>{errors.password && <small className="field-error">{errors.password.message}</small>}</label>}
     </div>
     <div className="usuario-form-actions"><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button><button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar usuario'}</button></div>

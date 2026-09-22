@@ -14,6 +14,7 @@ import { CierreMensualPreviewResponseDto, CierreMensualResponseDto } from './cie
 @Controller('configuracion-financiera')
 @ApiBearerAuth()
 @ApiTags('Cierre financiero')
+@Roles(RolUsuario.ADMINISTRADOR)
 export class ConfiguracionFinancieraController {
   constructor(@InjectDataSource() private readonly db: DataSource, private readonly service: FinancialPeriodService) {}
   @Get() @ApiOperation({ summary: 'Consultar configuración financiera' }) @ApiResponse({ status: 200, description: 'Configuración actual o null si aún no existe.' }) @ApiResponse({ status: 401, description: 'No autenticado.' }) async get() { const config = await this.db.getRepository(ConfiguracionFinancieraOrmEntity).findOne({ where: { singletonKey: 'FINANCIERA' } }); if (!config) return null; const { usuarioAperturaId, singletonKey, ...safe } = config; return safe; }
@@ -25,6 +26,7 @@ export class ConfiguracionFinancieraController {
 @Controller('cortes-mensuales')
 @ApiBearerAuth()
 @ApiTags('Cierre financiero')
+@Roles(RolUsuario.ADMINISTRADOR)
 export class CortesMensualesController {
   constructor(@InjectDataSource() private readonly db: DataSource, private readonly service: FinancialPeriodService) {}
   @Get('vista-previa') @ApiOperation({ summary: 'Previsualizar cierre mensual', description: 'Preview dinámica e informativa: no persiste, no crea Caja y excluye explícitamente el módulo Ingresos. La confirmación siempre recalcula.' }) @ApiResponse({ status: 200, type: CierreMensualPreviewResponseDto }) @ApiResponse({ status: 400, description: 'Período inválido.' }) @ApiResponse({ status: 401, description: 'No autenticado.' }) @ApiResponse({ status: 409, description: 'Salto o período ya cerrado.' }) preview(@Query() dto: PeriodoDto) { return this.db.transaction(m => this.service.previewClose(m, dto.anio, dto.mes)); }

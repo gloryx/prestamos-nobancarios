@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/app/providers/auth-context";
 import { formatCRC } from "@/shared/utils/currency";
 import { formatDateOnly } from "@/shared/utils/date";
 import {
@@ -79,6 +80,8 @@ export function PrestamoDetailModal({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = user?.rol === "ADMINISTRADOR" || user?.rol === "VENDEDOR";
   const [prestamo, setPrestamo] = useState<Prestamo | null>(null);
   const [summary, setSummary] = useState<PagoResumen | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,7 +186,7 @@ export function PrestamoDetailModal({
           </>
         )}
         <div className="prestamo-detail-actions">
-          {prestamo && prestamo.estado !== "CANCELADO" && prestamo.estado !== "ANULADO" && (
+           {canEdit && prestamo && prestamo.estado !== "CANCELADO" && prestamo.estado !== "ANULADO" && (
             <button className="primary-button" type="button" onClick={() => { onClose(); navigate(`/prestamos/${prestamo.id}/editar`); }}>
               <Pencil size={15} /> Editar préstamo
             </button>
@@ -198,6 +201,9 @@ export function PrestamoDetailModal({
 }
 
 export function PrestamosListPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.rol === "ADMINISTRADOR";
+  const canEdit = isAdmin || user?.rol === "VENDEDOR";
   const location = useLocation();
   const [page, setPage] = useState<PrestamoPage | null>(null);
   const [summary, setSummary] = useState<PrestamosResumen | null>(null);
@@ -315,8 +321,15 @@ export function PrestamosListPage() {
     void loadList();
   }, [loadList]);
   useEffect(() => {
+    if (!isAdmin) {
+      summaryRequestId.current += 1;
+      setSummary(null);
+      setSummaryLoading(false);
+      setSummaryError("");
+      return;
+    }
     void loadSummary();
-  }, [loadSummary]);
+  }, [isAdmin, loadSummary]);
   useEffect(() => {
     if (openActionMenu === null) return;
     const closeOnPointerDown = (event: PointerEvent) => {
@@ -337,7 +350,7 @@ export function PrestamosListPage() {
   const datosFiltrados = page?.datos ?? [];
   const reload = () => {
     void loadList();
-    void loadSummary();
+    if (isAdmin) void loadSummary();
   };
   const total = page?.total ?? 0;
   const totalPages = page?.totalPaginas ?? 0;
@@ -349,13 +362,7 @@ export function PrestamosListPage() {
     if (exportLoading) return;
     setExportLoading(true);
     try {
-      await descargarPrestamosExcel(repository, {
-        buscar: buscar.trim() || undefined,
-        direccion: direccion.trim() || undefined,
-         estados: ["ACTIVO"],
-        fechaInicio: fechaInicio || undefined,
-        fechaFin: fechaFin || undefined,
-      });
+      await descargarPrestamosExcel(repository, buildFilterValues());
     } catch {
       setError("No se pudo generar el archivo Excel.");
     } finally {
@@ -388,10 +395,10 @@ export function PrestamosListPage() {
           <p className="muted">Préstamos en gestión normal de cobro.</p>
         </div>
         <div className="prestamos-list-header-actions">
-          <Link className="primary-button" to="/prestamos/nuevo">
+          {canEdit && <Link className="primary-button" to="/prestamos/nuevo">
             Nuevo préstamo
-          </Link>
-          <button
+          </Link>}
+          {isAdmin && <button
             className="secondary-button"
             type="button"
             onClick={() => void exportar()}
@@ -399,7 +406,7 @@ export function PrestamosListPage() {
           >
             <Download size={16} />
             {exportLoading ? "Generando Excel..." : "Descargar Excel"}
-          </button>
+          </button>}
         </div>
       </div>
       <div className="panel prestamos-list-filters">
@@ -453,8 +460,8 @@ export function PrestamosListPage() {
           {dateValidation}
         </p>
       )}
-      <div
-        className="prestamos-financial-summary"
+       {isAdmin && <div
+         className="prestamos-financial-summary"
         aria-label="Resumen financiero"
       >
         <div>
@@ -463,14 +470,14 @@ export function PrestamosListPage() {
             {summary ? summary.total.toLocaleString("es-CR") : "—"}
           </strong>
         </div>
-        <div>
-          <span>PRESTADO</span>
-          <strong>{summary ? formatCRC(summary.prestado) : "—"}</strong>
-        </div>
-        <div>
-          <span>GANANCIA</span>
-          <strong>{summary ? formatCRC(summary.ganancia) : "—"}</strong>
-        </div>
+         <div>
+           <span>PRESTADO</span>
+           <strong>{summary ? formatCRC(summary.prestado) : "—"}</strong>
+         </div>
+         <div>
+           <span>GANANCIA</span>
+           <strong>{summary ? formatCRC(summary.ganancia) : "—"}</strong>
+         </div>
         <div>
           <span>RECUPERADO</span>
           <strong>{summary ? formatCRC(summary.recuperado) : "—"}</strong>
@@ -485,8 +492,8 @@ export function PrestamosListPage() {
             {summaryError}
           </small>
         )}
-      </div>
-      {notice && (
+       </div>}
+       {notice && (
         <p className="prestamos-list-notice" role="status">
           <CircleAlert size={15} />
           {notice}
@@ -678,7 +685,7 @@ export function PrestamosListPage() {
                           </button>
                            {openActionMenu === prestamo.id && <div className="prestamos-list-row-menu-content" role="menu">
                              <button type="button" role="menuitem" onClick={() => { setSelected(prestamo.id); setOpenActionMenu(null); }}><Eye size={15} /> Ver préstamo</button>
-                             {prestamo.estado !== "CANCELADO" && prestamo.estado !== "ANULADO" && <Link role="menuitem" to={`/prestamos/${prestamo.id}/editar`} onClick={() => setOpenActionMenu(null)}><Pencil size={15} /> Editar préstamo</Link>}
+                              {canEdit && prestamo.estado !== "CANCELADO" && prestamo.estado !== "ANULADO" && <Link role="menuitem" to={`/prestamos/${prestamo.id}/editar`} onClick={() => setOpenActionMenu(null)}><Pencil size={15} /> Editar préstamo</Link>}
                            </div>}
                       </div>
                        {prestamo.estado === "ACTIVO" && <Link className="table-action" title="Registrar pago" to="/pagos/registrar" state={{ prestamoId: prestamo.id }}>

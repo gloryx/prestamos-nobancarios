@@ -12,6 +12,7 @@ const safe = (v: any) => ({ ...v, fuenteIngreso: v.fuenteIngreso && { id: v.fuen
 @ApiTags('Ingresos')
 @ApiBearerAuth()
 @Controller('ingresos')
+@Roles(RolUsuario.ADMINISTRADOR)
 export class IngresosController {
   constructor(private crear: CrearIngresoUseCase, private listar: ListarIngresosUseCase, private obtener: ObtenerIngresoUseCase, private actualizar: ActualizarIngresoUseCase) {}
 
@@ -25,7 +26,7 @@ export class IngresosController {
   async crearIngreso(@Body() dto: CrearIngresoDto, @Req() request: AuthenticatedRequest) { return safe(await this.crear.execute(dto, authenticatedUserId(request))); }
 
   @Get()
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiOperation({ summary: 'Listar ingresos', description: 'Obtiene ingresos con paginación, búsqueda, fuente y rango de fechas.' })
   @ApiQuery({ name: 'page', required: false, type: Number, default: 1, minimum: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, default: 10, minimum: 1, maximum: 100 })
@@ -37,7 +38,7 @@ export class IngresosController {
   async listarIngresos(@Query() dto: FiltrosIngresosDto) { const r = await this.listar.execute(dto); return { ...r, datos: r.datos.map(safe) }; }
 
   @Get(':id')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiOperation({ summary: 'Obtener un ingreso', description: 'Obtiene un ingreso por su identificador.' })
   @ApiResponse({ status: 200, description: 'Ingreso obtenido correctamente.', type: IngresoResponseDto })
   @ApiResponse({ status: 404, description: 'Ingreso no encontrado.' })

@@ -44,7 +44,7 @@ export function AppRouter() {
           <Route path="login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route index element={<DashboardPage />} />
+              <Route index element={<ProtectedRoute role="ADMINISTRADOR"><DashboardPage /></ProtectedRoute>} />
               <Route element={<ProtectedRoute role="ADMINISTRADOR" />}>
                 <Route path="configuracion/usuarios" element={<UsuariosPage />} />
                 <Route path="configuracion/financiera" element={<ConfiguracionFinancieraPage />} />
@@ -57,30 +57,30 @@ export function AppRouter() {
                 <Route path="finanzas/caja/operaciones" element={<OperacionesCajaPage />} />
                 <Route path="finanzas/cierres" element={<CierresMensualesPage />} />
               </Route>
-              <Route path="configuracion/formas-de-pago" element={<FormasPagoPage />} />
-              <Route path="configuracion/periodicidades" element={<PeriodicidadesPage />} />
+              <Route path="configuracion/formas-de-pago" element={<ProtectedRoute role={["ADMINISTRADOR", "VENDEDOR"]}><FormasPagoPage /></ProtectedRoute>} />
+              <Route path="configuracion/periodicidades" element={<ProtectedRoute role={["ADMINISTRADOR", "VENDEDOR"]}><PeriodicidadesPage /></ProtectedRoute>} />
               <Route path="clientes" element={<ClientesPage />} />
-              <Route path="clientes/nuevo" element={<ClientesPage />} />
-              <Route path="clientes/:id/editar" element={<ClientesPage />} />
-              <Route path="clientes/analisis-financiero" element={<AnalisisFinancieroClientePage />} />
-              <Route path="clientes/reporte" element={<EstadisticasClientesPage />} />
+              <Route path="clientes/nuevo" element={<ProtectedRoute role={["ADMINISTRADOR", "VENDEDOR"]}><ClientesPage /></ProtectedRoute>} />
+              <Route path="clientes/:id/editar" element={<ProtectedRoute role={["ADMINISTRADOR", "VENDEDOR"]}><ClientesPage /></ProtectedRoute>} />
+              <Route path="clientes/analisis-financiero" element={<ProtectedRoute role="ADMINISTRADOR"><AnalisisFinancieroClientePage /></ProtectedRoute>} />
+              <Route path="clientes/reporte" element={<ProtectedRoute role="ADMINISTRADOR"><EstadisticasClientesPage /></ProtectedRoute>} />
               <Route path="prestamos" element={<PrestamosListPage />} />
               <Route path="prestamos/saldados" element={<SaldadosPage />} />
-              <Route path="prestamos/nuevo" element={<PrestamosPage />} />
-              <Route path="prestamos/:id/editar" element={<PrestamosPage />} />
-              <Route path="prestamos/seguimiento-cartera" element={<SeguimientoCarteraPage />} />
-              <Route path="prestamos/reporte" element={<RentabilidadCanceladosPage />} />
-              <Route path="finanzas/caja/cortes/rentabilidad-cancelados" element={<RentabilidadCanceladosPage />} />
-              <Route path="finanzas/reportes/flujo-prestamos" element={<FlujoPrestamosPage />} />
-              <Route path="finanzas/reportes/forma-pago" element={<FormaPagoReportPage />} />
+              <Route path="prestamos/nuevo" element={<ProtectedRoute role={["ADMINISTRADOR", "VENDEDOR"]}><PrestamosPage /></ProtectedRoute>} />
+              <Route path="prestamos/:id/editar" element={<ProtectedRoute role={["ADMINISTRADOR", "VENDEDOR"]}><PrestamosPage /></ProtectedRoute>} />
+              <Route path="prestamos/seguimiento-cartera" element={<ProtectedRoute role="ADMINISTRADOR"><SeguimientoCarteraPage /></ProtectedRoute>} />
+              <Route path="prestamos/reporte" element={<ProtectedRoute role="ADMINISTRADOR"><RentabilidadCanceladosPage /></ProtectedRoute>} />
+              <Route path="finanzas/caja/cortes/rentabilidad-cancelados" element={<ProtectedRoute role="ADMINISTRADOR"><RentabilidadCanceladosPage /></ProtectedRoute>} />
+              <Route path="finanzas/reportes/flujo-prestamos" element={<ProtectedRoute role="ADMINISTRADOR"><FlujoPrestamosPage /></ProtectedRoute>} />
+              <Route path="finanzas/reportes/forma-pago" element={<ProtectedRoute role="ADMINISTRADOR"><FormaPagoReportPage /></ProtectedRoute>} />
               <Route path="pagos/registrar" element={<RegistrarPagoPage />} />
               <Route path="pagos" element={<CobrosDelDiaPage />} />
-              <Route path="pagos/historial" element={<HistorialPagosPage />} />
-              <Route path="reportes/pagos/desempeno-cobradores" element={<DesempenoCobradoresPage />} />
+              <Route path="pagos/historial" element={<ProtectedRoute role="ADMINISTRADOR"><HistorialPagosPage /></ProtectedRoute>} />
+              <Route path="reportes/pagos/desempeno-cobradores" element={<ProtectedRoute role="ADMINISTRADOR"><DesempenoCobradoresPage /></ProtectedRoute>} />
               <Route path="refinanciamientos" element={<RefinanciamientosPage />} />
               <Route path="refinanciamientos/nuevo" element={<NuevoRefinanciamientoPage />} />
               <Route path="refinanciamientos/cadenas" element={<CadenasRefinanciamientoPage />} />
-              <Route path="refinanciamientos/reporte" element={<RefinanciamientosReportePage />} />
+              <Route path="refinanciamientos/reporte" element={<ProtectedRoute role="ADMINISTRADOR"><RefinanciamientosReportePage /></ProtectedRoute>} />
               <Route path="*" element={<PlaceholderPage />} />
             </Route>
           </Route>

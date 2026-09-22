@@ -43,7 +43,7 @@ export class UsuariosController {
   @ApiResponse({ status: 200, type: UsuariosPaginadosResponseDto })
   async listar(@Query() dto: FiltrosUsuariosDto) { const result = await this.listarUseCase.execute(dto); return { ...result, datos: result.datos.map(response) }; }
   @Get('selector')
-  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.VENDEDOR, RolUsuario.COBRADOR)
   @ApiOperation({ summary: 'Listar usuarios activos para selectores' })
   @ApiResponse({ status: 200, type: UsuarioSelectorResponseDto, isArray: true })
   listarSelector() { return this.listarSelectorUseCase.execute(); }
